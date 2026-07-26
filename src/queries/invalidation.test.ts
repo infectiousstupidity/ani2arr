@@ -11,7 +11,10 @@ import {
 	invalidateAfterProviderLibraryChange,
 	resetAfterProviderConnectionChange,
 } from "@/queries/invalidation";
-import { queryKeys } from "@/queries/query-keys";
+import {
+	normalizeSeerrTargetInput,
+	queryKeys,
+} from "@/queries/query-keys";
 
 const aid = (value: number): AniListId => value as AniListId;
 
@@ -75,7 +78,9 @@ describe("query invalidation helpers", () => {
 		const inspection = queryKeys.mappingInspection("sonarr", aid(1));
 		const changedProviderLookup = queryKeys.providerLookup("sonarr", "test");
 		const otherProviderLookup = queryKeys.providerLookup("radarr", "test");
-		const seerrTarget = queryKeys.seerrTarget(aid(1));
+		const seerrTarget = queryKeys.seerrTarget(
+			normalizeSeerrTargetInput(aid(1)),
+		);
 		const seerrTargets = queryKeys.seerrTargets([aid(1)]);
 		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
 			mediaType: "movie",
@@ -119,7 +124,9 @@ describe("query invalidation helpers", () => {
 
 	it("invalidates effective Seerr reads after a Radarr mapping change", () => {
 		const queryClient = createQueryClient();
-		const seerrTarget = queryKeys.seerrTarget(aid(1));
+		const seerrTarget = queryKeys.seerrTarget(
+			normalizeSeerrTargetInput(aid(1)),
+		);
 		const seerrTargets = queryKeys.seerrTargets([aid(1), aid(2)]);
 		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
 			mediaType: "movie",
@@ -153,7 +160,9 @@ describe("query invalidation helpers", () => {
 		});
 		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
 		const radarrLookup = queryKeys.providerLookup("radarr", "test");
-		const seerrTarget = queryKeys.seerrTarget(aid(1));
+		const seerrTarget = queryKeys.seerrTarget(
+			normalizeSeerrTargetInput(aid(1)),
+		);
 		const seerrTargets = queryKeys.seerrTargets([aid(1), aid(2)]);
 		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
 			mediaType: "movie",

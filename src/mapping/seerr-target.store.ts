@@ -6,14 +6,9 @@ import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import {
 	parseSourceIdentityKey,
 	sourceIdentityKey,
+	storageIdentity,
 	type SourceIdentity,
 } from "@/mapping/source-identity";
-import {
-	parseTmdbIdOrNull,
-	parseTvdbIdOrNull,
-	type TmdbId,
-	type TvdbId,
-} from "@/providers/schemas";
 import {
 	getSeerrAutoResult,
 	listAniListSeerrAutoResults,
@@ -25,35 +20,14 @@ import {
 	listSeerrUpstreamTargets,
 	type SeerrUpstreamRecord,
 } from "./upstream.store";
+import {
+	normalizeSeerrTarget,
+	type SeerrTarget,
+} from "./seerr-target";
 import type { SeerrUpstreamTarget } from "./types";
 
-type AniListManualSeerrTarget = {
-	anilistId: AniListId;
-} & (
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			tvdbId?: TvdbId;
-			seasons?: number[];
-	  }
-);
-
-type StoredManualSeerrTarget =
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			tvdbId?: TvdbId;
-			seasons?: number[];
-	  };
-type ManualSeerrTargets = Record<string, StoredManualSeerrTarget>;
+type AniListManualSeerrTarget = { anilistId: AniListId } & SeerrTarget;
+type ManualSeerrTargets = Record<string, SeerrTarget>;
 
 export type SeerrTargetIdentity = {
 	identity: SourceIdentity;
@@ -66,7 +40,7 @@ export type EffectiveSeerrTarget =
 	| ({
 			anilistId?: AniListId | undefined;
 			source: "manual";
-	  } & StoredManualSeerrTarget)
+	  } & SeerrTarget)
 	| ({
 			anilistId?: AniListId | undefined;
 			source: "anibridge";
@@ -74,7 +48,7 @@ export type EffectiveSeerrTarget =
 	| ({
 			anilistId?: AniListId | undefined;
 			source: "automatic";
-	  } & StoredManualSeerrTarget);
+	  } & SeerrTarget);
 
 type AniListEffectiveSeerrTarget = EffectiveSeerrTarget & {
 	anilistId: AniListId;
@@ -89,33 +63,6 @@ const manualSeerrTargets = storage.defineItem<ManualSeerrTargets>(
 
 let writes: Promise<void> = Promise.resolve();
 
-function normalizeSeasons(seasons: readonly number[]): number[] {
-	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((left, right) => left - right);
-}
-
-function normalizeTarget(
-	target: StoredManualSeerrTarget,
-): StoredManualSeerrTarget | null {
-	const tmdbId = parseTmdbIdOrNull(target.tmdbId);
-	if (tmdbId === null) return null;
-
-	if (target.mediaType === "movie") {
-		return { mediaType: "movie", tmdbId };
-	}
-
-	const seasons = normalizeSeasons(target.seasons ?? []);
-
-	const tvdbId = parseTvdbIdOrNull(target.tvdbId);
-	return {
-		mediaType: "tv",
-		tmdbId,
-		...(seasons.length === 0 ? {} : { seasons }),
-		...(tvdbId === null ? {} : { tvdbId }),
-	};
-}
-
 function normalizeManualSeerrTargets(
 	targets: ManualSeerrTargets,
 ): ManualSeerrTargets {
@@ -123,7 +70,7 @@ function normalizeManualSeerrTargets(
 
 	for (const [rawKey, target] of Object.entries(targets)) {
 		const identity = parseSourceIdentityKey(rawKey);
-		const normalized = normalizeTarget(target);
+		const normalized = normalizeSeerrTarget(target);
 		if (identity !== null && normalized !== null) {
 			normalizedTargets[sourceIdentityKey(identity)] = normalized;
 			continue;
@@ -148,7 +95,7 @@ function normalizeManualSeerrTargets(
 function getStoredManualTarget(
 	targets: ManualSeerrTargets,
 	identity: SourceIdentity,
-): StoredManualSeerrTarget | null {
+): SeerrTarget | null {
 	return targets[sourceIdentityKey(identity)] ?? null;
 }
 
@@ -168,32 +115,16 @@ async function getManualSeerrTarget(input: SeerrTargetIdentityInput) {
 	const targets = normalizeManualSeerrTargets(
 		await manualSeerrTargets.getValue(),
 	);
-	const direct = getStoredManualTarget(targets, normalizedInput.identity);
-	if (direct) {
-		return {
-			...direct,
-			...(normalizedInput.anilistId === undefined
-				? {}
-				: { anilistId: normalizedInput.anilistId }),
-			source: "manual" as const,
-		};
-	}
-
-	if (
-		normalizedInput.anilistId === undefined ||
-		normalizedInput.identity.source === "anilist"
-	) {
-		return null;
-	}
-
-	const canonical = getStoredManualTarget(targets, {
-		source: "anilist",
-		id: normalizedInput.anilistId,
-	});
-	return canonical
+	const target = getStoredManualTarget(
+		targets,
+		storageIdentity(normalizedInput.identity, normalizedInput.anilistId),
+	);
+	return target
 		? {
-				...canonical,
-				anilistId: normalizedInput.anilistId,
+				...target,
+				...(normalizedInput.anilistId === undefined
+					? {}
+					: { anilistId: normalizedInput.anilistId }),
 				source: "manual" as const,
 			}
 		: null;
@@ -267,7 +198,10 @@ export async function getEffectiveSeerrTarget(
 		};
 	}
 
-	const automatic = await getSeerrAutoResult(normalizedInput.identity);
+	const automatic = await getSeerrAutoResult(
+		normalizedInput.identity,
+		anilistId,
+	);
 	if (automatic?.kind !== "mapped") return null;
 	return {
 		...(anilistId === undefined ? {} : { anilistId }),
@@ -306,34 +240,20 @@ export async function listAllEffectiveSeerrTargets(): Promise<
 }
 
 export async function setManualSeerrTarget(
-	input:
-		(SeerrTargetIdentity & StoredManualSeerrTarget) | AniListManualSeerrTarget,
+	input: (SeerrTargetIdentity & SeerrTarget) | AniListManualSeerrTarget,
 ): Promise<void> {
 	const identity =
 		"identity" in input
 			? input.identity
 			: ({ source: "anilist", id: input.anilistId } as const);
 	const anilistId = input.anilistId;
-	const storedTarget: StoredManualSeerrTarget =
-		input.mediaType === "movie"
-			? { mediaType: "movie", tmdbId: input.tmdbId }
-			: {
-					mediaType: "tv",
-					tmdbId: input.tmdbId,
-					...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
-					...(input.seasons === undefined ? {} : { seasons: input.seasons }),
-				};
-	const normalized = normalizeTarget(storedTarget);
+	const normalized = normalizeSeerrTarget(input);
 	if (normalized === null) {
 		throw new Error("Invalid Seerr target.");
 	}
 	await updateManualSeerrTargets((targets) => {
-		if (anilistId !== undefined && identity.source !== "anilist") {
-			delete targets[
-				sourceIdentityKey({ source: "anilist", id: anilistId })
-			];
-		}
-		targets[sourceIdentityKey(identity)] = normalized;
+		const selected = storageIdentity(identity, anilistId);
+		targets[sourceIdentityKey(selected)] = normalized;
 	});
 }
 
@@ -342,15 +262,11 @@ export async function clearManualSeerrTarget(
 ): Promise<void> {
 	const normalizedInput = normalizeIdentityInput(input);
 	await updateManualSeerrTargets((targets) => {
-		delete targets[sourceIdentityKey(normalizedInput.identity)];
-		if (normalizedInput.anilistId !== undefined) {
-			delete targets[
-				sourceIdentityKey({
-					source: "anilist",
-					id: normalizedInput.anilistId,
-				})
-			];
-		}
+		const selected = storageIdentity(
+			normalizedInput.identity,
+			normalizedInput.anilistId,
+		);
+		delete targets[sourceIdentityKey(selected)];
 	});
 }
 

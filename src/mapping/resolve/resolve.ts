@@ -11,7 +11,10 @@ import {
 import type { MyAnimeListId } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import { setAutoResult } from "../auto.store";
-import type { SourceIdentity } from "../source-identity";
+import {
+	storageIdentity,
+	type SourceIdentity,
+} from "../source-identity";
 import {
 	searchCandidate,
 	type ProviderCandidateSearch,
@@ -162,16 +165,17 @@ export function createAutomaticResolver(dependencies: {
 			}
 		}
 
+		const result: Parameters<typeof setAutoResult>[2] = match
+			? {
+					kind: "mapped",
+					providerId: match.providerId,
+					matchedTitle: match.matchedTitle,
+				}
+			: { kind: "unmapped" };
 		await setAutoResult(
 			provider,
-			identity,
-			match
-				? {
-						kind: "mapped",
-						providerId: match.providerId,
-						matchedTitle: match.matchedTitle,
-					}
-				: { kind: "unmapped" },
+			storageIdentity(identity, anilistId ?? undefined),
+			result,
 		);
 		return true;
 	};

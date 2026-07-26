@@ -42,7 +42,7 @@ describe("auto mapping store", () => {
 		).resolves.toMatchObject({
 			[AUTO_STORAGE_KEY]: {
 				radarr: {
-					1: { kind: "mapped", providerId: tmdb(10) },
+					"anilist:1": { kind: "mapped", providerId: tmdb(10) },
 				},
 			},
 		});

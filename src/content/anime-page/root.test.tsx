@@ -108,8 +108,12 @@ describe("ContentRoot", () => {
 		expect(view).toContain("Actions");
 		expect(view).toContain("Configure Seerr");
 		expect(useSeerrTarget).toHaveBeenCalledWith(
-			{ source },
-			{ enabled: true },
+			{
+				source,
+				title: "Kaguya-sama: The First Kiss That Never Ends",
+				metadata,
+			},
+			{ enabled: false },
 		);
 	});
 

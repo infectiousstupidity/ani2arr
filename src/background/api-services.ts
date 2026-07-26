@@ -16,6 +16,7 @@ import {
 } from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
+import { createSeerrAutoResolver } from "@/mapping/resolve/seerr-auto-resolver";
 import { clearUpstreamMappings } from "@/mapping/upstream.store";
 import { MyAnimeListMediaService } from "@/myanimelist/media.service";
 import { metadataHintFromMyAnimeListMetadata } from "@/myanimelist/types";
@@ -52,7 +53,6 @@ import {
 	resetAllRevisions,
 } from "@/rpc/revision-signals";
 import { fetchProviderCandidates } from "./provider-candidate-search";
-import { createSeerrAutoResolver } from "./seerr-auto-resolver";
 import {
 	requireProviderCredentials,
 	requireSeerrConnection,

@@ -1,8 +1,9 @@
 # Mapping architecture
 
-Upstream provider facts, manual decisions, and automatic results are keyed by
-the page's `SourceIdentity`. A linked AniList ID is used only for metadata
-fallback and narrow reads of records written before source-native storage.
+Upstream facts keep the page's `SourceIdentity`. Durable manual and automatic
+results use the linked AniList identity when one exists, or the page identity
+when it does not. Released numeric AniList keys remain readable and are
+rewritten as `anilist:<id>` by a later mutation.
 
 Mapping owns facts and effective AniList-to-provider mapping results. It does
 not own provider library state or RPC presentation DTOs.
@@ -10,14 +11,14 @@ not own provider library state or RPC presentation DTOs.
 ## Stored facts
 
 - `manual.store.ts` stores user mappings, ignores, and rejected automatic
-  candidates by source identity. Rejected IDs are facts attached to the manual
-  record.
+  candidates by durable storage identity. Rejected IDs are facts attached to
+  the manual record.
 - `upstream.store.ts` stores source-native AniBridge targets plus source
   crosswalks and refresh metadata. It does not persist Sonarr, Radarr, or Seerr
   projections.
-- `auto.store.ts` stores expiring automatic results by source identity. AniList
-  identities keep their numeric keys; MAL sources use keys such as
-  `mal:63816`. Expired reads return no result and do not mutate storage.
+- `auto.store.ts` stores expiring automatic results by durable storage identity,
+  using keys such as `anilist:209939` or `mal:63816`. Expired reads return no
+  result and do not mutate storage.
 - `seerr-target.store.ts` stores user-owned manual Seerr overrides separately
   from downloaded AniBridge data.
 
@@ -44,9 +45,9 @@ unmapped
 ```
 
 Manual mappings may match and therefore be reported as upstream, but user intent
-still wins. Automatic results never resolve upstream ambiguity. A single Sonarr
-season scope is preserved; multiple scopes for one TVDB ID resolve as the
-unscoped series identity.
+still wins. Automatic results never resolve upstream ambiguity. Every distinct
+Sonarr `(TVDB ID, season)` pair is preserved; several pairs use the existing
+ambiguous result instead of widening to an unscoped series.
 
 AniBridge projections are derived on read:
 
@@ -71,13 +72,15 @@ rejected provider IDs
 The resolver searches page titles first, then linked AniList metadata when that
 capability exists, then known prequel relations. It never branches on the
 content site's name or reconstructs an AniList ID from the source key. Mapped
-and unmapped results use one write path under the page source identity.
+and unmapped results use one write path under the durable storage identity.
 
 ## Effective Seerr targets
 
 Seerr targets are derived from AniList-source AniBridge external IDs. TV targets
-require one unambiguous TMDB show ID and at least one valid season. A manual
-Seerr target overrides the derived target for the same AniList ID.
+require one unambiguous TMDB show ID; a unique TVDB ID and scoped seasons are
+retained when available. TVDB-only facts are treated as missing so automatic
+TMDB resolution can run. A manual Seerr target overrides the derived target for
+the same durable storage identity.
 
 ## Library boundary
 

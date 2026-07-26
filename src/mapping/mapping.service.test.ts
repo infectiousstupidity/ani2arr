@@ -4,7 +4,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import { sourceIdentityKey, type SourceIdentity } from "./source-identity";
+import {
+	sourceIdentityKey,
+	storageIdentity,
+	type SourceIdentity,
+} from "./source-identity";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
@@ -40,11 +44,16 @@ const storeRecords = vi.hoisted(() => ({
 
 vi.mock("./manual.store", () => ({
 	getManualFacts: vi.fn(
-		async (provider: Provider, identity: SourceIdentity) =>
+		async (
+			provider: Provider,
+			identity: SourceIdentity,
+			anilistId?: AniListId,
+		) =>
 			storeRecords.manual.find(
 				(record) =>
 					record.provider === provider &&
-					sourceIdentityKey(record.identity) === sourceIdentityKey(identity),
+					sourceIdentityKey(record.identity) ===
+						sourceIdentityKey(storageIdentity(identity, anilistId)),
 			)?.facts ?? null,
 	),
 	listAniListManualFacts: vi.fn(async (provider: Provider) =>
@@ -68,11 +77,16 @@ vi.mock("./manual.store", () => ({
 
 vi.mock("./auto.store", () => ({
 	getAutoResult: vi.fn(
-		async (provider: Provider, identity: SourceIdentity) =>
+		async (
+			provider: Provider,
+			identity: SourceIdentity,
+			anilistId?: AniListId,
+		) =>
 			storeRecords.auto.find(
 				(record) =>
 					record.provider === provider &&
-					sourceIdentityKey(record.identity) === sourceIdentityKey(identity),
+					sourceIdentityKey(record.identity) ===
+						sourceIdentityKey(storageIdentity(identity, anilistId)),
 			)?.result ?? null,
 	),
 	listAniListAutoResults: vi.fn(async (provider: Provider) =>
@@ -341,7 +355,7 @@ describe("MappingService", () => {
 		expect(resolver).not.toHaveBeenCalled();
 	});
 
-	it("prefers source-native manual facts and uses the linked AniList fact only as fallback", async () => {
+	it("reads linked MAL manual facts only through the canonical AniList identity", async () => {
 		const firstAniListId = aid(21);
 		const secondAniListId = aid(22);
 		const source = { source: "mal", id: mal(5114) } as const;
@@ -367,22 +381,13 @@ describe("MappingService", () => {
 		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
-			providerId: tvdb(400),
+			providerId: tvdb(300),
 		});
 
 		storeRecords.aliases.set(sourceIdentityKey(source), secondAniListId);
 		await expect(
 			service().getMapping("sonarr", source),
 		).resolves.toEqual({
-			kind: "mapped",
-			source: "manual",
-			providerId: tvdb(400),
-		});
-
-		storeRecords.manual = storeRecords.manual.filter(
-			(record) => sourceIdentityKey(record.identity) !== sourceIdentityKey(source),
-		);
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
 			providerId: tvdb(500),
@@ -444,7 +449,7 @@ describe("MappingService", () => {
 		storeRecords.aliases.set(sourceIdentityKey(source), anilistId);
 		replaceAuto("sonarr", anilistSource(anilistId), { kind: "unmapped" });
 		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", source, {
+			replaceAuto("sonarr", anilistSource(anilistId), {
 				kind: "mapped",
 				providerId: tvdb(1000),
 			});
@@ -474,7 +479,11 @@ describe("MappingService", () => {
 		});
 		await expect(
 			mappingService.getMapping("sonarr", anilistSource(anilistId)),
-		).resolves.toEqual({ kind: "unmapped", hadResolveAttempt: true });
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(1000),
+		});
 	});
 
 	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {

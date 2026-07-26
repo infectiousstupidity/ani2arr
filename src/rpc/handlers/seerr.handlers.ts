@@ -78,8 +78,8 @@ export const seerrHandlers = {
 	async getSeerrTarget(input: GetSeerrTargetInput) {
 		const identity = await resolveSeerrTargetIdentity(input);
 		if (
-			input.title !== undefined ||
-			input.metadata !== undefined ||
+			input.title != null ||
+			input.metadata != null ||
 			input.forceRetry === true
 		) {
 			return resolveSeerrAutomaticTarget({
@@ -87,8 +87,8 @@ export const seerrHandlers = {
 				...(identity.anilistId === undefined
 					? {}
 					: { anilistId: identity.anilistId }),
-				...(input.title === undefined ? {} : { title: input.title }),
-				...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+				...(input.title == null ? {} : { title: input.title }),
+				...(input.metadata == null ? {} : { metadata: input.metadata }),
 				...(input.forceRetry === undefined
 					? {}
 					: { forceRetry: input.forceRetry }),

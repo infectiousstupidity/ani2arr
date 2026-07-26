@@ -351,6 +351,7 @@ describe("mappingHandlers", () => {
 			"sonarr",
 			source,
 			tvdb(20),
+			aid(10),
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
@@ -365,11 +366,15 @@ describe("mappingHandlers", () => {
 			}),
 		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", source);
+		expect(mappingService.setIgnored).toHaveBeenCalledWith(
+			"sonarr",
+			source,
+			aid(10),
+		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
-	it("writes a MAL-only mutation without resolving its crosswalk", async () => {
+	it("keeps a MAL-only mutation when its crosswalk is missing", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 
 		await expect(
@@ -379,8 +384,12 @@ describe("mappingHandlers", () => {
 			}),
 		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", source);
-		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
+		expect(mappingService.setIgnored).toHaveBeenCalledWith(
+			"sonarr",
+			source,
+			undefined,
+		);
+		expect(getUniqueAniListIdForSource).toHaveBeenCalledWith(source);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 });

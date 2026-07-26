@@ -8,6 +8,7 @@ import { parseTmdbId } from "@/providers/schemas";
 import type { StatusInput } from "@/rpc/types";
 import {
 	normalizeMetadataIds,
+	normalizeSeerrTargetInput,
 	normalizeSourceKeys,
 	queryKeys,
 } from "@/queries/query-keys";
@@ -66,15 +67,59 @@ describe("queryKeys", () => {
 			source: { source: "mal", id: parseMyAnimeListId(1) },
 		} as const;
 
-		expectPrefix(queryKeys.seerrTarget(aid(1)), root);
-		expectPrefix(queryKeys.seerrTarget(malSource), root);
+		expectPrefix(
+			queryKeys.seerrTarget(normalizeSeerrTargetInput(aid(1))),
+			root,
+		);
+		expectPrefix(
+			queryKeys.seerrTarget(normalizeSeerrTargetInput(malSource)),
+			root,
+		);
 		expectPrefix(queryKeys.seerrTargets([aid(1), aid(2)]), root);
-		expect(queryKeys.seerrTarget(aid(1))).not.toEqual(
+		expect(
+			queryKeys.seerrTarget(normalizeSeerrTargetInput(aid(1))),
+		).not.toEqual(
 			queryKeys.seerrTargets([aid(1)]),
 		);
-		expect(queryKeys.seerrTarget(aid(1))).not.toEqual(
-			queryKeys.seerrTarget(malSource),
+		expect(
+			queryKeys.seerrTarget(normalizeSeerrTargetInput(aid(1))),
+		).not.toEqual(
+			queryKeys.seerrTarget(normalizeSeerrTargetInput(malSource)),
 		);
+	});
+
+	it("keys Seerr resolution by normalized hints and force retry", () => {
+		const source = {
+			source: { source: "mal", id: parseMyAnimeListId(5114) },
+		} as const;
+		const base = normalizeSeerrTargetInput({ ...source, title: "  Title  " });
+		const enriched = normalizeSeerrTargetInput({
+			...source,
+			title: "Title",
+			metadata: { format: "TV", startYear: 2009 },
+		});
+		const forced = normalizeSeerrTargetInput({
+			...source,
+			title: "Title",
+			forceRetry: true,
+		});
+
+		expect(base).toMatchObject({
+			title: "Title",
+			metadata: null,
+			forceRetry: false,
+		});
+		expect(queryKeys.seerrTarget(base)).not.toEqual(
+			queryKeys.seerrTarget(enriched),
+		);
+		expect(queryKeys.seerrTarget(base)).not.toEqual(
+			queryKeys.seerrTarget(forced),
+		);
+		expect(
+			queryKeys.seerrTarget(
+				normalizeSeerrTargetInput({ ...source, title: " ".repeat(3) }),
+			),
+		).toEqual(queryKeys.seerrTarget(normalizeSeerrTargetInput(source)));
 	});
 
 	it("separates Seerr media status keys by media type and seasons", () => {

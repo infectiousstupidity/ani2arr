@@ -1,7 +1,11 @@
 /** Shared React Query cache keys and pure input normalizers. */
 // src/queries/query-keys.ts
 
-import { isAniListId, type AniListId } from "@/anilist/types";
+import {
+	isAniListId,
+	type AniListId,
+	type AniListMediaHint,
+} from "@/anilist/types";
 import {
 	sourceIdentityKey,
 	type SourceIdentity,
@@ -10,7 +14,7 @@ import type { MyAnimeListId } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
-import type { StatusInput } from "@/rpc/types";
+import type { GetSeerrTargetInput, StatusInput } from "@/rpc/types";
 import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
@@ -38,6 +42,14 @@ type SeerrLinkedAniListEntriesKeyInput = {
 };
 type SourceKeyInput = SourceInputLike | SourceIdentity | AniListId;
 
+export type NormalizedSeerrTargetInput = {
+	source: SourceIdentity;
+	anilistId?: AniListId;
+	title: string | null;
+	metadata: AniListMediaHint | null;
+	forceRetry: boolean;
+};
+
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
 export const normalizeMetadataIds = (
@@ -54,6 +66,22 @@ export const normalizeSourceKeys = (
 ): string[] => {
 	return [...new Set(sources.map((source) => sourceIdentityKey(source)))].toSorted();
 };
+
+export function normalizeSeerrTargetInput(
+	input: GetSeerrTargetInput | AniListId,
+): NormalizedSeerrTargetInput {
+	const sourceInput = typeof input === "number" ? { anilistId: input } : input;
+	const title = sourceInput.title?.trim() || null;
+	return {
+		source: sourceFromInput(sourceInput),
+		...(sourceInput.anilistId === undefined
+			? {}
+			: { anilistId: sourceInput.anilistId }),
+		title,
+		metadata: sourceInput.metadata ?? null,
+		forceRetry: sourceInput.forceRetry === true,
+	};
+}
 
 const sourceKeyFromInput = (input: SourceKeyInput): string => {
 	if (typeof input === "number") {
@@ -124,8 +152,12 @@ export const queryKeys = {
 	seerrConnection: (scope = configuredScope) =>
 		[...rootQueryKey, "seerr", "connection", scope] as const,
 	seerrTargetsRoot: seerrTargetsRootKey,
-	seerrTarget: (input: SourceKeyInput) =>
-		[...seerrTargetsRootKey(), "single", sourceKeyFromInput(input)] as const,
+	seerrTarget: (input: NormalizedSeerrTargetInput) =>
+		[
+			...seerrTargetsRootKey(),
+			"single",
+			input,
+		] as const,
 	seerrTargets: (ids: readonly AniListId[]) =>
 		[
 			...seerrTargetsRootKey(),

@@ -225,7 +225,7 @@ describe("Seerr automatic resolver", () => {
 		).not.toHaveProperty("seasons");
 	});
 
-	it("returns fresh cached results without another search", async () => {
+	it("returns fresh mapped results without another search", async () => {
 		cached = {
 			kind: "mapped",
 			target: { mediaType: "movie", tmdbId: parseTmdbId(10_494) },
@@ -242,15 +242,56 @@ describe("Seerr automatic resolver", () => {
 			mediaType: "movie",
 			tmdbId: parseTmdbId(10_494),
 		});
+		expect(searchMedia).not.toHaveBeenCalled();
+	});
 
-		cached = { kind: "unmapped" };
+	it("retries after metadata enrichment changes an earlier null result", async () => {
+		searchMedia.mockResolvedValue([]);
 		await expect(
 			resolve({
-				source: { source: "anilist", id: parseAniListId(21_004) },
+				source,
 				title: "Unknown anime",
-				metadata: { format: "TV" },
 			}),
 		).resolves.toBeNull();
-		expect(searchMedia).not.toHaveBeenCalled();
+		expect(cached).toEqual({ kind: "unmapped" });
+
+		searchMedia.mockResolvedValue([
+			{
+				mediaType: "movie",
+				tmdbId: parseTmdbId(10_494),
+				title: "Perfect Blue",
+				year: 1998,
+			},
+		]);
+		await expect(
+			resolve({
+				source,
+				title: "Perfect Blue",
+				metadata: { format: "MOVIE", startYear: 1998 },
+			}),
+		).resolves.toMatchObject({ tmdbId: parseTmdbId(10_494) });
+		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
+	});
+
+	it("force retries an earlier null result", async () => {
+		cached = { kind: "unmapped" };
+		searchMedia.mockResolvedValue([
+			{
+				mediaType: "movie",
+				tmdbId: parseTmdbId(10_494),
+				title: "Perfect Blue",
+				year: 1998,
+			},
+		]);
+
+		await expect(
+			resolve({
+				source,
+				title: "Perfect Blue",
+				metadata: { format: "MOVIE", startYear: 1998 },
+				forceRetry: true,
+			}),
+		).resolves.toMatchObject({ tmdbId: parseTmdbId(10_494) });
+		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
 	});
 });

@@ -8,6 +8,7 @@ import {
 	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
+	storageIdentity,
 	type SourceIdentity,
 } from "./source-identity";
 
@@ -51,10 +52,11 @@ let writes: Promise<void> = Promise.resolve();
 export async function getManualFacts(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
 ): Promise<ManualFacts | null> {
 	const mappings = await getManualMappings();
 
-	return mappings[provider][manualFactsKey(identity)] ?? null;
+	return mappings[provider][manualFactsKey(identity, anilistId)] ?? null;
 }
 
 export async function listAniListManualFacts(
@@ -63,11 +65,10 @@ export async function listAniListManualFacts(
 	const mappings = await getManualMappings();
 	const records: ManualRecord[] = [];
 
-	for (const [rawAniListId, facts] of Object.entries(mappings[provider])) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
-
-		if (anilistId !== null) {
-			records.push({ anilistId, facts });
+	for (const [rawKey, facts] of Object.entries(mappings[provider])) {
+		const identity = parseSourceIdentityKey(rawKey);
+		if (identity?.source === "anilist") {
+			records.push({ anilistId: identity.id, facts });
 		}
 	}
 
@@ -78,9 +79,10 @@ export async function setManualMapping(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
 	mapping: ManualMapping,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const key = manualFactsKey(identity);
+		const key = manualFactsKey(identity, anilistId);
 		const previous = mappings[provider][key];
 		const rejectedProviderIds = previous?.rejectedProviderIds?.filter(
 			(providerId) => providerId !== mapping.providerId,
@@ -96,9 +98,10 @@ export async function setManualMapping(
 export async function clearManualMapping(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const key = manualFactsKey(identity);
+		const key = manualFactsKey(identity, anilistId);
 		const previous = mappings[provider][key];
 
 		if (!previous || !("mapping" in previous)) {
@@ -119,9 +122,10 @@ export async function clearManualMapping(
 export async function setIgnored(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const key = manualFactsKey(identity);
+		const key = manualFactsKey(identity, anilistId);
 		const previous = mappings[provider][key];
 
 		mappings[provider][key] = {
@@ -136,9 +140,10 @@ export async function setIgnored(
 export async function clearIgnored(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const key = manualFactsKey(identity);
+		const key = manualFactsKey(identity, anilistId);
 		const previous = mappings[provider][key];
 
 		if (!previous || !("ignored" in previous)) {
@@ -160,9 +165,10 @@ export async function rejectAutoCandidate(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
 	providerId: number,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const key = manualFactsKey(identity);
+		const key = manualFactsKey(identity, anilistId);
 		const previous = mappings[provider][key];
 
 		if (
@@ -190,9 +196,10 @@ export async function clearRejectedAutoCandidate(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
 	providerId: number,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const key = manualFactsKey(identity);
+		const key = manualFactsKey(identity, anilistId);
 		const previous = mappings[provider][key];
 
 		if (!previous?.rejectedProviderIds?.includes(providerId)) {
@@ -287,17 +294,20 @@ function normalizeManualProviderMappings(
 }
 
 function normalizeStoredManualFactsKey(rawKey: string): string | null {
-	const direct = parseAniListIdOrNull(Number(rawKey));
-	if (direct !== null && rawKey === String(direct)) return rawKey;
-
-	/** LEGACY: remove after branch testers have rewritten pre-canonical AniList facts. */
 	const source = parseSourceIdentityKey(rawKey);
-	return source === null ? null : manualFactsKey(source);
+	if (source !== null) return sourceIdentityKey(source);
+
+	/** LEGACY: accept released numeric AniList keys until they are rewritten by a mutation. */
+	const anilistId = parseAniListIdOrNull(Number(rawKey));
+	return anilistId !== null && rawKey === String(anilistId)
+		? sourceIdentityKey({ source: "anilist", id: anilistId })
+		: null;
 }
 
-function manualFactsKey(identity: SourceIdentity | AniListId): string {
+function manualFactsKey(
+	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
+): string {
 	const source = normalizeSourceIdentity(identity);
-	return source.source === "anilist"
-		? String(source.id)
-		: sourceIdentityKey(source);
+	return sourceIdentityKey(storageIdentity(source, anilistId));
 }

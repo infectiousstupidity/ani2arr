@@ -51,6 +51,7 @@ import type {
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
+	SourceRpcInput,
 } from "@/rpc/types";
 
 type ProviderMetaSource = {
@@ -441,17 +442,24 @@ async function assertNoConflictingLinkedIds(input: {
 	);
 }
 
+async function resolveMappingIdentity(input: SourceRpcInput) {
+	const anilistId = await resolveAniListIdFromInput(input);
+	return {
+		identity: sourceFromInput(input),
+		anilistId: anilistId ?? undefined,
+	};
+}
+
 export const mappingHandlers = {
 	getMappingIdentities(ids: GetMappingIdentitiesInput) {
 		return getMappingIdentities(ids);
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {
-		const identity = sourceFromInput(input);
-		const anilistId = await resolveAniListIdFromInput(input);
+		const { identity, anilistId } = await resolveMappingIdentity(input);
 		await assertNoConflictingLinkedIds({
 			provider: input.provider,
-			currentAniListId: anilistId,
+			currentAniListId: anilistId ?? null,
 			providerId: input.providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});
@@ -460,38 +468,40 @@ export const mappingHandlers = {
 			input.provider,
 			identity,
 			input.providerId,
+			anilistId,
 		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
-		const identity = sourceFromInput(input);
-		await mappingService.clearManualMapping(input.provider, identity);
+		const { identity, anilistId } = await resolveMappingIdentity(input);
+		await mappingService.clearManualMapping(input.provider, identity, anilistId);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
-		const identity = sourceFromInput(input);
-		await mappingService.setIgnored(input.provider, identity);
+		const { identity, anilistId } = await resolveMappingIdentity(input);
+		await mappingService.setIgnored(input.provider, identity, anilistId);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
-		const identity = sourceFromInput(input);
-		await mappingService.clearIgnored(input.provider, identity);
+		const { identity, anilistId } = await resolveMappingIdentity(input);
+		await mappingService.clearIgnored(input.provider, identity, anilistId);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput) {
-		const identity = sourceFromInput(input);
+		const { identity, anilistId } = await resolveMappingIdentity(input);
 		await mappingService.rejectCandidate(
 			input.provider,
 			identity,
 			input.providerId,
+			anilistId,
 		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
@@ -500,11 +510,12 @@ export const mappingHandlers = {
 	async clearMappingRejectedCandidate(
 		input: ClearMappingRejectedCandidateInput,
 	) {
-		const identity = sourceFromInput(input);
+		const { identity, anilistId } = await resolveMappingIdentity(input);
 		await mappingService.clearRejectedCandidate(
 			input.provider,
 			identity,
 			input.providerId,
+			anilistId,
 		);
 		await bumpMappingsRevision();
 		return { ok: true as const };

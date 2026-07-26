@@ -5,8 +5,10 @@ import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import {
+	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
+	storageIdentity,
 	type SourceIdentity,
 } from "./source-identity";
 import type { AutoResult } from "./types";
@@ -36,10 +38,11 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getAutoResult(
 	provider: Provider,
-	identity: SourceIdentity,
+	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
 ): Promise<AutoResult | null> {
 	const mappings = await getAutoMappings();
-	const result = mappings[provider][autoResultKey(identity)];
+	const result = mappings[provider][autoResultKey(identity, anilistId)];
 
 	if (!result || result.expiresAt <= Date.now()) {
 		return null;
@@ -54,16 +57,15 @@ export async function listAniListAutoResults(
 	const mappings = await getAutoMappings();
 	const records: AutoRecord[] = [];
 
-	for (const [rawAniListId, result] of Object.entries(mappings[provider])) {
+	for (const [rawKey, result] of Object.entries(mappings[provider])) {
 		if (result.expiresAt <= Date.now()) {
 			continue;
 		}
 
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
-
-		if (anilistId !== null) {
+		const identity = parseSourceIdentityKey(rawKey);
+		if (identity?.source === "anilist") {
 			records.push({
-				anilistId,
+				anilistId: identity.id,
 				result: withoutExpiry(result),
 			});
 		}
@@ -74,11 +76,12 @@ export async function listAniListAutoResults(
 
 export async function setAutoResult(
 	provider: Provider,
-	identity: SourceIdentity,
+	identity: SourceIdentity | AniListId,
 	result: AutoResult,
+	anilistId?: AniListId,
 ): Promise<void> {
 	await updateAutoMappings((mappings) => {
-		mappings[provider][autoResultKey(identity)] = {
+		mappings[provider][autoResultKey(identity, anilistId)] = {
 			...result,
 			expiresAt:
 				Date.now() +
@@ -173,17 +176,21 @@ function normalizeAutoProviderMappings(
 }
 
 function normalizeStoredAutoResultKey(rawKey: string): string | null {
-	const direct = parseAniListIdOrNull(Number(rawKey));
-	if (direct !== null && rawKey === String(direct)) return rawKey;
-
-	/** LEGACY: remove after branch testers have rewritten pre-canonical AniList facts. */
 	const source = parseSourceIdentityKey(rawKey);
-	if (source === null) return null;
-	return autoResultKey(source);
+	if (source !== null) return sourceIdentityKey(source);
+
+	/** LEGACY: accept released numeric AniList keys until they are rewritten by a mutation. */
+	const anilistId = parseAniListIdOrNull(Number(rawKey));
+	return anilistId !== null && rawKey === String(anilistId)
+		? sourceIdentityKey({ source: "anilist", id: anilistId })
+		: null;
 }
 
-function autoResultKey(identity: SourceIdentity): string {
-	return identity.source === "anilist"
-		? String(identity.id)
-		: sourceIdentityKey(identity);
+function autoResultKey(
+	identity: SourceIdentity | AniListId,
+	anilistId?: AniListId,
+): string {
+	return sourceIdentityKey(
+		storageIdentity(normalizeSourceIdentity(identity), anilistId),
+	);
 }

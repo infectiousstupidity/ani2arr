@@ -2,6 +2,7 @@
 // src/mapping/types.ts
 
 import type { TmdbId, TvdbId } from "@/providers/schemas";
+import type { SeerrTarget } from "./seerr-target";
 
 export type AniBridgeTarget =
 	| {
@@ -33,18 +34,11 @@ export type UpstreamTarget =
 	  };
 
 export type SeerrUpstreamTarget =
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			seasons?: number[];
+	| Extract<SeerrTarget, { mediaType: "movie" }>
+	| (Extract<SeerrTarget, { mediaType: "tv" }> & {
 			tmdbSeasons?: number[];
 			tvdbSeasons?: number[];
-			tvdbId?: TvdbId;
-	  };
+	  });
 
 export type AutoResult =
 	| {

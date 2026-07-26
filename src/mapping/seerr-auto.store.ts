@@ -3,16 +3,15 @@
 import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import {
-	parseTmdbIdOrNull,
-	parseTvdbIdOrNull,
-	type TmdbId,
-	type TvdbId,
-} from "@/providers/schemas";
-import {
 	parseSourceIdentityKey,
 	sourceIdentityKey,
+	storageIdentity,
 	type SourceIdentity,
 } from "./source-identity";
+import {
+	normalizeSeerrTarget,
+	type SeerrTarget,
+} from "./seerr-target";
 
 const MAPPED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const UNMAPPED_TTL_MS = 48 * 60 * 60 * 1000;
@@ -20,14 +19,7 @@ const UNMAPPED_TTL_MS = 48 * 60 * 60 * 1000;
 export type SeerrAutoResult =
 	| {
 			kind: "mapped";
-			target:
-				| { mediaType: "movie"; tmdbId: TmdbId }
-				| {
-						mediaType: "tv";
-						tmdbId: TmdbId;
-						tvdbId?: TvdbId;
-						seasons?: number[];
-				  };
+			target: SeerrTarget;
 			matchedTitle?: string;
 	  }
 	| { kind: "unmapped" };
@@ -47,37 +39,15 @@ const seerrAutoResults = storage.defineItem<SeerrAutoResults>(
 
 let writes: Promise<void> = Promise.resolve();
 
-function normalizeSeasons(seasons: readonly number[]): number[] {
-	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((left, right) => left - right);
-}
-
 function normalizeResult(result: SeerrAutoResult): SeerrAutoResult | null {
 	if (result.kind === "unmapped") return result;
 
-	const tmdbId = parseTmdbIdOrNull(result.target.tmdbId);
-	if (tmdbId === null) return null;
-
+	const target = normalizeSeerrTarget(result.target);
+	if (target === null) return null;
 	const matchedTitle = result.matchedTitle?.trim();
-	if (result.target.mediaType === "movie") {
-		return {
-			kind: "mapped",
-			target: { mediaType: "movie", tmdbId },
-			...(matchedTitle ? { matchedTitle } : {}),
-		};
-	}
-
-	const tvdbId = parseTvdbIdOrNull(result.target.tvdbId);
-	const seasons = normalizeSeasons(result.target.seasons ?? []);
 	return {
 		kind: "mapped",
-		target: {
-			mediaType: "tv",
-			tmdbId,
-			...(tvdbId === null ? {} : { tvdbId }),
-			...(seasons.length === 0 ? {} : { seasons }),
-		},
+		target,
 		...(matchedTitle ? { matchedTitle } : {}),
 	};
 }
@@ -92,9 +62,10 @@ async function getStoredResults(): Promise<SeerrAutoResults> {
 
 export async function getSeerrAutoResult(
 	identity: SourceIdentity,
+	anilistId?: AniListId,
 ): Promise<SeerrAutoResult | null> {
 	const results = await getStoredResults();
-	const stored = results[sourceIdentityKey(identity)];
+	const stored = results[sourceIdentityKey(storageIdentity(identity, anilistId))];
 	if (!stored || stored.expiresAt <= Date.now()) return null;
 	return withoutExpiry(stored);
 }
@@ -121,12 +92,13 @@ export async function listAniListSeerrAutoResults(): Promise<
 export async function setSeerrAutoResult(
 	identity: SourceIdentity,
 	result: SeerrAutoResult,
+	anilistId?: AniListId,
 ): Promise<void> {
 	const normalized = normalizeResult(result);
 	if (normalized === null) throw new Error("Invalid automatic Seerr target.");
 
 	await updateResults((results) => {
-		results[sourceIdentityKey(identity)] = {
+		results[sourceIdentityKey(storageIdentity(identity, anilistId))] = {
 			...normalized,
 			expiresAt:
 				Date.now() +

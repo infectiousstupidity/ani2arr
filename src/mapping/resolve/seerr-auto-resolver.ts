@@ -6,11 +6,9 @@ import type {
 	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
-import {
-	sourceIdentityKey,
-	type SourceIdentity,
-} from "@/mapping/source-identity";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { SeerrAutoResult } from "@/mapping/seerr-auto.store";
+import type { SeerrTarget } from "@/mapping/seerr-target";
 import type { EffectiveSeerrTarget } from "@/mapping/seerr-target.store";
 import { searchMediaFromHint } from "@/mapping/resolve/resolve";
 import {
@@ -24,16 +22,7 @@ import type {
 	SeerrMediaType,
 	SeerrSearchResult,
 } from "@/providers/seerr/types";
-import type { TmdbId, TvdbId } from "@/providers/schemas";
-
-type SeerrTarget =
-	| { mediaType: "movie"; tmdbId: TmdbId }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			tvdbId?: TvdbId;
-			seasons?: number[];
-	  };
+import type { TmdbId } from "@/providers/schemas";
 
 export type SeerrAutoResolverInput = {
 	source: SourceIdentity;
@@ -48,10 +37,14 @@ type SeerrAutoResolverDependencies = {
 		identity: SourceIdentity;
 		anilistId?: AniListId;
 	}): Promise<EffectiveSeerrTarget | null>;
-	getAutoResult(identity: SourceIdentity): Promise<SeerrAutoResult | null>;
+	getAutoResult(
+		identity: SourceIdentity,
+		anilistId?: AniListId,
+	): Promise<SeerrAutoResult | null>;
 	setAutoResult(
 		identity: SourceIdentity,
 		result: SeerrAutoResult,
+		anilistId?: AniListId,
 	): Promise<void>;
 	loadAniListMedia(anilistId: AniListId): Promise<AniListMedia>;
 	loadMyAnimeListMetadata(
@@ -236,9 +229,7 @@ async function buildMatchedTarget(input: {
 export function createSeerrAutoResolver(
 	dependencies: SeerrAutoResolverDependencies,
 ): (input: SeerrAutoResolverInput) => Promise<EffectiveSeerrTarget | null> {
-	const inflight = new Map<string, Promise<EffectiveSeerrTarget | null>>();
-
-	const resolveOnce = async (
+	return async (
 		input: SeerrAutoResolverInput,
 	): Promise<EffectiveSeerrTarget | null> => {
 		const identity = {
@@ -246,13 +237,28 @@ export function createSeerrAutoResolver(
 			...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
 		};
 		const effective = await dependencies.getEffectiveTarget(identity);
-		if (effective) return effective;
+		if (
+			effective &&
+			(input.forceRetry !== true || effective.source !== "automatic")
+		) {
+			return effective;
+		}
 
-		const cached = await dependencies.getAutoResult(input.source);
-		if (cached?.kind === "mapped") {
+		const cached = await dependencies.getAutoResult(
+			input.source,
+			input.anilistId,
+		);
+		if (cached?.kind === "mapped" && input.forceRetry !== true) {
 			return toEffectiveTarget(input, cached.target);
 		}
-		if (cached?.kind === "unmapped" && input.forceRetry !== true) return null;
+		if (
+			cached?.kind === "unmapped" &&
+			input.forceRetry !== true &&
+			input.title === undefined &&
+			input.metadata === undefined
+		) {
+			return null;
+		}
 
 		const searchedTitleKeys = new Set<string>();
 		const hintMedia = searchMediaFromHint({
@@ -280,7 +286,11 @@ export function createSeerrAutoResolver(
 		}
 
 		if (!match) {
-			await dependencies.setAutoResult(input.source, { kind: "unmapped" });
+			await dependencies.setAutoResult(
+				input.source,
+				{ kind: "unmapped" },
+				input.anilistId,
+			);
 			return null;
 		}
 
@@ -291,23 +301,15 @@ export function createSeerrAutoResolver(
 			dependencies,
 		});
 
-		await dependencies.setAutoResult(input.source, {
-			kind: "mapped",
-			target,
-			matchedTitle: match.matchedTitle,
-		});
+		await dependencies.setAutoResult(
+			input.source,
+			{
+				kind: "mapped",
+				target,
+				matchedTitle: match.matchedTitle,
+			},
+			input.anilistId,
+		);
 		return toEffectiveTarget(input, target);
-	};
-
-	return (input) => {
-		const key = sourceIdentityKey(input.source);
-		const existing = inflight.get(key);
-		if (existing) return existing;
-
-		const request = resolveOnce(input).finally(() => {
-			if (inflight.get(key) === request) inflight.delete(key);
-		});
-		inflight.set(key, request);
-		return request;
 	};
 }

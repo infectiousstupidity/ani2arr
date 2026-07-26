@@ -26,7 +26,11 @@ import {
 	ErrorCode,
 	type ExtensionError,
 } from "@/shared/errors/error.types";
-import { normalizeMetadataIds, queryKeys } from "./query-keys";
+import {
+	normalizeMetadataIds,
+	normalizeSeerrTargetInput,
+	queryKeys,
+} from "./query-keys";
 
 const NON_RETRYABLE_SEERR_ERRORS = new Set<ErrorCode>([
 	ErrorCode.SEERR_AUTH_REQUIRED,
@@ -110,11 +114,10 @@ export const useSeerrTarget = (
 	input: GetSeerrTargetInput | AniListId,
 	options?: { enabled?: boolean },
 ) => {
-	const sourceInput =
-		typeof input === "number" ? ({ anilistId: input } as const) : input;
+	const resolverInput = normalizeSeerrTargetInput(input);
 	return useQuery<SeerrRequestTarget | null, ExtensionError>({
-		queryKey: queryKeys.seerrTarget(sourceInput),
-		queryFn: () => getAni2arrApi().getSeerrTarget(sourceInput),
+		queryKey: queryKeys.seerrTarget(resolverInput),
+		queryFn: () => getAni2arrApi().getSeerrTarget(resolverInput),
 		enabled: options?.enabled ?? true,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,

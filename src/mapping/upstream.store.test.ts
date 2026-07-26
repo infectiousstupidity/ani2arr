@@ -282,6 +282,7 @@ describe("refreshUpstreamMappings", () => {
 						{ kind: "tvdb-show", id: tvdb(81_797), season: 0 },
 						{ kind: "tvdb-show", id: tvdb(81_797), season: 1 },
 						{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
+						{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
 					],
 					"anilist:3": [
 						{ kind: "tvdb-show", id: tvdb(100), season: 1 },
@@ -311,7 +312,11 @@ describe("refreshUpstreamMappings", () => {
 			},
 			{
 				anilistId: aid(2),
-				targets: [{ provider: "sonarr", providerId: tvdb(81_797) }],
+				targets: [
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 1 },
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
+				],
 			},
 			{
 				anilistId: aid(3),
@@ -409,7 +414,7 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("uses scoped TVDB seasons with one unscoped TMDB show ID", async () => {
+	it("uses only unambiguous TVDB identity and lets TVDB-only facts fall back", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
@@ -417,13 +422,20 @@ describe("refreshUpstreamMappings", () => {
 						{ kind: "tmdb-show", id: tmdb(500) },
 						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
 					],
+					"anilist:2": [
+						{ kind: "tmdb-show", id: tmdb(501) },
+						{ kind: "tvdb-show", id: tvdb(701) },
+					],
+					"anilist:3": [{ kind: "tvdb-show", id: tvdb(702), season: 1 }],
 				},
 				aniListCrosswalks: {},
 				fetchedAt: Date.now(),
 			},
 		});
 
-		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
+		await expect(
+			listSeerrUpstreamTargets([aid(1), aid(2), aid(3)]),
+		).resolves.toEqual([
 			{
 				anilistId: aid(1),
 				kind: "target",
@@ -435,7 +447,19 @@ describe("refreshUpstreamMappings", () => {
 					tvdbId: tvdb(700),
 				},
 			},
+			{
+				anilistId: aid(2),
+				kind: "target",
+				target: {
+					mediaType: "tv",
+					tmdbId: tmdb(501),
+					tvdbId: tvdb(701),
+				},
+			},
 		]);
+		await expect(
+			getSourceSeerrUpstreamMapping(anilistSource(3)),
+		).resolves.toEqual({ anilistId: aid(3), kind: "missing" });
 	});
 
 	it("uses direct MAL targets before provider-specific AniList fallbacks", async () => {

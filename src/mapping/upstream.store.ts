@@ -17,6 +17,7 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
+import { normalizeSeerrSeasons } from "./seerr-target";
 import type {
 	AniBridgeEntries,
 	AniBridgeTarget,
@@ -355,24 +356,16 @@ function projectUpstreamTargets(
 		provider: "radarr",
 		providerId,
 	}));
-	const sonarrTargets: UpstreamTarget[] = [...sonarrSeasonsById].map(
-		([providerId, seasons]) => {
-			const [season] = seasons;
-			return {
+	const sonarrTargets: UpstreamTarget[] = [...sonarrSeasonsById].flatMap(
+		([providerId, seasons]) =>
+			[...seasons].map((season) => ({
 				provider: "sonarr",
 				providerId,
-				...(seasons.size === 1 && season !== undefined ? { season } : {}),
-			};
-		},
+				...(season === undefined ? {} : { season }),
+			})),
 	);
 
 	return [...radarrTargets, ...sonarrTargets];
-}
-
-function normalizeSeasons(seasons: readonly number[]): number[] {
-	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((left, right) => left - right);
 }
 
 function projectSeerrTarget(
@@ -395,9 +388,19 @@ function projectSeerrTarget(
 		const tmdbId = parseTmdbIdOrNull(target.id);
 		return tmdbId === null ? [] : [{ tmdbId, season: target.season }];
 	});
+	const tvdbTargets = targets.flatMap((target) => {
+		if (target.kind !== "tvdb-show") return [];
+
+		const tvdbId = parseTvdbIdOrNull(target.id);
+		return tvdbId === null ? [] : [{ tvdbId, season: target.season }];
+	});
 
 	if (movieTmdbIds.size > 0) {
-		if (movieTmdbIds.size !== 1 || tmdbTargets.length > 0) {
+		if (
+			movieTmdbIds.size !== 1 ||
+			tmdbTargets.length > 0 ||
+			tvdbTargets.length > 0
+		) {
 			return { kind: "conflict" };
 		}
 		const tmdbId = [...movieTmdbIds][0];
@@ -407,33 +410,30 @@ function projectSeerrTarget(
 	}
 
 	const tmdbIds = new Set(tmdbTargets.map((target) => target.tmdbId));
-	if (tmdbIds.size !== 1) return { kind: "conflict" };
+	if (tmdbIds.size === 0) return { kind: "missing" };
+	if (tmdbIds.size > 1) return { kind: "conflict" };
 
 	const tmdbId = tmdbTargets[0]?.tmdbId;
 	if (tmdbId === undefined) return { kind: "conflict" };
 
-	const tmdbSeasons = normalizeSeasons(
+	const tmdbSeasons = normalizeSeerrSeasons(
 		tmdbTargets.flatMap((target) =>
 			target.season === undefined ? [] : [target.season],
 		),
 	);
-	const tvdbTargets = targets.flatMap((target) => {
-		if (target.kind !== "tvdb-show" || target.season === undefined) return [];
-
-		const tvdbId = parseTvdbIdOrNull(target.id);
-		return tvdbId === null ? [] : [{ tvdbId, season: target.season }];
-	});
 	const tvdbIds = new Set(tvdbTargets.map((target) => target.tvdbId));
 	const tvdbId = tvdbIds.size === 1 ? [...tvdbIds][0] : undefined;
 	const tvdbSeasons =
 		tvdbId === undefined
 			? []
-			: normalizeSeasons(
-					tvdbTargets
-						.filter((target) => target.tvdbId === tvdbId)
-						.map((target) => target.season),
+			: normalizeSeerrSeasons(
+					tvdbTargets.flatMap((target) =>
+						target.tvdbId === tvdbId && target.season !== undefined
+							? [target.season]
+							: [],
+					),
 				);
-	const seasons = normalizeSeasons([...tmdbSeasons, ...tvdbSeasons]);
+	const seasons = normalizeSeerrSeasons([...tmdbSeasons, ...tvdbSeasons]);
 
 	return {
 		kind: "target",

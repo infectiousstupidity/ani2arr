@@ -41,7 +41,9 @@ describe("manual mapping store", () => {
 			browser.storage.local.get(MANUAL_STORAGE_KEY),
 		).resolves.toMatchObject({
 			[MANUAL_STORAGE_KEY]: {
-				sonarr: { 1: { mapping: { providerId: tvdb(20) } } },
+				sonarr: {
+					"anilist:1": { mapping: { providerId: tvdb(20) } },
+				},
 			},
 		});
 	});
@@ -89,12 +91,20 @@ describe("manual mapping store", () => {
 		]);
 	});
 
-	it("round-trips a source-native MAL manual decision", async () => {
+	it("stores and lists a linked MAL decision through its AniList identity", async () => {
 		const source = { source: "mal", id: mal(63_816) } as const;
+		const anilistId = aid(209_939);
 
-		await setManualMapping("sonarr", source, { providerId: tvdb(424_536) });
+		await setManualMapping(
+			"sonarr",
+			source,
+			{ providerId: tvdb(424_536) },
+			anilistId,
+		);
 
-		await expect(getManualFacts("sonarr", source)).resolves.toEqual({
+		await expect(
+			getManualFacts("sonarr", source, anilistId),
+		).resolves.toEqual({
 			mapping: { providerId: tvdb(424_536) },
 		});
 		await expect(
@@ -102,11 +112,18 @@ describe("manual mapping store", () => {
 		).resolves.toMatchObject({
 			[MANUAL_STORAGE_KEY]: {
 				sonarr: {
-					"mal:63816": { mapping: { providerId: tvdb(424_536) } },
+					"anilist:209939": {
+						mapping: { providerId: tvdb(424_536) },
+					},
 				},
 			},
 		});
-		await expect(listAniListManualFacts("sonarr")).resolves.toEqual([]);
+		await expect(listAniListManualFacts("sonarr")).resolves.toEqual([
+			{
+				anilistId,
+				facts: { mapping: { providerId: tvdb(424_536) } },
+			},
+		]);
 	});
 
 	it("reads legacy raw AniList keys", async () => {

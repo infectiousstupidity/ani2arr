@@ -47,3 +47,12 @@ export function normalizeSourceIdentity(
 
 	return source;
 }
+
+export function storageIdentity(
+	identity: SourceIdentity,
+	anilistId?: AniListId,
+): SourceIdentity {
+	return anilistId === undefined
+		? identity
+		: { source: "anilist", id: anilistId };
+}

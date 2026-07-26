@@ -51,12 +51,13 @@ describe("Seerr targets", () => {
 		await clearManualSeerrTargets();
 	});
 
-	it("stores source-native MAL targets and removes a legacy alias", async () => {
+	it("sets and clears only the selected linked MAL target", async () => {
 		const identity = { source: "mal", id: mal(5114) } as const;
-		await setManualSeerrTarget({
-			anilistId: aid(100),
-			mediaType: "movie",
-			tmdbId: tmdb(999),
+		await browser.storage.local.set({
+			[MANUAL_STORAGE_KEY]: {
+				"anilist:100": { mediaType: "movie", tmdbId: tmdb(999) },
+				"mal:5114": { mediaType: "movie", tmdbId: tmdb(555) },
+			},
 		});
 		await setManualSeerrTarget({
 			identity,
@@ -77,16 +78,25 @@ describe("Seerr targets", () => {
 		});
 		await expect(browser.storage.local.get(MANUAL_STORAGE_KEY)).resolves.toEqual({
 			[MANUAL_STORAGE_KEY]: {
-				"mal:5114": {
+				"anilist:100": {
 					mediaType: "tv",
 					tmdbId: 31_911,
 					seasons: [1],
 				},
+				"mal:5114": { mediaType: "movie", tmdbId: 555 },
+			},
+		});
+
+		await clearManualSeerrTarget({ identity, anilistId: aid(100) });
+
+		await expect(browser.storage.local.get(MANUAL_STORAGE_KEY)).resolves.toEqual({
+			[MANUAL_STORAGE_KEY]: {
+				"mal:5114": { mediaType: "movie", tmdbId: 555 },
 			},
 		});
 	});
 
-	it("uses the linked AniList manual target only as a legacy fallback", async () => {
+	it("reads a linked MAL target through its canonical AniList key", async () => {
 		const identity = { source: "mal", id: mal(5114) } as const;
 		await setManualSeerrTarget({
 			anilistId: aid(100),

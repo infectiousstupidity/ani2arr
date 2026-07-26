@@ -12,7 +12,6 @@ import {
 	setIgnored as saveIgnored,
 	setManualMapping as saveManualMapping,
 	type ManualFacts,
-	type ManualMapping,
 } from "./manual.store";
 import { getSourceUpstreamMapping } from "./upstream.store";
 import { getAutoResult } from "./auto.store";
@@ -49,27 +48,11 @@ export class MappingService {
 		result: MappingResult;
 	}> {
 		const upstream = await getSourceUpstreamMapping(provider, source);
-		const legacyIdentity =
-			source.source === "mal" && upstream.anilistId !== null
-				? ({ source: "anilist", id: upstream.anilistId } as const)
-				: null;
-		const [directManual, directAuto] = await Promise.all([
-			getManualFacts(provider, source),
-			getAutoResult(provider, source),
+		const anilistId = upstream.anilistId ?? undefined;
+		const [manual, auto] = await Promise.all([
+			getManualFacts(provider, source, anilistId),
+			getAutoResult(provider, source, anilistId),
 		]);
-		const [legacyManual, legacyAuto] =
-			legacyIdentity === null
-				? [null, null]
-				: await Promise.all([
-						directManual === null
-							? getManualFacts(provider, legacyIdentity)
-							: null,
-						directAuto === null
-							? getAutoResult(provider, legacyIdentity)
-							: null,
-					]);
-		const manual = directManual ?? legacyManual;
-		const auto = directAuto ?? legacyAuto;
 		return {
 			identity: source,
 			anilistId: upstream.anilistId,
@@ -123,7 +106,11 @@ export class MappingService {
 				: { metadata: options.metadata }),
 		});
 
-		const auto = await getAutoResult(provider, currentState.identity);
+		const auto = await getAutoResult(
+			provider,
+			currentState.identity,
+			currentState.anilistId ?? undefined,
+		);
 		return chooseMappingResult({
 			provider,
 			manual: currentState.manual,
@@ -136,51 +123,51 @@ export class MappingService {
 		provider: Provider,
 		identity: SourceIdentity | AniListId,
 		providerId: number,
-		season?: number,
+		anilistId?: AniListId,
 	): Promise<void> {
-		const mapping: ManualMapping =
-			provider === "sonarr" && season !== undefined
-				? { providerId, season }
-				: { providerId };
-
-		await saveManualMapping(provider, identity, mapping);
+		await saveManualMapping(provider, identity, { providerId }, anilistId);
 	}
 
 	public async clearManualMapping(
 		provider: Provider,
 		identity: SourceIdentity | AniListId,
+		anilistId?: AniListId,
 	): Promise<void> {
-		await removeManualMapping(provider, identity);
+		await removeManualMapping(provider, identity, anilistId);
 	}
 
 	public async setIgnored(
 		provider: Provider,
 		identity: SourceIdentity | AniListId,
+		anilistId?: AniListId,
 	): Promise<void> {
-		await saveIgnored(provider, identity);
+		await saveIgnored(provider, identity, anilistId);
 	}
 
 	public async clearIgnored(
 		provider: Provider,
 		identity: SourceIdentity | AniListId,
+		anilistId?: AniListId,
 	): Promise<void> {
-		await removeIgnored(provider, identity);
+		await removeIgnored(provider, identity, anilistId);
 	}
 
 	public async rejectCandidate(
 		provider: Provider,
 		identity: SourceIdentity | AniListId,
 		providerId: number,
+		anilistId?: AniListId,
 	): Promise<void> {
-		await rejectAutoCandidate(provider, identity, providerId);
+		await rejectAutoCandidate(provider, identity, providerId, anilistId);
 	}
 
 	public async clearRejectedCandidate(
 		provider: Provider,
 		identity: SourceIdentity | AniListId,
 		providerId: number,
+		anilistId?: AniListId,
 	): Promise<void> {
-		await removeRejectedCandidate(provider, identity, providerId);
+		await removeRejectedCandidate(provider, identity, providerId, anilistId);
 	}
 
 	public async cleanupRedundantManualMapping(

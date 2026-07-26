@@ -35,8 +35,9 @@ import type {
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
 import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
+import type { SeerrTarget } from "@/mapping/seerr-target";
 import type { SourceIdentity } from "@/mapping/source-identity";
-import type { MappingResult } from "@/mapping/types";
+import type { MappingResult, SeerrUpstreamTarget } from "@/mapping/types";
 import type { MyAnimeListMetadata } from "@/myanimelist/types";
 import type { PublicOptions } from "@/settings/types";
 
@@ -131,7 +132,7 @@ export type ValidateTmdbInput = {
 export type GetMappingIdentitiesInput = AniListId[];
 export type GetSeerrTargetsInput = AniListId[];
 export type GetSeerrTargetInput = SourceRpcInput & {
-	title?: string;
+	title?: string | null;
 	metadata?: AniListMediaHint | null;
 	forceRetry?: boolean;
 };
@@ -191,34 +192,9 @@ export type GetSeerrMediaStatusOutput = {
 export type SeerrRequestTarget = {
 	anilistId?: AniListId | undefined;
 	source: SeerrTargetSource;
-} & (
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			seasons?: number[];
-			tmdbSeasons?: number[];
-			tvdbSeasons?: number[];
-			tvdbId?: TvdbId;
-	  }
-);
+} & SeerrUpstreamTarget;
 
-export type SetManualSeerrTargetInput = SourceRpcInput &
-	(
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			tvdbId?: TvdbId;
-			seasons?: number[];
-	  }
-	  );
+export type SetManualSeerrTargetInput = SourceRpcInput & SeerrTarget;
 
 export type ClearManualSeerrTargetInput = SourceRpcInput;
 

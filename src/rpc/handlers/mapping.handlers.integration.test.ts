@@ -1,4 +1,4 @@
-/** Regression test for source-native mapping facts across the RPC boundary. */
+/** Regression test for canonical mapping facts across the RPC boundary. */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
@@ -49,7 +49,7 @@ function upstreamSnapshot(fetchedAt: number) {
 	};
 }
 
-describe("source-native mapping regression", () => {
+describe("canonical mapping regression", () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		await browser.storage.local.set({
@@ -66,7 +66,7 @@ describe("source-native mapping regression", () => {
 		});
 	});
 
-	it("keeps a MAL decision under its source key and reads the old AniList key only as fallback", async () => {
+	it("stores a linked MAL decision under its durable AniList identity", async () => {
 		await expect(
 			mappingService.getMapping("sonarr", MAL_SOURCE),
 		).resolves.toMatchObject({
@@ -82,16 +82,14 @@ describe("source-native mapping regression", () => {
 		});
 
 		const manualBeforeRefresh = await browser.storage.local.get("mapping:manual");
-		expect(manualBeforeRefresh).toMatchObject({
+		expect(manualBeforeRefresh).toEqual({
 			"mapping:manual": {
 				sonarr: {
-					[ANILIST_ID]: {
-						mapping: { providerId: LEGACY_TVDB_ID },
-					},
-					[`mal:${MAL_ID}`]: {
+					[`anilist:${ANILIST_ID}`]: {
 						mapping: { providerId: MAL_TVDB_ID },
 					},
 				},
+				radarr: {},
 			},
 		});
 		await expect(
@@ -102,7 +100,7 @@ describe("source-native mapping regression", () => {
 				source: "anilist",
 				id: ANILIST_ID,
 			}),
-		).resolves.toMatchObject({ providerId: LEGACY_TVDB_ID });
+		).resolves.toMatchObject({ providerId: MAL_TVDB_ID });
 
 		await browser.storage.local.set({
 			"mapping:upstream": upstreamSnapshot(Date.now() + 1),
