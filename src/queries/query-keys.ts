@@ -2,21 +2,21 @@
 // src/queries/query-keys.ts
 
 import {
-	isAniListId,
 	type AniListId,
 	type AniListMediaHint,
+	isAniListId,
 } from "@/anilist/types";
 import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import {
-	sourceIdentityKey,
 	type SourceIdentity,
+	sourceIdentityKey,
 } from "@/mapping/source-identity";
 import type { MyAnimeListId } from "@/myanimelist/types";
-import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
+import type { Provider } from "@/providers/types";
+import { type SourceInputLike, sourceFromInput } from "@/rpc/source-input";
 import type { GetSeerrTargetInput, StatusInput } from "@/rpc/types";
-import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
 const configuredScope = "configured";
@@ -65,7 +65,9 @@ export const normalizeSourceKey = (source: SourceIdentity): string =>
 export const normalizeSourceKeys = (
 	sources: readonly SourceIdentity[],
 ): string[] => {
-	return [...new Set(sources.map((source) => sourceIdentityKey(source)))].toSorted();
+	return [
+		...new Set(sources.map((source) => sourceIdentityKey(source))),
+	].toSorted();
 };
 
 export function normalizeSeerrTargetInput(
@@ -103,27 +105,26 @@ export const queryKeys = {
 	aniListMediaPlaceholder: () =>
 		[...rootQueryKey, "anilist", "media", 0] as const,
 	aniListMetadata: (ids: readonly AniListId[]) =>
-		[...rootQueryKey, "anilist", "metadata", normalizeMetadataIds(ids)] as const,
+		[
+			...rootQueryKey,
+			"anilist",
+			"metadata",
+			normalizeMetadataIds(ids),
+		] as const,
 	myAnimeListMetadata: (malId: MyAnimeListId | 0) =>
 		[...rootQueryKey, "myanimelist", "metadata", malId] as const,
 	mappingRoot: mappingRootKey,
 	mappings: () => [...mappingRootKey(), "list"] as const,
-	mappingIdentitiesRoot: () =>
-		[...mappingRootKey(), "identities"] as const,
+	mappingIdentitiesRoot: () => [...mappingRootKey(), "identities"] as const,
 	mappingIdentities: (ids: readonly AniListId[]) =>
-		[
-			...mappingRootKey(),
-			"identities",
-			normalizeMetadataIds(ids),
-		] as const,
+		[...mappingRootKey(), "identities", normalizeMetadataIds(ids)] as const,
 	sourceAniListIds: (sourceKeys: readonly string[]) =>
 		[
 			...mappingRootKey(),
 			"sourceAniListIds",
 			[...new Set(sourceKeys)].toSorted(),
 		] as const,
-	mappingInspectionRoot: () =>
-		[...mappingRootKey(), "inspection"] as const,
+	mappingInspectionRoot: () => [...mappingRootKey(), "inspection"] as const,
 	mappingInspection: (provider: Provider, input: SourceKeyInput) =>
 		[
 			...mappingRootKey(),
@@ -134,29 +135,15 @@ export const queryKeys = {
 	providerRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider] as const,
 	providerConnection: (provider: Provider, scope = configuredScope) =>
-		[
-			...rootQueryKey,
-			"provider",
-			provider,
-			"connection",
-			scope,
-		] as const,
+		[...rootQueryKey, "provider", provider, "connection", scope] as const,
 	seerrRoot: () => [...rootQueryKey, "seerr"] as const,
 	seerrConnection: (scope = configuredScope) =>
 		[...rootQueryKey, "seerr", "connection", scope] as const,
 	seerrTargetsRoot: seerrTargetsRootKey,
 	seerrTarget: (input: NormalizedSeerrTargetInput) =>
-		[
-			...seerrTargetsRootKey(),
-			"single",
-			input,
-		] as const,
+		[...seerrTargetsRootKey(), "single", input] as const,
 	seerrTargets: (ids: readonly AniListId[]) =>
-		[
-			...seerrTargetsRootKey(),
-			"batch",
-			normalizeMetadataIds(ids),
-		] as const,
+		[...seerrTargetsRootKey(), "batch", normalizeMetadataIds(ids)] as const,
 	seerrMediaStatus: (input: SeerrMediaStatusKeyInput | null) =>
 		[
 			...rootQueryKey,
@@ -209,17 +196,17 @@ export const queryKeys = {
 	seerrSearch: (query: string) =>
 		[...rootQueryKey, "seerr", "search", normalizeText(query)] as const,
 	providerFormResources: (provider: Provider, scope = configuredScope) =>
+		[...rootQueryKey, "provider", provider, "formResources", scope] as const,
+	providerLookupRoot: (provider: Provider) =>
+		[...rootQueryKey, "provider", provider, "lookup"] as const,
+	providerLookup: (provider: Provider, term: string) =>
 		[
 			...rootQueryKey,
 			"provider",
 			provider,
-			"formResources",
-			scope,
+			"lookup",
+			normalizeText(term),
 		] as const,
-	providerLookupRoot: (provider: Provider) =>
-		[...rootQueryKey, "provider", provider, "lookup"] as const,
-	providerLookup: (provider: Provider, term: string) =>
-		[...rootQueryKey, "provider", provider, "lookup", normalizeText(term)] as const,
 	providerMediaStatusRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "mediaStatus"] as const,
 	providerMediaStatusItem: (provider: Provider, input: SourceKeyInput) =>

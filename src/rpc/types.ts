@@ -3,17 +3,21 @@
 
 import type {
 	AniListId,
-	AniListMediaHint,
 	AniListMediaFormat,
+	AniListMediaHint,
 	AniListMetadata,
 } from "@/anilist/types";
-import type { Provider, ProviderCredentials } from "@/providers/types";
+import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
+import type { SeerrTarget } from "@/mapping/seerr-target";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MappingResult, SeerrUpstreamTarget } from "@/mapping/types";
+import type { MyAnimeListMetadata } from "@/myanimelist/types";
 import type { ProviderOpenTarget } from "@/providers/provider-links";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
-	RadarrMovieSnapshot,
 	RadarrLookupMovie,
 	RadarrMovie,
+	RadarrMovieSnapshot,
 } from "@/providers/radarr/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type {
@@ -34,11 +38,7 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
-import type { SeerrTarget } from "@/mapping/seerr-target";
-import type { SourceIdentity } from "@/mapping/source-identity";
-import type { MappingResult, SeerrUpstreamTarget } from "@/mapping/types";
-import type { MyAnimeListMetadata } from "@/myanimelist/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 import type { PublicOptions } from "@/settings/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
