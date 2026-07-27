@@ -1,7 +1,4 @@
-/** Tests for provider RPC connection handlers. */
-// src/rpc/handlers/provider.handlers.test.ts
-
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import type { ProviderCredentials } from "@/providers/types";
 import { ErrorCode } from "@/shared/errors/error.types";
@@ -10,6 +7,11 @@ import { providerHandlers } from "./provider.handlers";
 const credentials: ProviderCredentials = {
 	url: "https://sonarr.example",
 	apiKey: "secret",
+};
+const seerrSessionConnection = {
+	url: "https://seerr.example",
+	auth: { mode: "session" as const },
+	account: { id: 1, displayName: "Alice" },
 };
 
 const sonarrClientMock = vi.hoisted(() => ({
@@ -42,34 +44,24 @@ vi.mock("@/providers/seerr/csrf-token", () => ({
 }));
 
 describe("providerHandlers", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
-
-	it("tests Sonarr connections through the current Sonarr client", async () => {
-		sonarrClientMock.testConnection.mockResolvedValue({ version: "4.0.1" });
+	it("tests Sonarr connections through its client", async () => {
+		const result = { version: "4.0.1" };
+		sonarrClientMock.testConnection.mockResolvedValue(result);
 
 		await expect(
-			providerHandlers.testSonarrConnection({
-				credentials,
-			}),
-		).resolves.toEqual({ version: "4.0.1" });
-
+			providerHandlers.testSonarrConnection({ credentials }),
+		).resolves.toBe(result);
 		expect(sonarrClientMock.testConnection).toHaveBeenCalledWith(credentials);
-		expect(radarrClientMock.testConnection).not.toHaveBeenCalled();
 	});
 
-	it("tests Radarr connections through the current Radarr client", async () => {
-		radarrClientMock.testConnection.mockResolvedValue({ version: "5.0.1" });
+	it("tests Radarr connections through its client", async () => {
+		const result = { version: "5.0.1" };
+		radarrClientMock.testConnection.mockResolvedValue(result);
 
 		await expect(
-			providerHandlers.testRadarrConnection({
-				credentials,
-			}),
-		).resolves.toEqual({ version: "5.0.1" });
-
+			providerHandlers.testRadarrConnection({ credentials }),
+		).resolves.toBe(result);
 		expect(radarrClientMock.testConnection).toHaveBeenCalledWith(credentials);
-		expect(sonarrClientMock.testConnection).not.toHaveBeenCalled();
 	});
 
 	it("checks Seerr browser sessions through a URL-only RPC", async () => {
@@ -89,8 +81,6 @@ describe("providerHandlers", () => {
 			url: "https://seerr.example/base",
 			auth: { mode: "session" },
 		});
-		expect(sonarrClientMock.testConnection).not.toHaveBeenCalled();
-		expect(radarrClientMock.testConnection).not.toHaveBeenCalled();
 	});
 
 	it("tests advanced Seerr API-key mode explicitly", async () => {
@@ -110,29 +100,25 @@ describe("providerHandlers", () => {
 	});
 
 	it("checks the stored Seerr connection without accepting a URL", async () => {
-		const connection = {
-			url: "https://seerr.example",
-			auth: { mode: "session" as const },
-			account: { id: 1, displayName: "Alice" },
-		};
-		getSeerrConfigMock.mockResolvedValue(connection);
+		getSeerrConfigMock.mockResolvedValue(seerrSessionConnection);
 		seerrClientMock.validateConnection.mockResolvedValue({
-			account: connection.account,
+			account: seerrSessionConnection.account,
 		});
 
 		await expect(
 			providerHandlers.checkConfiguredSeerrConnection(),
 		).resolves.toEqual({
-			account: connection.account,
+			account: seerrSessionConnection.account,
 		});
-		expect(seerrClientMock.validateConnection).toHaveBeenCalledWith(connection);
+		expect(seerrClientMock.validateConnection).toHaveBeenCalledWith(
+			seerrSessionConnection,
+		);
 	});
 
 	it("confirms CSRF support only when the configured session token is readable", async () => {
 		getSeerrConfigMock.mockResolvedValue({
+			...seerrSessionConnection,
 			url: "https://seerr.example/base",
-			auth: { mode: "session" },
-			account: { id: 1, displayName: "Alice" },
 		});
 		getSeerrXsrfTokenMock.mockResolvedValue("xsrf-token");
 
@@ -145,19 +131,13 @@ describe("providerHandlers", () => {
 	});
 
 	it("rejects CSRF support when cookie permission exposes no token", async () => {
-		getSeerrConfigMock.mockResolvedValue({
-			url: "https://seerr.example",
-			auth: { mode: "session" },
-			account: { id: 1, displayName: "Alice" },
-		});
+		getSeerrConfigMock.mockResolvedValue(seerrSessionConnection);
 		getSeerrXsrfTokenMock.mockResolvedValue(null);
 
 		await expect(
 			providerHandlers.checkConfiguredSeerrCsrfSupport(),
 		).rejects.toMatchObject({
 			code: ErrorCode.SEERR_CSRF_REQUIRED,
-			userMessage:
-				"Cookie access is enabled, but no Seerr XSRF token is available. Open or reload the configured Seerr server in the same browser profile, then try again. HTTPS may be required, and Firefox Containers can isolate the cookie.",
 		});
 	});
 

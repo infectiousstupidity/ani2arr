@@ -1,5 +1,3 @@
-/** Regression test for canonical mapping facts across the RPC boundary. */
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
@@ -51,7 +49,6 @@ function upstreamSnapshot(fetchedAt: number) {
 
 describe("canonical mapping regression", () => {
 	beforeEach(async () => {
-		vi.clearAllMocks();
 		await browser.storage.local.set({
 			"mapping:manual": {
 				sonarr: {
@@ -81,20 +78,16 @@ describe("canonical mapping regression", () => {
 			providerId: MAL_TVDB_ID,
 		});
 
-		const manualBeforeRefresh = await browser.storage.local.get("mapping:manual");
+		const stored = await browser.storage.local.get("mapping:manual");
+		const manualBeforeRefresh = stored["mapping:manual"];
 		expect(manualBeforeRefresh).toEqual({
-			"mapping:manual": {
-				sonarr: {
-					[`anilist:${ANILIST_ID}`]: {
-						mapping: { providerId: MAL_TVDB_ID },
-					},
+			sonarr: {
+				[`anilist:${ANILIST_ID}`]: {
+					mapping: { providerId: MAL_TVDB_ID },
 				},
-				radarr: {},
 			},
+			radarr: {},
 		});
-		await expect(
-			mappingService.getMapping("sonarr", MAL_SOURCE),
-		).resolves.toMatchObject({ providerId: MAL_TVDB_ID });
 		await expect(
 			mappingService.getMapping("sonarr", {
 				source: "anilist",
@@ -105,12 +98,11 @@ describe("canonical mapping regression", () => {
 		await browser.storage.local.set({
 			"mapping:upstream": upstreamSnapshot(Date.now() + 1),
 		});
-		await expect(
-			browser.storage.local.get("mapping:manual"),
-		).resolves.toEqual(manualBeforeRefresh);
+		const storedAfterRefresh =
+			await browser.storage.local.get("mapping:manual");
+		expect(storedAfterRefresh["mapping:manual"]).toEqual(manualBeforeRefresh);
 		await expect(
 			mappingService.getMapping("sonarr", MAL_SOURCE),
 		).resolves.toMatchObject({ providerId: MAL_TVDB_ID });
-
 	});
 });

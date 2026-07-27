@@ -1,6 +1,3 @@
-/** Tests for Sonarr RPC handler wiring that is easy to regress during client migration. */
-// src/rpc/handlers/sonarr.handlers.test.ts
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
@@ -22,27 +19,42 @@ const parseProviderQualityProfileId = (value: number) =>
 	value as ProviderQualityProfileId;
 const parseProviderTagId = (value: number) => value as ProviderTagId;
 const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
+const sonarrForm = {
+	rootFolderPath: "/anime",
+	qualityProfileId: parseProviderQualityProfileId(1),
+	seriesType: "anime" as const,
+	seasonFolder: true,
+	tags: [],
+	freeformTags: [],
+};
+const addSonarrForm = {
+	...sonarrForm,
+	addOptions: {
+		monitor: "all" as const,
+		searchForMissingEpisodes: true,
+		searchForCutoffUnmetEpisodes: false,
+	},
+};
+const updateSonarrInput = {
+	anilistId: parseAniListId(100),
+	tvdbId: parseTvdbId(200),
+	title: "Updated Series",
+	form: sonarrForm,
+};
 
 const sonarrClientMock = vi.hoisted(() => ({
-	findSeriesByTvdbId: vi.fn(),
 	getQualityProfiles: vi.fn(),
 	getRootFolders: vi.fn(),
 	getTags: vi.fn(),
-	lookupSeries: vi.fn(),
-	lookupSeriesByTvdbId: vi.fn(),
 }));
 
 const apiServicesMock = vi.hoisted(() => ({
 	mappingService: {
-		getLinkedAniListIds: vi.fn(),
 		resolveMapping: vi.fn(),
 	},
 	scheduleLibraryRefresh: vi.fn(),
-	sonarrClient: sonarrClientMock,
 	sonarrLibrary: {
-		clearSeriesSnapshotCache: vi.fn(),
 		getSeriesLibraryStatusByTvdbId: vi.fn(),
-		getSeriesSnapshots: vi.fn(),
 		upsertSeriesSnapshot: vi.fn(),
 	},
 }));
@@ -77,8 +89,6 @@ vi.mock("@/providers/sonarr/edit", () => ({
 
 describe("sonarrHandlers", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
-		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
 		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(true);
 	});
 
@@ -123,7 +133,7 @@ describe("sonarrHandlers", () => {
 	});
 
 	it("returns mapped Sonarr library status with raw series", async () => {
-		const anilistId = parseAniListId(100);
+		const source = { source: "mal", id: parseMyAnimeListId(5114) } as const;
 		const tvdbId = parseTvdbId(200);
 		const series = {
 			id: parseSonarrSeriesId(5),
@@ -149,7 +159,7 @@ describe("sonarrHandlers", () => {
 
 		await expect(
 			sonarrHandlers.getSeriesStatus({
-				anilistId,
+				source,
 				title: "Mapped Series",
 				force_verify: true,
 				force_mapping_retry: true,
@@ -165,40 +175,11 @@ describe("sonarrHandlers", () => {
 		});
 		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
 			"sonarr",
-			{ source: "anilist", id: anilistId },
+			source,
 			{
 				forceRetry: true,
 				title: "Mapped Series",
 			},
-		);
-	});
-
-	it("uses a direct MAL mapping for Sonarr library status", async () => {
-		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
-		const source = { source: "mal", id: parseMyAnimeListId(5114) } as const;
-		const tvdbId = parseTvdbId(78_874);
-		apiServicesMock.mappingService.resolveMapping.mockResolvedValue({
-			kind: "mapped",
-			source: "upstream",
-			providerId: tvdbId,
-		});
-		apiServicesMock.sonarrLibrary.getSeriesLibraryStatusByTvdbId.mockResolvedValue(
-			{
-				provider: "sonarr",
-				providerId: tvdbId,
-				isInLibrary: false,
-			},
-		);
-
-		await expect(sonarrHandlers.getSeriesStatus({ source })).resolves.toEqual({
-			mapping: { kind: "mapped", source: "upstream", providerId: tvdbId },
-			isInLibrary: false,
-		});
-
-		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
-			"sonarr",
-			source,
-			{ forceRetry: false },
 		);
 		expect(
 			apiServicesMock.sonarrLibrary.getSeriesLibraryStatusByTvdbId,
@@ -206,26 +187,13 @@ describe("sonarrHandlers", () => {
 			tvdbId,
 			credentials,
 			onCacheChanged: expect.any(Function),
-			forceVerify: false,
+			forceVerify: true,
 		});
 	});
 
 	it("updates Sonarr cache and revision after add", async () => {
 		const anilistId = parseAniListId(100);
 		const tvdbId = parseTvdbId(200);
-		const form = {
-			rootFolderPath: "/anime",
-			qualityProfileId: parseProviderQualityProfileId(1),
-			seriesType: "anime" as const,
-			seasonFolder: true,
-			tags: [],
-			freeformTags: [],
-			addOptions: {
-				monitor: "all" as const,
-				searchForMissingEpisodes: true,
-				searchForCutoffUnmetEpisodes: false,
-			},
-		};
 		const created = {
 			id: parseSonarrSeriesId(5),
 			title: "Added Series",
@@ -234,7 +202,7 @@ describe("sonarrHandlers", () => {
 		};
 		providerConfigMock.requireProviderConfig.mockResolvedValue({
 			credentials,
-			options: { providers: { sonarr: { defaults: form } } },
+			options: { providers: { sonarr: { defaults: addSonarrForm } } },
 		});
 		addSonarrSeriesMock.mockResolvedValue(created);
 
@@ -243,7 +211,7 @@ describe("sonarrHandlers", () => {
 				anilistId,
 				tvdbId,
 				title: "Added Series",
-				form,
+				form: addSonarrForm,
 			}),
 		).resolves.toBe(created);
 
@@ -271,19 +239,7 @@ describe("sonarrHandlers", () => {
 		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(false);
 
 		await expect(
-			sonarrHandlers.updateSonarrSeries({
-				anilistId: parseAniListId(100),
-				tvdbId,
-				title: "Updated Series",
-				form: {
-					rootFolderPath: "/anime",
-					qualityProfileId: parseProviderQualityProfileId(1),
-					seriesType: "anime",
-					seasonFolder: true,
-					tags: [],
-					freeformTags: [],
-				},
-			}),
+			sonarrHandlers.updateSonarrSeries(updateSonarrInput),
 		).resolves.toBe(updated);
 
 		expect(
@@ -309,19 +265,7 @@ describe("sonarrHandlers", () => {
 		updateSonarrSeriesMock.mockRejectedValue(partialSuccessError);
 
 		await expect(
-			sonarrHandlers.updateSonarrSeries({
-				anilistId: parseAniListId(100),
-				tvdbId: parseTvdbId(200),
-				title: "Updated Series",
-				form: {
-					rootFolderPath: "/anime",
-					qualityProfileId: parseProviderQualityProfileId(1),
-					seriesType: "anime",
-					seasonFolder: true,
-					tags: [],
-					freeformTags: [],
-				},
-			}),
+			sonarrHandlers.updateSonarrSeries(updateSonarrInput),
 		).rejects.toBe(partialSuccessError);
 
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(

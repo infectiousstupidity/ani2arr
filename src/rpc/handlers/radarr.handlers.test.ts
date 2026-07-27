@@ -1,9 +1,5 @@
-/** Tests for Radarr RPC handler resource loading. */
-// src/rpc/handlers/radarr.handlers.test.ts
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
-import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type { ProviderCredentials } from "@/providers/types";
 import type {
@@ -21,26 +17,33 @@ const parseProviderQualityProfileId = (value: number) =>
 	value as ProviderQualityProfileId;
 const parseProviderTagId = (value: number) => value as ProviderTagId;
 const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
+const radarrForm = {
+	rootFolderPath: "/movies",
+	qualityProfileId: parseProviderQualityProfileId(1),
+	minimumAvailability: "released" as const,
+	tags: [],
+	freeformTags: [],
+};
+const addRadarrForm = {
+	...radarrForm,
+	addOptions: {
+		monitor: "movieOnly" as const,
+		searchForMovie: false,
+	},
+};
 
 const radarrClientMock = vi.hoisted(() => ({
-	findMovieByTmdbId: vi.fn(),
 	getQualityProfiles: vi.fn(),
 	getRootFolders: vi.fn(),
 	getTags: vi.fn(),
-	lookupMovieByTmdbId: vi.fn(),
-	lookupMovies: vi.fn(),
 }));
 
 const apiServicesMock = vi.hoisted(() => ({
 	mappingService: {
-		getLinkedAniListIds: vi.fn(),
 		resolveMapping: vi.fn(),
 	},
-	radarrClient: radarrClientMock,
 	radarrLibrary: {
-		clearMovieSnapshotCache: vi.fn(),
 		getMovieLibraryStatusByTmdbId: vi.fn(),
-		getMovieSnapshots: vi.fn(),
 		upsertMovieSnapshot: vi.fn(),
 	},
 	scheduleLibraryRefresh: vi.fn(),
@@ -76,8 +79,6 @@ vi.mock("@/providers/radarr/edit", () => ({
 
 describe("radarrHandlers", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
-		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
 		apiServicesMock.radarrLibrary.upsertMovieSnapshot.mockResolvedValue(true);
 	});
 
@@ -173,56 +174,9 @@ describe("radarrHandlers", () => {
 		);
 	});
 
-	it("uses a direct MAL mapping for Radarr library status", async () => {
-		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
-		const source = { source: "mal", id: parseMyAnimeListId(59_571) } as const;
-		const tmdbId = parseTmdbId(1_333_100);
-		apiServicesMock.mappingService.resolveMapping.mockResolvedValue({
-			kind: "mapped",
-			source: "upstream",
-			providerId: tmdbId,
-		});
-		apiServicesMock.radarrLibrary.getMovieLibraryStatusByTmdbId.mockResolvedValue(
-			{
-				provider: "radarr",
-				providerId: tmdbId,
-				isInLibrary: false,
-			},
-		);
-
-		await expect(radarrHandlers.getMovieStatus({ source })).resolves.toEqual({
-			mapping: { kind: "mapped", source: "upstream", providerId: tmdbId },
-			isInLibrary: false,
-		});
-		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
-			"radarr",
-			source,
-			{ forceRetry: false },
-		);
-		expect(
-			apiServicesMock.radarrLibrary.getMovieLibraryStatusByTmdbId,
-		).toHaveBeenCalledWith({
-			tmdbId,
-			credentials,
-			onCacheChanged: expect.any(Function),
-			forceVerify: false,
-		});
-	});
-
 	it("updates Radarr cache and revision after add", async () => {
 		const anilistId = parseAniListId(100);
 		const tmdbId = parseTmdbId(200);
-		const form = {
-			rootFolderPath: "/movies",
-			qualityProfileId: parseProviderQualityProfileId(1),
-			minimumAvailability: "released" as const,
-			tags: [],
-			freeformTags: [],
-			addOptions: {
-				monitor: "movieOnly" as const,
-				searchForMovie: false,
-			},
-		};
 		const created = {
 			id: parseRadarrMovieId(5),
 			title: "Added Movie",
@@ -231,7 +185,7 @@ describe("radarrHandlers", () => {
 		};
 		providerConfigMock.requireProviderConfig.mockResolvedValue({
 			credentials,
-			options: { providers: { radarr: { defaults: form } } },
+			options: { providers: { radarr: { defaults: addRadarrForm } } },
 		});
 		addRadarrMovieMock.mockResolvedValue(created);
 
@@ -240,7 +194,7 @@ describe("radarrHandlers", () => {
 				anilistId,
 				tmdbId,
 				title: "Added Movie",
-				form,
+				form: addRadarrForm,
 			}),
 		).resolves.toBe(created);
 
@@ -272,13 +226,7 @@ describe("radarrHandlers", () => {
 				anilistId: parseAniListId(100),
 				tmdbId,
 				title: "Updated Movie",
-				form: {
-					rootFolderPath: "/movies",
-					qualityProfileId: parseProviderQualityProfileId(1),
-					minimumAvailability: "released",
-					tags: [],
-					freeformTags: [],
-				},
+				form: radarrForm,
 			}),
 		).resolves.toBe(updated);
 

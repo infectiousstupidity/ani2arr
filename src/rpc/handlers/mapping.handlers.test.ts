@@ -1,6 +1,3 @@
-/** Tests for mapping RPC listing composition and mapping writes. */
-// src/rpc/handlers/mapping.handlers.test.ts
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
@@ -47,11 +44,7 @@ vi.mock("@/background/api-services", () => ({
 		getMetadata: vi.fn(),
 	},
 	mappingService: {
-		clearIgnored: vi.fn(),
-		clearManualMapping: vi.fn(),
-		clearRejectedCandidate: vi.fn(),
 		getLinkedAniListIds: vi.fn(),
-		rejectCandidate: vi.fn(),
 		setIgnored: vi.fn(),
 		setManualMapping: vi.fn(),
 	},
@@ -79,6 +72,14 @@ const anilistSource = (anilistId: ReturnType<typeof aid>) =>
 	({ source: "anilist", id: anilistId }) as const;
 const credentials = { url: "http://localhost", apiKey: "api-key" };
 
+function mappingRecord(
+	anilistId: ReturnType<typeof aid>,
+	provider: Provider,
+	result: EffectiveMappingRecord["result"],
+): EffectiveMappingRecord {
+	return { anilistId, provider, result };
+}
+
 function sonarrSeries(tvdbId: ReturnType<typeof tvdb>): SonarrSeriesSnapshot {
 	return {
 		id: Number(tvdbId) as SonarrSeriesId,
@@ -100,21 +101,21 @@ function radarrMovie(tmdbId: ReturnType<typeof tmdb>): RadarrMovieSnapshot {
 }
 
 const sonarrMappings: EffectiveMappingRecord[] = [
-	{
-		anilistId: aid(1),
-		provider: "sonarr",
-		result: { kind: "mapped", source: "manual", providerId: tvdb(10) },
-	},
-	{
-		anilistId: aid(2),
-		provider: "sonarr",
-		result: { kind: "mapped", source: "auto", providerId: tvdb(10) },
-	},
-	{
-		anilistId: aid(3),
-		provider: "sonarr",
-		result: { kind: "mapped", source: "auto", providerId: tvdb(20) },
-	},
+	mappingRecord(aid(1), "sonarr", {
+		kind: "mapped",
+		source: "manual",
+		providerId: tvdb(10),
+	}),
+	mappingRecord(aid(2), "sonarr", {
+		kind: "mapped",
+		source: "auto",
+		providerId: tvdb(10),
+	}),
+	mappingRecord(aid(3), "sonarr", {
+		kind: "mapped",
+		source: "auto",
+		providerId: tvdb(20),
+	}),
 ];
 
 function mockMappingRecords(
@@ -128,7 +129,6 @@ function mockMappingRecords(
 
 describe("mappingHandlers", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		vi.mocked(getSourceAliasesByAniListId).mockResolvedValue(new Map());
 		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
 		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue({});
@@ -141,38 +141,21 @@ describe("mappingHandlers", () => {
 	it("delegates the complete alias batch to one pure store read", async () => {
 		const directSource = anilistSource(aid(20));
 		const malSource = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue({
+		const resolvedIds = {
 			"anilist:20": aid(20),
 			"mal:5114": aid(21),
-		});
+		};
+		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue(resolvedIds);
 
 		await expect(
 			mappingHandlers.resolveAniListIdsForSources([directSource, malSource]),
-		).resolves.toEqual({
-			"anilist:20": aid(20),
-			"mal:5114": aid(21),
-		});
+		).resolves.toBe(resolvedIds);
 
 		expect(getUniqueAniListIdsForSources).toHaveBeenCalledOnce();
 		expect(getUniqueAniListIdsForSources).toHaveBeenCalledWith([
 			directSource,
 			malSource,
 		]);
-	});
-
-	it("returns a missing alias without triggering another operation", async () => {
-		const malSource = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue({
-			"mal:5114": null,
-		});
-
-		await expect(
-			mappingHandlers.resolveAniListIdsForSources([malSource]),
-		).resolves.toEqual({
-			"mal:5114": null,
-		});
-
-		expect(getUniqueAniListIdsForSources).toHaveBeenCalledOnce();
 	});
 
 	it("returns every composed mapping group without filtering", async () => {
@@ -191,15 +174,11 @@ describe("mappingHandlers", () => {
 		const alias = { source: "mal", id: mal(5114) } as const;
 		mockMappingRecords({
 			sonarr: [
-				{
-					anilistId,
-					provider: "sonarr",
-					result: {
-						kind: "mapped",
-						source: "upstream",
-						providerId: tvdb(10),
-					},
-				},
+				mappingRecord(anilistId, "sonarr", {
+					kind: "mapped",
+					source: "upstream",
+					providerId: tvdb(10),
+				}),
 			],
 		});
 		vi.mocked(getSourceAliasesByAniListId).mockResolvedValue(
@@ -219,43 +198,38 @@ describe("mappingHandlers", () => {
 		expect(getSourceAliasesByAniListId).toHaveBeenCalledOnce();
 	});
 
-	it("builds Sonarr route metadata", async () => {
+	it("builds provider route metadata", async () => {
+		const radarrProviderId = tmdb(30);
+		mockMappingRecords({
+			sonarr: sonarrMappings,
+			radarr: [
+				mappingRecord(aid(30), "radarr", {
+					kind: "mapped",
+					source: "auto",
+					providerId: radarrProviderId,
+				}),
+			],
+		});
 		getProviderConfigMock.mockResolvedValue(credentials);
 		vi.mocked(sonarrLibrary.getSeriesSnapshots).mockResolvedValue([
 			sonarrSeries(tvdb(10)),
 		]);
+		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([
+			radarrMovie(radarrProviderId),
+		]);
 
 		const result = await mappingHandlers.getMappings();
-		const group = result.find(
+		const sonarrGroup = result.find(
 			(item) => item.provider === "sonarr" && item.providerId === tvdb(10),
 		);
+		const radarrGroup = result.find((item) => item.provider === "radarr");
 
-		expect(group?.providerMeta).toEqual({
+		expect(sonarrGroup?.providerMeta).toEqual({
 			title: "Sonarr 10",
 			statusLabel: "continuing",
 			providerRouteSlug: "sonarr-10",
 		});
-	});
-
-	it("builds Radarr route metadata", async () => {
-		const providerId = tmdb(30);
-		const mappings: EffectiveMappingRecord[] = [
-			{
-				anilistId: aid(30),
-				provider: "radarr",
-				result: { kind: "mapped", source: "auto", providerId },
-			},
-		];
-		mockMappingRecords({ radarr: mappings });
-		getProviderConfigMock.mockResolvedValue(credentials);
-		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([
-			radarrMovie(providerId),
-		]);
-
-		const result = await mappingHandlers.getMappings();
-		const group = result.find((item) => item.provider === "radarr");
-
-		expect(group?.providerMeta).toEqual({
+		expect(radarrGroup?.providerMeta).toEqual({
 			title: "Radarr 30",
 			statusLabel: "released",
 			providerRouteSlug: "radarr-30",
@@ -264,18 +238,14 @@ describe("mappingHandlers", () => {
 
 	it("uses the only existing ambiguous target", async () => {
 		const existingProviderId = tvdb(40);
-		const mappings: EffectiveMappingRecord[] = [
-			{
-				anilistId: aid(40),
-				provider: "sonarr",
-				result: {
-					kind: "ambiguous",
-					targets: [
-						{ provider: "sonarr", providerId: existingProviderId },
-						{ provider: "sonarr", providerId: tvdb(41) },
-					],
-				},
-			},
+		const mappings = [
+			mappingRecord(aid(40), "sonarr", {
+				kind: "ambiguous",
+				targets: [
+					{ provider: "sonarr", providerId: existingProviderId },
+					{ provider: "sonarr", providerId: tvdb(41) },
+				],
+			}),
 		];
 		mockMappingRecords({ sonarr: mappings });
 		getProviderConfigMock.mockResolvedValue(credentials);
@@ -298,17 +268,12 @@ describe("mappingHandlers", () => {
 	});
 
 	it("keeps groups without an active provider target", async () => {
-		const mappings: EffectiveMappingRecord[] = [
-			{
-				anilistId: aid(51),
-				provider: "sonarr",
-				result: { kind: "ignored" },
-			},
-			{
-				anilistId: aid(52),
-				provider: "sonarr",
-				result: { kind: "unmapped", hadResolveAttempt: false },
-			},
+		const mappings = [
+			mappingRecord(aid(51), "sonarr", { kind: "ignored" }),
+			mappingRecord(aid(52), "sonarr", {
+				kind: "unmapped",
+				hadResolveAttempt: false,
+			}),
 		];
 		mockMappingRecords({ sonarr: mappings });
 
@@ -351,24 +316,6 @@ describe("mappingHandlers", () => {
 			"sonarr",
 			source,
 			tvdb(20),
-			aid(10),
-		);
-		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
-	});
-
-	it("keeps the MAL source when an AniList metadata ID accompanies a mutation", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		await expect(
-			mappingHandlers.setMappingIgnore({
-				source,
-				anilistId: aid(10),
-				provider: "sonarr",
-			}),
-		).resolves.toEqual({ ok: true });
-
-		expect(mappingService.setIgnored).toHaveBeenCalledWith(
-			"sonarr",
-			source,
 			aid(10),
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();

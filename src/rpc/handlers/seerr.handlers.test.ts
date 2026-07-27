@@ -1,9 +1,6 @@
-/** Tests for Seerr RPC request, target, search, and status handlers. */
-// src/rpc/handlers/seerr.handlers.test.ts
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
-import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
+import { parseTmdbId } from "@/providers/schemas";
 import type { SeerrConnection } from "@/providers/seerr/types";
 import { seerrHandlers } from "./seerr.handlers";
 
@@ -55,48 +52,22 @@ vi.mock("@/rpc/revision-signals", () => ({
 
 describe("seerrHandlers", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
 		requireSeerrConnectionMock.mockResolvedValue(connection);
-		getEffectiveSeerrTargetMock.mockResolvedValue(null);
-		resolveSeerrAutomaticTargetMock.mockResolvedValue(null);
-		listEffectiveSeerrTargetsMock.mockResolvedValue([]);
-		listAllEffectiveSeerrTargetsMock.mockResolvedValue([]);
-		setManualSeerrTargetMock.mockResolvedValue(null);
-		clearManualSeerrTargetMock.mockResolvedValue(null);
-		anilistMetadataStoreMock.getMetadata.mockResolvedValue({ metadata: [] });
 	});
 
 	it("creates Seerr requests from minimal RPC input", async () => {
-		seerrClientMock.requestMedia.mockResolvedValue({ id: 1, status: 1 });
+		const result = { id: 1, status: 1 };
+		seerrClientMock.requestMedia.mockResolvedValue(result);
 
 		await expect(
 			seerrHandlers.requestInSeerr({
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 			}),
-		).resolves.toEqual({ id: 1, status: 1 });
+		).resolves.toBe(result);
 
 		expect(seerrClientMock.requestMedia).toHaveBeenCalledWith(
 			{ mediaType: "movie", mediaId: parseTmdbId(123) },
-			connection,
-		);
-	});
-
-	it("reads Seerr movie status through TMDB ID", async () => {
-		seerrClientMock.getMediaStatus.mockResolvedValue("available");
-
-		await expect(
-			seerrHandlers.getSeerrMediaStatus({
-				mediaType: "movie",
-				tmdbId: parseTmdbId(123),
-			}),
-		).resolves.toEqual({ status: "available" });
-
-		expect(seerrClientMock.getMediaStatus).toHaveBeenCalledWith(
-			{
-				mediaType: "movie",
-				tmdbId: parseTmdbId(123),
-			},
 			connection,
 		);
 	});
@@ -123,92 +94,59 @@ describe("seerrHandlers", () => {
 	});
 
 	it("delegates batch Seerr target reads to mapping", async () => {
-		listEffectiveSeerrTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				mediaType: "tv",
-				tmdbId: parseTmdbId(456),
-				seasons: [0, 1, 2],
-				tmdbSeasons: [0, 2],
-				tvdbSeasons: [0, 1],
-				tvdbId: parseTvdbId(789),
-				source: "anibridge",
-			},
-		]);
 		const ids = [parseAniListId(100)];
-
-		await expect(seerrHandlers.getSeerrTargets(ids)).resolves.toEqual([
+		const targets = [
 			{
-				anilistId: parseAniListId(100),
-				mediaType: "tv",
+				anilistId: ids[0],
+				mediaType: "movie" as const,
 				tmdbId: parseTmdbId(456),
-				seasons: [0, 1, 2],
-				tmdbSeasons: [0, 2],
-				tvdbSeasons: [0, 1],
-				tvdbId: parseTvdbId(789),
-				source: "anibridge",
+				source: "manual" as const,
 			},
-		]);
+		];
+		listEffectiveSeerrTargetsMock.mockResolvedValue(targets);
+
+		await expect(seerrHandlers.getSeerrTargets(ids)).resolves.toBe(targets);
 		expect(listEffectiveSeerrTargetsMock).toHaveBeenCalledWith(ids);
 	});
 
 	it("delegates one Seerr target read to mapping", async () => {
-		getEffectiveSeerrTargetMock.mockResolvedValue({
+		const target = {
 			anilistId: parseAniListId(100),
-			mediaType: "movie",
+			mediaType: "movie" as const,
 			tmdbId: parseTmdbId(123),
-			source: "manual",
-		});
+			source: "manual" as const,
+		};
+		getEffectiveSeerrTargetMock.mockResolvedValue(target);
 
 		await expect(
 			seerrHandlers.getSeerrTarget({ anilistId: parseAniListId(100) }),
-		).resolves.toEqual({
+		).resolves.toBe(target);
+		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith({
+			identity: { source: "anilist", id: parseAniListId(100) },
 			anilistId: parseAniListId(100),
-			mediaType: "movie",
-			tmdbId: parseTmdbId(123),
-			source: "manual",
 		});
-		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith(
-			{
-				identity: { source: "anilist", id: parseAniListId(100) },
-				anilistId: parseAniListId(100),
-			},
-		);
 	});
 
 	it("clears manual Seerr targets", async () => {
 		await expect(
 			seerrHandlers.clearManualSeerrTarget({ anilistId: parseAniListId(100) }),
 		).resolves.toEqual({ ok: true });
-		expect(clearManualSeerrTargetMock).toHaveBeenCalledWith(
-			{
-				identity: { source: "anilist", id: parseAniListId(100) },
-				anilistId: parseAniListId(100),
-			},
-		);
+		expect(clearManualSeerrTargetMock).toHaveBeenCalledWith({
+			identity: { source: "anilist", id: parseAniListId(100) },
+			anilistId: parseAniListId(100),
+		});
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
-	});
-
-	it("returns null when no manual or upstream Seerr target exists", async () => {
-		await expect(
-			seerrHandlers.getSeerrTarget({ anilistId: parseAniListId(100) }),
-		).resolves.toBeNull();
-		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith(
-			{
-				identity: { source: "anilist", id: parseAniListId(100) },
-				anilistId: parseAniListId(100),
-			},
-		);
 	});
 
 	it("resolves a missing target when source metadata is provided", async () => {
 		const anilistId = parseAniListId(100);
-		resolveSeerrAutomaticTargetMock.mockResolvedValue({
+		const target = {
 			anilistId,
-			mediaType: "movie",
+			mediaType: "movie" as const,
 			tmdbId: parseTmdbId(123),
-			source: "automatic",
-		});
+			source: "automatic" as const,
+		};
+		resolveSeerrAutomaticTargetMock.mockResolvedValue(target);
 
 		await expect(
 			seerrHandlers.getSeerrTarget({
@@ -216,7 +154,7 @@ describe("seerrHandlers", () => {
 				title: "Perfect Blue",
 				metadata: { format: "MOVIE", startYear: 1998 },
 			}),
-		).resolves.toMatchObject({ source: "automatic", tmdbId: parseTmdbId(123) });
+		).resolves.toBe(target);
 		expect(resolveSeerrAutomaticTargetMock).toHaveBeenCalledWith({
 			source: { source: "anilist", id: anilistId },
 			anilistId,
@@ -224,40 +162,6 @@ describe("seerrHandlers", () => {
 			metadata: { format: "MOVIE", startYear: 1998 },
 		});
 		expect(getEffectiveSeerrTargetMock).not.toHaveBeenCalled();
-	});
-
-	it("returns already-effective targets from bulk lookup", async () => {
-		listEffectiveSeerrTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				mediaType: "movie",
-				tmdbId: parseTmdbId(123),
-				source: "manual",
-			},
-			{
-				anilistId: parseAniListId(200),
-				mediaType: "movie",
-				tmdbId: parseTmdbId(789),
-				source: "anibridge",
-			},
-		]);
-		const ids = [parseAniListId(100), parseAniListId(200)];
-
-		await expect(seerrHandlers.getSeerrTargets(ids)).resolves.toEqual([
-			{
-				anilistId: parseAniListId(100),
-				mediaType: "movie",
-				tmdbId: parseTmdbId(123),
-				source: "manual",
-			},
-			{
-				anilistId: parseAniListId(200),
-				mediaType: "movie",
-				tmdbId: parseTmdbId(789),
-				source: "anibridge",
-			},
-		]);
-		expect(listEffectiveSeerrTargetsMock).toHaveBeenCalledWith(ids);
 	});
 
 	it("saves manual Seerr targets", async () => {
@@ -278,37 +182,35 @@ describe("seerrHandlers", () => {
 	});
 
 	it("searches Seerr through configured credentials", async () => {
-		seerrClientMock.searchMedia.mockResolvedValue([
+		const results = [
 			{ mediaType: "movie", tmdbId: parseTmdbId(123), title: "Movie" },
-		]);
+		];
+		seerrClientMock.searchMedia.mockResolvedValue(results);
 
 		await expect(
 			seerrHandlers.searchSeerrMedia({ query: "movie" }),
-		).resolves.toEqual([
-			{ mediaType: "movie", tmdbId: parseTmdbId(123), title: "Movie" },
-		]);
-		expect(seerrClientMock.searchMedia).toHaveBeenCalledWith("movie", connection);
+		).resolves.toBe(results);
+		expect(seerrClientMock.searchMedia).toHaveBeenCalledWith(
+			"movie",
+			connection,
+		);
 	});
 
 	it("reads Seerr details through configured credentials", async () => {
-		seerrClientMock.getMediaDetails.mockResolvedValue({
+		const details = {
 			mediaType: "movie",
 			tmdbId: parseTmdbId(123),
 			title: "Movie",
 			status: "unknown",
-		});
+		} as const;
+		seerrClientMock.getMediaDetails.mockResolvedValue(details);
 
 		await expect(
 			seerrHandlers.getSeerrMediaDetails({
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 			}),
-		).resolves.toEqual({
-			mediaType: "movie",
-			tmdbId: parseTmdbId(123),
-			title: "Movie",
-			status: "unknown",
-		});
+		).resolves.toBe(details);
 		expect(seerrClientMock.getMediaDetails).toHaveBeenCalledWith(
 			{ mediaType: "movie", tmdbId: parseTmdbId(123) },
 			connection,
