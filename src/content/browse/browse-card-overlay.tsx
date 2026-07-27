@@ -1,16 +1,16 @@
 /** Browse-card overlay selector for provider-specific card actions. */
 // src/content/browse/browse-card-overlay.tsx
 
-import React, {
-	type MouseEvent,
-	type ReactElement,
-	type ReactNode,
-	type SyntheticEvent,
-} from "react";
 import { SlidersHorizontal } from "lucide-react";
-import type { AniListId } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
+import type React from "react";
+import type {
+	MouseEvent,
+	ReactElement,
+	ReactNode,
+	SyntheticEvent,
+} from "react";
 import type { metadataHintFromAniListMetadata } from "@/anilist/title";
+import type { AniListId } from "@/anilist/types";
 import type {
 	MediaModalMetadataHint,
 	MediaModalOpenState,
@@ -21,14 +21,18 @@ import {
 	SeerrStandaloneCardOverlay,
 } from "@/features/media-overlay/seerr-card-overlay";
 import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { Provider } from "@/providers/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { MappingIdentity } from "@/rpc/types";
-import type { PublicOptions } from "@/settings/types";
+import type {
+	BrowseCardPrimaryStatus,
+	PublicOptions,
+} from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import type { BrowseAdapter, HostMediaTarget } from "./types";
 import { resolveBrowseCardProvider } from "./browse-card-provider";
-import type { Provider } from "@/providers/types";
+import type { BrowseAdapter, HostMediaTarget } from "./types";
 
 type MetadataHint = ReturnType<typeof metadataHintFromAniListMetadata>;
 
@@ -67,8 +71,33 @@ function getModalMetadataHint(input: {
 	};
 }
 
-function getPrimaryStatus(publicOptions: PublicOptions | undefined): string {
+function getPrimaryStatus(
+	publicOptions: PublicOptions | undefined,
+): BrowseCardPrimaryStatus {
 	return publicOptions?.ui?.browseCards.primaryStatus ?? "arr";
+}
+
+function getEffectivePrimaryStatus(input: {
+	preferred: BrowseCardPrimaryStatus;
+	arrEnabled: boolean;
+	arrConfigured: boolean;
+	seerrEnabled: boolean;
+	seerrConfigured: boolean;
+}): BrowseCardPrimaryStatus | null {
+	const arrReady = input.arrEnabled && input.arrConfigured;
+	const seerrReady = input.seerrEnabled && input.seerrConfigured;
+
+	if (arrReady !== seerrReady) {
+		return arrReady ? "arr" : "seerr";
+	}
+
+	if (input.preferred === "arr" && input.arrEnabled) return "arr";
+	if (input.preferred === "seerr" && input.seerrEnabled) return "seerr";
+
+	if (input.arrEnabled) return "arr";
+	if (input.seerrEnabled) return "seerr";
+
+	return null;
 }
 
 function getActiveArrProvider(
@@ -185,6 +214,7 @@ function openProviderModal(input: {
 	metadataHint: MediaModalMetadataHint;
 }): void {
 	if (input.anilistId === undefined) return;
+
 	input.onOpenMediaModal({
 		anilistId: input.anilistId,
 		source: input.source,
@@ -240,7 +270,25 @@ export function BrowseCardOverlay({
 
 	if (activeArr === "none" && !seerrEnabled) return null;
 
-	const displayTitle = getDisplayTitle({ metadata, parsedTitle: parsed.title });
+	const arrConfigured =
+		activeArr === "sonarr"
+			? sonarrOpts.isConfigured
+			: (activeArr === "radarr"
+				? radarrOpts.isConfigured
+				: false);
+
+	const effectivePrimaryStatus = getEffectivePrimaryStatus({
+		preferred: getPrimaryStatus(publicOptions),
+		arrEnabled: activeArr !== "none",
+		arrConfigured,
+		seerrEnabled,
+		seerrConfigured: seerrOpts.isConfigured,
+	});
+
+	const displayTitle = getDisplayTitle({
+		metadata,
+		parsedTitle: parsed.title,
+	});
 	const metadataHint = getModalMetadataHint({
 		title: displayTitle,
 		parsedFormat: parsed.format,
@@ -261,7 +309,7 @@ export function BrowseCardOverlay({
 		});
 	};
 
-	const handleOpenSeerrModal = () => {
+	const handleOpenSeerrModal = (): void => {
 		openSeerrModal({
 			onOpenMediaModal,
 			anilistId,
@@ -273,9 +321,8 @@ export function BrowseCardOverlay({
 	let arrStackAction: ReactNode = null;
 
 	if (activeArr === "sonarr") {
-		const isConfig = sonarrOpts.isConfigured;
 		arrStackAction = getProviderStackAction({
-			isConfigured: isConfig,
+			isConfigured: sonarrOpts.isConfigured,
 			anilistId,
 			configuredLabel: "Sonarr options",
 			configureLabel: "Configure Sonarr",
@@ -284,9 +331,8 @@ export function BrowseCardOverlay({
 			onConfigure: () => openOptionsPage({ sectionId: "sonarr" }),
 		});
 	} else if (activeArr === "radarr") {
-		const isConfig = radarrOpts.isConfigured;
 		arrStackAction = getProviderStackAction({
-			isConfigured: isConfig,
+			isConfigured: radarrOpts.isConfigured,
 			anilistId,
 			configuredLabel: "Radarr options",
 			configureLabel: "Configure Radarr",
@@ -298,29 +344,29 @@ export function BrowseCardOverlay({
 
 	const stackDirection = adapter.stackDirection ?? "up";
 
-	const seerrStackActions: ReactNode =
-		seerrEnabled ? (
-			<SeerrCardStackActions
-				source={parsed.source}
-				{...(anilistId === undefined ? {} : { anilistId })}
-				title={displayTitle}
-				metadata={metadata}
-				isConfigured={seerrOpts.isConfigured}
-				observeTarget={parsed.mountTarget}
-				tooltipContainer={tooltipContainer}
-				onOpenModal={handleOpenSeerrModal}
-				stackDirection={stackDirection}
-				presentation={parsed.presentation}
-			/>
-		) : null;
+	const seerrStackActions: ReactNode = seerrEnabled ? (
+		<SeerrCardStackActions
+			source={parsed.source}
+			{...(anilistId === undefined ? {} : { anilistId })}
+			title={displayTitle}
+			metadata={metadata}
+			isConfigured={seerrOpts.isConfigured}
+			observeTarget={parsed.mountTarget}
+			tooltipContainer={tooltipContainer}
+			onOpenModal={handleOpenSeerrModal}
+			stackDirection={stackDirection}
+			presentation={parsed.presentation}
+		/>
+	) : null;
 
-	const primaryStatus = getPrimaryStatus(publicOptions);
+	const usesFloatingOverlay =
+		parsed.presentation !== "status-column" &&
+		parsed.presentation !== "action-row";
+
 	const showSeerrMain =
 		seerrEnabled &&
 		(activeArr === "none" ||
-			(parsed.presentation !== "status-column" &&
-				parsed.presentation !== "action-row" &&
-				primaryStatus === "seerr"));
+			(usesFloatingOverlay && effectivePrimaryStatus === "seerr"));
 
 	const commonProps = {
 		anilistId,

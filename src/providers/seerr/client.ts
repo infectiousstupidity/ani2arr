@@ -2,28 +2,25 @@
 // src/providers/seerr/client.ts
 
 import { readProviderErrorMessage } from "@/providers/provider-error";
+import { ErrorCode, type ExtensionError } from "@/shared/errors/error.types";
 import { createError } from "@/shared/errors/error-utils";
-import {
-	ErrorCode,
-	type ExtensionError,
-} from "@/shared/errors/error.types";
+import { SEERR_XSRF_HEADER_NAME } from "./csrf-token";
 import {
 	readSeerrMediaDetails,
 	readSeerrMediaStatus,
 	readSeerrPublicSettings,
 	readSeerrSearchResults,
 } from "./request";
-import { SEERR_XSRF_HEADER_NAME } from "./csrf-token";
 import type {
 	SeerrAccountSummary,
 	SeerrConnection,
 	SeerrMediaDetails,
-	SeerrMediaStatusInput,
 	SeerrMediaRequest,
-	SeerrMediaStatus,
+	SeerrMediaStatusInput,
 	SeerrPublicSettings,
 	SeerrRequestPayload,
 	SeerrSearchResult,
+	SeerrStatusSummary,
 } from "./types";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -88,10 +85,7 @@ export class SeerrClient {
 			throw await createSeerrResponseError(response, connection);
 		}
 
-		return readJsonResponse(
-			response,
-			"request",
-		) as Promise<SeerrMediaRequest>;
+		return readJsonResponse(response, "request") as Promise<SeerrMediaRequest>;
 	}
 
 	public async searchMedia(
@@ -124,7 +118,7 @@ export class SeerrClient {
 	public async getMediaStatus(
 		input: SeerrMediaStatusInput,
 		connection: SeerrConnection,
-	): Promise<SeerrMediaStatus> {
+	): Promise<SeerrStatusSummary> {
 		const route = input.mediaType === "movie" ? "movie" : "tv";
 		const details = await this.requestJson(
 			`${route}/${input.tmdbId}`,
@@ -202,14 +196,16 @@ export class SeerrClient {
 			const requestOptions: RequestInit = {
 				...fetchOptions,
 				headers,
-				credentials:
-					connection.auth.mode === "session" ? "include" : "omit",
+				credentials: connection.auth.mode === "session" ? "include" : "omit",
 				referrerPolicy: "no-referrer",
 				signal: controller.signal,
 				...(body === undefined ? {} : { body }),
 			};
 
-			return await fetch(buildSeerrApiUrl(connection.url, endpoint), requestOptions);
+			return await fetch(
+				buildSeerrApiUrl(connection.url, endpoint),
+				requestOptions,
+			);
 		} catch (error) {
 			if (
 				connection.auth.mode === "session" &&

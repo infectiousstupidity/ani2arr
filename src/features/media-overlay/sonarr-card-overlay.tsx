@@ -3,16 +3,16 @@
 
 import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
-import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
-import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
-import type { BadgeVisibility } from "@/settings/types";
 import { SonarrIcon } from "@/features/provider-ui/provider-icons";
-import { getCardPrimaryLabel, getCardPrimaryTitle } from "./card-primary-title";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import { openOptionsPage } from "@/rpc/runtime-messages";
+import type { BadgeVisibility } from "@/settings/types";
+import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
+import { getCardPrimaryLabel, getCardPrimaryTitle } from "./card-primary-title";
 
 interface SonarrCardOverlayProps {
 	anilistId?: AniListId | undefined;
@@ -49,8 +49,7 @@ export function SonarrCardOverlay({
 }: SonarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
-	const identity =
-		anilistId === undefined ? { source } : { source, anilistId };
+	const identity = anilistId === undefined ? { source } : { source, anilistId };
 	const mediaAction = useSonarrMediaAction({
 		...identity,
 		displayTitle: title,

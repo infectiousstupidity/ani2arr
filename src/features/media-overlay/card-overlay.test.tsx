@@ -34,6 +34,7 @@ describe("CardOverlay", () => {
 		);
 
 		expect(view).toContain('data-presentation="status-column"');
+		expect(view).toContain("<fieldset");
 		expect(view).toContain("a2a-card-overlay__status-primary");
 		expect(view).not.toContain("a2a-card-overlay__quick");
 		expect(view).not.toContain("a2a-card-overlay__stack");
@@ -69,6 +70,8 @@ describe("CardOverlay", () => {
 		);
 
 		expect(view).toContain('data-presentation="action-row"');
+		expect(view).toContain("<fieldset");
+		expect(view).toContain('aria-label="Sonarr actions"');
 		expect(view).toContain("a2a-card-overlay__row-primary");
 		expect(view).toContain("a2a-card-overlay__row-external");
 		expect(view).toContain('aria-label="Already in Sonarr"');

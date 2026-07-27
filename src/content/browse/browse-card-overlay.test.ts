@@ -2,18 +2,22 @@
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
+import {
+	SeerrCardStackActions,
+	SeerrStandaloneCardOverlay,
+} from "@/features/media-overlay/seerr-card-overlay";
+import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import type { MappingIdentity } from "@/rpc/types";
-import type { BrowseAdapter, HostMediaTarget } from "./types";
-import { resolveBrowseCardProvider } from "./browse-card-provider";
-import { BrowseCardOverlay } from "./browse-card-overlay";
-import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
-import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
-import { SeerrCardStackActions } from "@/features/media-overlay/seerr-card-overlay";
 import { createDefaultPublicOptions } from "@/settings/schema";
 import type { PublicOptions } from "@/settings/types";
+import { BrowseCardOverlay } from "./browse-card-overlay";
+import { resolveBrowseCardProvider } from "./browse-card-provider";
+import type { BrowseAdapter, HostMediaTarget } from "./types";
 
 const mountTarget = {} as HTMLElement;
+
 const adapter: BrowseAdapter = {
 	cardSelector: ".card",
 	parseCard: () => null,
@@ -21,6 +25,7 @@ const adapter: BrowseAdapter = {
 
 function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
 	const anilistId = parseAniListId(210_031);
+
 	return {
 		source: { source: "anilist", id: anilistId },
 		anilistId,
@@ -30,10 +35,7 @@ function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
 	};
 }
 
-function createOverlay(
-	parsed: HostMediaTarget,
-	publicOptions?: PublicOptions,
-) {
+function createOverlay(parsed: HostMediaTarget, publicOptions?: PublicOptions) {
 	return BrowseCardOverlay({
 		parsed,
 		adapter,
@@ -66,7 +68,10 @@ describe("resolveBrowseCardProvider", () => {
 	it("uses mapped identity when both host and metadata formats are unknown", () => {
 		const mappedIdentities: MappingIdentity[] = [
 			{
-				source: { source: "anilist", id: parseAniListId(210_031) },
+				source: {
+					source: "anilist",
+					id: parseAniListId(210_031),
+				},
 				anilistId: parseAniListId(210_031),
 				provider: "sonarr",
 				result: {
@@ -93,7 +98,10 @@ describe("BrowseCardOverlay", () => {
 		["MOVIE" as const, RadarrCardOverlay],
 	])("renders the source-only %s Arr action", (format, expectedComponent) => {
 		const parsed: HostMediaTarget = {
-			source: { source: "mal", id: parseMyAnimeListId(5114) },
+			source: {
+				source: "mal",
+				id: parseMyAnimeListId(5114),
+			},
 			title: "Fullmetal Alchemist: Brotherhood",
 			format,
 			mountTarget,
@@ -109,11 +117,46 @@ describe("BrowseCardOverlay", () => {
 				source: parsed.source,
 				extraAction: {
 					type: SeerrCardStackActions,
-					props: { source: parsed.source },
+					props: {
+						source: parsed.source,
+					},
 				},
 			},
 		});
 	});
+
+	it.each([
+		{
+			format: "TV" as const,
+			configureLabel: "Configure Sonarr",
+		},
+		{
+			format: "MOVIE" as const,
+			configureLabel: "Configure Radarr",
+		},
+	])(
+		"uses Seerr as the visible $format action when only Seerr is configured",
+		({ format, configureLabel }) => {
+			const publicOptions = createDefaultPublicOptions();
+			publicOptions.providers.sonarr.isConfigured = false;
+			publicOptions.providers.radarr.isConfigured = false;
+			publicOptions.seerr.isConfigured = true;
+
+			const overlay = createOverlay(createTarget(format), publicOptions);
+
+			expect(overlay).toMatchObject({
+				type: SeerrStandaloneCardOverlay,
+				props: {
+					isConfigured: true,
+					extraAction: {
+						props: {
+							label: configureLabel,
+						},
+					},
+				},
+			});
+		},
+	);
 
 	it.each(["status-column", "action-row"] as const)(
 		"keeps Arr before Seerr for %s targets",
@@ -134,7 +177,9 @@ describe("BrowseCardOverlay", () => {
 					presentation,
 					extraAction: {
 						type: SeerrCardStackActions,
-						props: { presentation },
+						props: {
+							presentation,
+						},
 					},
 				},
 			});

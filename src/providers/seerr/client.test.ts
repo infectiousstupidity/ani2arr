@@ -379,7 +379,7 @@ describe("SeerrClient", () => {
 				{ mediaType: "movie", tmdbId: parseTmdbId(123) },
 				basePathConnection,
 			),
-		).resolves.toBe("available");
+		).resolves.toEqual({ target: "available", overall: "available" });
 		await expect(
 			createClient().searchMedia("one piece", basePathConnection),
 		).resolves.toEqual([]);

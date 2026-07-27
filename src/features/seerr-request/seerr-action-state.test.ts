@@ -2,7 +2,10 @@
 // src/features/seerr-request/seerr-action-state.test.ts
 
 import { describe, expect, it } from "vitest";
-import { getSeerrActionState } from "./seerr-action-state";
+import {
+	getSeerrActionState,
+	getSeerrVisualStatus,
+} from "./seerr-action-state";
 
 const baseInput = {
 	isConfigured: true,
@@ -126,5 +129,25 @@ describe("getSeerrActionState", () => {
 			disabled: true,
 			settled: true,
 		});
+	});
+});
+
+describe("getSeerrVisualStatus", () => {
+	it("lets target available win", () => {
+		expect(
+			getSeerrVisualStatus({ target: "available", overall: "partial" }),
+		).toBe("available");
+	});
+
+	it("lets target pending win", () => {
+		expect(
+			getSeerrVisualStatus({ target: "pending", overall: "partial" }),
+		).toBe("pending");
+	});
+
+	it("shows overall partial when the target is not requested", () => {
+		expect(
+			getSeerrVisualStatus({ target: "not-requested", overall: "partial" }),
+		).toBe("partial");
 	});
 });

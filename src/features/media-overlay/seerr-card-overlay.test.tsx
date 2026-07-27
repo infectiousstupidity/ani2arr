@@ -1,7 +1,7 @@
 /** Focused viewport tests for Seerr card overlay presentations. */
 
-import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import {
@@ -67,20 +67,21 @@ beforeEach(() => {
 	viewportMock.mockReturnValue(false);
 });
 
-describe.each(overlayRenderers)("$name Seerr overlay outside the viewport", ({
-	render,
-}) => {
-	it("renders Configure Seerr for the status-column presentation", () => {
-		const view = renderToStaticMarkup(render("status-column"));
+describe.each(overlayRenderers)(
+	"$name Seerr overlay outside the viewport",
+	({ render }) => {
+		it("renders Configure Seerr for the status-column presentation", () => {
+			const view = renderToStaticMarkup(render("status-column"));
 
-		expect(view).toContain('data-presentation="status-column"');
-		expect(view).toContain("Configure Seerr");
-	});
+			expect(view).toContain('data-presentation="status-column"');
+			expect(view).toContain("Configure Seerr");
+		});
 
-	it("does not render the poster presentation", () => {
-		expect(renderToStaticMarkup(render())).toBe("");
-	});
-});
+		it("does not render the poster presentation", () => {
+			expect(renderToStaticMarkup(render())).toBe("");
+		});
+	},
+);
 
 it("keeps configured Seerr status queries disabled outside the viewport", () => {
 	renderToStaticMarkup(

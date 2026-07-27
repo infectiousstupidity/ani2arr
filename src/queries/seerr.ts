@@ -224,7 +224,8 @@ export const useRequestInSeerr = () => {
 		mutationFn: (input) => getAni2arrApi().requestInSeerr(input),
 		onSuccess: (_request, variables) => {
 			queryClient.setQueryData(queryKeys.seerrMediaStatus(variables), {
-				status: "pending",
+				target: "pending",
+				overall: "pending",
 			} satisfies GetSeerrMediaStatusOutput);
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.seerrMediaDetails(variables),

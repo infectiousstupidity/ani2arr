@@ -25,9 +25,9 @@ import type {
 	SeerrConnection,
 	SeerrMediaDetails,
 	SeerrMediaRequest,
-	SeerrMediaStatus,
 	SeerrPublicSettings,
 	SeerrSearchResult,
+	SeerrStatusSummary,
 	SeerrTargetSource,
 	SeerrTvSeasons,
 } from "@/providers/seerr/types";
@@ -185,9 +185,7 @@ export type GetSeerrMediaStatusInput =
 			seasons?: SeerrTvSeasons;
 	  };
 
-export type GetSeerrMediaStatusOutput = {
-	status: SeerrMediaStatus;
-};
+export type GetSeerrMediaStatusOutput = SeerrStatusSummary;
 
 export type SeerrRequestTarget = {
 	anilistId?: AniListId | undefined;

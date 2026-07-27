@@ -2,13 +2,16 @@
 // src/features/seerr-request/seerr-request-button.tsx
 
 import type { MouseEvent, ReactElement } from "react";
+import { SeerrIcon } from "@/features/provider-ui/provider-icons";
 import { useSeerrMediaStatus } from "@/queries/seerr";
 import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
-import { SeerrIcon } from "@/features/provider-ui/provider-icons";
-import { getSeerrActionState } from "./seerr-action-state";
+import {
+	getSeerrActionState,
+	getSeerrVisualStatus,
+} from "./seerr-action-state";
 
 interface SeerrRequestButtonProps {
 	requestInput: RequestInSeerrInput | null;
@@ -52,14 +55,19 @@ export function SeerrRequestButton({
 				isChecking: status.isEnabled && !status.data && !status.isError,
 				requestSucceeded: false,
 				requestFailed: false,
-				status: status.data?.status,
+				status: status.data?.target,
 			})
-		: {
+		: ({
 				state: isConfigured ? "can-add" : "unconfigured",
 				label: isConfigured ? "Choose Seerr target" : "Configure Seerr",
 				disabled: false,
 				settled: false,
-			} as const;
+			} as const);
+	const visualStatus = getSeerrVisualStatus(status.data);
+	const visualTitle =
+		visualStatus === "partial"
+			? "Partially in Seerr. Request mapped season."
+			: actionState.label;
 
 	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
 		if (!isTrustedClick(event)) return;
@@ -81,12 +89,12 @@ export function SeerrRequestButton({
 			variant="primary"
 			onClick={handleClick}
 			disabled={actionState.disabled}
-			tooltip={actionState.label}
+			tooltip={visualTitle}
 			tooltipContainer={portalContainer}
 			className={`${compact ? "h-6.5 text-[11px]" : "h-8.75 text-[14px]"} w-full rounded-[3px]`}
 		>
 			<span className="inline-flex min-w-0 items-center justify-center gap-2">
-				<span className="truncate">{actionState.label}</span>
+				<span className="truncate">{visualTitle}</span>
 			</span>
 		</Button>
 	);

@@ -1,14 +1,14 @@
 /** RPC handlers for Seerr request creation, details, and target mapping reads. */
 // src/rpc/handlers/seerr.handlers.ts
 
+import { resolveTitlePreference } from "@/anilist/title";
+import type { AniListId, AniListMetadata } from "@/anilist/types";
 import {
 	anilistMetadataStore,
 	resolveSeerrAutomaticTarget,
 	seerrClient,
 } from "@/background/api-services";
 import { requireSeerrConnection } from "@/background/provider-config";
-import type { AniListId, AniListMetadata } from "@/anilist/types";
-import { resolveTitlePreference } from "@/anilist/title";
 import {
 	clearManualSeerrTarget,
 	getEffectiveSeerrTarget,
@@ -18,15 +18,12 @@ import {
 } from "@/mapping/seerr-target.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
-import {
-	resolveAniListIdFromInput,
-	sourceFromInput,
-} from "@/rpc/source-input";
+import { resolveAniListIdFromInput, sourceFromInput } from "@/rpc/source-input";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrMediaDetailsInput,
-	GetSeerrTargetInput,
 	GetSeerrMediaStatusInput,
+	GetSeerrTargetInput,
 	GetSeerrTargetsInput,
 	MappingDetailsLinkedAniListEntry,
 	RequestInSeerrInput,
@@ -125,14 +122,15 @@ export const seerrHandlers = {
 
 	async requestInSeerr(input: RequestInSeerrInput) {
 		const connection = await requireSeerrConnection();
-		return seerrClient.requestMedia(buildSeerrRequestPayload(input), connection);
+		return seerrClient.requestMedia(
+			buildSeerrRequestPayload(input),
+			connection,
+		);
 	},
 
 	async getSeerrMediaStatus(input: GetSeerrMediaStatusInput) {
 		const connection = await requireSeerrConnection();
-		return {
-			status: await seerrClient.getMediaStatus(input, connection),
-		};
+		return seerrClient.getMediaStatus(input, connection);
 	},
 
 	async searchSeerrMedia(input: { query: string }) {

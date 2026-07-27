@@ -287,7 +287,7 @@ export function SeerrRequestView(props: {
 		needsConnectionRecovery: feedback.connectionRecovery !== null,
 		target,
 		requestInput,
-		tvStatus: statusQuery.data?.status,
+		tvStatus: statusQuery.data?.target,
 		isMovieRequestable,
 	});
 	const requestLabel = getRequestLabel(target, publicSettings);

@@ -1,13 +1,6 @@
 /** Shared visual chrome for browse-card overlay buttons and action stacks. */
 // src/features/media-overlay/card-overlay.tsx
 
-import {
-	type ComponentType,
-	type ReactElement,
-	type ReactNode,
-	type SVGProps,
-	type SyntheticEvent,
-} from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
 	Check,
@@ -18,16 +11,25 @@ import {
 	TriangleAlert,
 	Wrench,
 } from "lucide-react";
-import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
+import type {
+	ComponentType,
+	ReactElement,
+	ReactNode,
+	SVGProps,
+	SyntheticEvent,
+} from "react";
 import type { MediaActionState } from "@/features/media-action/state";
 import type { BadgeVisibility } from "@/settings/types";
+import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
+import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 
 interface CardOverlayProps {
 	providerLabel: string;
 	primaryState: MediaActionState;
 	primaryTitle: string;
 	primaryLabel?: string;
+	primaryIcon?: ReactNode;
+	primaryTone?: "partial";
 	primaryDisabled: boolean;
 	onPrimaryAction(): void;
 	statusPrimaryDisabled?: boolean;
@@ -44,7 +46,12 @@ interface CardOverlayProps {
 	presentation?: "status-column" | "action-row" | undefined;
 }
 
-function getPrimaryActionIcon(actionState: MediaActionState) {
+function getPrimaryActionIcon(
+	actionState: MediaActionState,
+	primaryIcon?: ReactNode,
+) {
+	if (primaryIcon !== undefined) return primaryIcon;
+
 	switch (actionState) {
 		case "checking":
 		case "adding": {
@@ -56,20 +63,10 @@ function getPrimaryActionIcon(actionState: MediaActionState) {
 			);
 		}
 		case "in-library": {
-			return (
-				<Check
-					className="a2a-card-overlay__symbol"
-					aria-hidden="true"
-				/>
-			);
+			return <Check className="a2a-card-overlay__symbol" aria-hidden="true" />;
 		}
 		case "unmapped": {
-			return (
-				<Wrench
-					className="a2a-card-overlay__symbol"
-					aria-hidden="true"
-				/>
-			);
+			return <Wrench className="a2a-card-overlay__symbol" aria-hidden="true" />;
 		}
 		case "unknown":
 		case "error": {
@@ -81,12 +78,7 @@ function getPrimaryActionIcon(actionState: MediaActionState) {
 			);
 		}
 		default: {
-			return (
-				<Plus
-					className="a2a-card-overlay__symbol"
-					aria-hidden="true"
-				/>
-			);
+			return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />;
 		}
 	}
 }
@@ -205,7 +197,8 @@ function StatusColumnOverlay({
 		openProvider !== null;
 
 	return (
-		<div
+		<fieldset
+			aria-label={`${providerLabel} actions`}
 			className="a2a-card-overlay"
 			data-state={primaryState}
 			data-presentation="status-column"
@@ -247,7 +240,7 @@ function StatusColumnOverlay({
 				</div>
 			</div>
 			{extraAction}
-		</div>
+		</fieldset>
 	);
 }
 
@@ -269,7 +262,8 @@ function ActionRowOverlay({
 	const externalTitle = `Open in ${providerLabel}`;
 
 	return (
-		<div
+		<fieldset
+			aria-label={`${providerLabel} actions`}
 			className="a2a-card-overlay"
 			data-state={primaryState}
 			data-presentation="action-row"
@@ -324,7 +318,7 @@ function ActionRowOverlay({
 				</TooltipWrapper>
 			) : null}
 			{extraAction}
-		</div>
+		</fieldset>
 	);
 }
 
@@ -333,6 +327,8 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 		providerLabel,
 		primaryState,
 		primaryTitle,
+		primaryIcon,
+		primaryTone,
 		primaryDisabled,
 		onPrimaryAction,
 		hasMapping,
@@ -410,29 +406,31 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 		</TooltipWrapper>
 	) : null;
 
-	const externalAction = openProvider && OpenProviderIcon ? (
-		<TooltipWrapper
-			content={`Open in ${providerLabel}`}
-			side="right"
-			align="center"
-			sideOffset={6}
-			container={resolvedTooltipContainer}
-			showArrow={false}
-		>
-			<button
-				type="button"
-				className="a2a-card-overlay__action a2a-card-overlay__action--external"
-				aria-label={`Open in ${providerLabel}`}
-				onClick={withSwallow(openProvider)}
-				onMouseDown={swallowEvent}
+	const externalAction =
+		openProvider && OpenProviderIcon ? (
+			<TooltipWrapper
+				content={`Open in ${providerLabel}`}
+				side="right"
+				align="center"
+				sideOffset={6}
+				container={resolvedTooltipContainer}
+				showArrow={false}
 			>
-				<OpenProviderIcon aria-hidden="true" className="h-4 w-4" />
-			</button>
-		</TooltipWrapper>
-	) : null;
+				<button
+					type="button"
+					className="a2a-card-overlay__action a2a-card-overlay__action--external"
+					aria-label={`Open in ${providerLabel}`}
+					onClick={withSwallow(openProvider)}
+					onMouseDown={swallowEvent}
+				>
+					<OpenProviderIcon aria-hidden="true" className="h-4 w-4" />
+				</button>
+			</TooltipWrapper>
+		) : null;
 
 	return (
-		<div
+		<fieldset
+			aria-label={`${providerLabel} actions`}
 			className="a2a-card-overlay"
 			data-state={primaryState}
 			data-visibility={badgeVisibility}
@@ -458,13 +456,14 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 						type="button"
 						className="a2a-card-overlay__quick"
 						data-state={primaryState}
+						data-tone={primaryTone}
 						aria-label={primaryTitle}
 						onClick={withSwallow(onPrimaryAction)}
 						onMouseDown={swallowEvent}
 						disabled={primaryDisabled}
 						aria-disabled={primaryDisabled || undefined}
 					>
-						{getPrimaryActionIcon(primaryState)}
+						{getPrimaryActionIcon(primaryState, primaryIcon)}
 					</button>
 				</TooltipWrapper>
 			</div>
@@ -475,13 +474,23 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 					data-direction={stackDirection}
 				>
 					{stackDirection === "down" ? (
-						<>{setupAction}{mappingAction}{externalAction}{extraAction}</>
+						<>
+							{setupAction}
+							{mappingAction}
+							{externalAction}
+							{extraAction}
+						</>
 					) : (
-						<>{extraAction}{externalAction}{mappingAction}{setupAction}</>
+						<>
+							{extraAction}
+							{externalAction}
+							{mappingAction}
+							{setupAction}
+						</>
 					)}
 				</div>
 			) : null}
-		</div>
+		</fieldset>
 	);
 }
 

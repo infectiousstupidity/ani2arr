@@ -2,7 +2,10 @@
 // src/features/seerr-request/seerr-action-state.ts
 
 import type { MediaActionState } from "@/features/media-action/state";
-import type { SeerrMediaStatus } from "@/providers/seerr/types";
+import type {
+	SeerrMediaStatus,
+	SeerrStatusSummary,
+} from "@/providers/seerr/types";
 
 export type SeerrActionStatus = SeerrMediaStatus | undefined;
 
@@ -23,6 +26,26 @@ export interface SeerrActionState {
 	label: string;
 	disabled: boolean;
 	settled: boolean;
+}
+
+export function getSeerrVisualStatus(
+	summary: SeerrStatusSummary | undefined,
+): SeerrMediaStatus | undefined {
+	if (!summary) return undefined;
+
+	if (summary.target === "available") return "available";
+
+	if (
+		["pending", "processing", "deleted-or-blocked"].includes(summary.target)
+	) {
+		return summary.target;
+	}
+
+	if (summary.target === "partial" || summary.overall === "partial") {
+		return "partial";
+	}
+
+	return summary.target;
 }
 
 export function isSettledSeerrStatus(status: SeerrActionStatus): boolean {

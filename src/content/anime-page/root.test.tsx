@@ -6,7 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
-import { useSeerrTarget } from "@/queries/seerr";
+import { parseTmdbId } from "@/providers/schemas";
+import { usePublicOptions } from "@/queries/options";
+import { useSeerrMediaStatus, useSeerrTarget } from "@/queries/seerr";
+import { createDefaultPublicOptions } from "@/settings/schema";
 import { ContentRoot, type AnimePageTarget } from "./root";
 
 const modalOpen = vi.hoisted(() => vi.fn());
@@ -147,5 +150,36 @@ describe("ContentRoot", () => {
 				coverImage: null,
 			},
 		});
+	});
+
+	it("shows the mapped-season partial status on anime pages", () => {
+		const publicOptions = createDefaultPublicOptions();
+		publicOptions.providers.sonarr.isConfigured = false;
+		publicOptions.providers.radarr.isConfigured = false;
+		publicOptions.seerr.isConfigured = true;
+		publicOptions.ui.animePages.sonarr.enabled = false;
+		publicOptions.ui.animePages.radarr.enabled = false;
+		vi.mocked(usePublicOptions).mockReturnValueOnce({
+			data: publicOptions,
+			isPending: false,
+		} as ReturnType<typeof usePublicOptions>);
+		vi.mocked(useSeerrTarget).mockReturnValueOnce({
+			data: {
+				source: "automatic",
+				mediaType: "tv",
+				tmdbId: parseTmdbId(37_854),
+				seasons: [1],
+			},
+		} as ReturnType<typeof useSeerrTarget>);
+		vi.mocked(useSeerrMediaStatus).mockReturnValueOnce({
+			data: { target: "not-requested", overall: "partial" },
+			isEnabled: true,
+			isError: false,
+		} as ReturnType<typeof useSeerrMediaStatus>);
+
+		const view = renderTarget(createTarget("TV"));
+
+		expect(view).toContain("Partially in Seerr. Request mapped season.");
+		expect(view).not.toContain(">Request in Seerr<");
 	});
 });

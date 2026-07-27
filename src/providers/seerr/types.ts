@@ -59,6 +59,11 @@ export type SeerrMediaStatus =
 	| "deleted"
 	| "unknown";
 
+export type SeerrStatusSummary = {
+	target: SeerrMediaStatus;
+	overall: SeerrMediaStatus;
+};
+
 export interface SeerrSearchResult {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
