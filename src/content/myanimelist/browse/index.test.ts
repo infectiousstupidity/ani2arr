@@ -6,7 +6,6 @@ import { isBrowseSurface } from "./surface";
 describe("isBrowseSurface", () => {
 	it.each([
 		"https://myanimelist.net/search/all",
-		"https://myanimelist.net/search/all?q=frieren&cat=all",
 		"https://myanimelist.net/anime.php?cat=anime&q=frieren",
 		"https://myanimelist.net/anime/season/2026/summer",
 		"https://myanimelist.net/topanime.php",

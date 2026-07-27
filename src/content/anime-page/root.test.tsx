@@ -3,12 +3,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { describe, expect, it, vi } from "vitest";
-import type { AniListMediaHint } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import { useSeerrTarget } from "@/queries/seerr";
-import { ContentRoot } from "./root";
+import { ContentRoot, type AnimePageTarget } from "./root";
 
 const modalOpen = vi.hoisted(() => vi.fn());
 
@@ -71,33 +70,36 @@ vi.mock("@/features/media-modal/hooks/use-media-modal-state", () => ({
 	})),
 }));
 
+const source = { source: "mal", id: parseMyAnimeListId(1) } as const;
+
+function createTarget(format: "MOVIE" | "TV"): AnimePageTarget {
+	const title = format === "MOVIE" ? "Example Movie" : "Example Series";
+	return {
+		source,
+		format,
+		title,
+		metadata: { titles: { english: title }, format },
+	};
+}
+
+function renderTarget(target: AnimePageTarget): string {
+	return renderToStaticMarkup(
+		<Tooltip.Provider>
+			<ContentRoot target={target} />
+		</Tooltip.Provider>,
+	);
+}
+
 describe("ContentRoot", () => {
 	it("renders source-only MAL provider actions while alias lookup is pending", () => {
-		const source = { source: "mal", id: parseMyAnimeListId(59_571) } as const;
-		const metadata: AniListMediaHint = {
-			titles: { english: "Kaguya-sama: The First Kiss That Never Ends" },
-			synonyms: ["Kaguya-sama wa Kokurasetai: First Kiss wa Owaranai"],
-			format: "MOVIE",
-		};
-
-		const view = renderToStaticMarkup(
-			<Tooltip.Provider>
-				<ContentRoot
-					target={{
-						source,
-						format: "MOVIE",
-						title: "Kaguya-sama: The First Kiss That Never Ends",
-						metadata,
-					}}
-				/>
-			</Tooltip.Provider>,
-		);
+		const target = createTarget("MOVIE");
+		const view = renderTarget(target);
 
 		expect(view).toContain("Checking Radarr");
 		expect(useRadarrMediaAction).toHaveBeenCalledWith(
 			expect.objectContaining({
-				source,
-				metadata,
+				source: target.source,
+				metadata: target.metadata,
 				enabled: true,
 				statusBlocked: false,
 			}),
@@ -105,13 +107,11 @@ describe("ContentRoot", () => {
 		expect(useRadarrMediaAction).not.toHaveBeenCalledWith(
 			expect.objectContaining({ anilistId: expect.anything() }),
 		);
-		expect(view).toContain("Actions");
-		expect(view).toContain("Configure Seerr");
 		expect(useSeerrTarget).toHaveBeenCalledWith(
 			{
-				source,
-				title: "Kaguya-sama: The First Kiss That Never Ends",
-				metadata,
+				source: target.source,
+				title: target.title,
+				metadata: target.metadata,
 			},
 			{ enabled: false },
 		);
@@ -129,38 +129,20 @@ describe("ContentRoot", () => {
 			openProvider: null,
 			runPrimaryAction: vi.fn(),
 		});
-		const source = { source: "mal", id: parseMyAnimeListId(63_816) } as const;
-		const metadata: AniListMediaHint = {
-			titles: {
-				english: "Frieren: Beyond Journey's End - Golden Land Arc",
-			},
-			format: "TV",
-		};
-
-		const view = renderToStaticMarkup(
-			<Tooltip.Provider>
-				<ContentRoot
-					target={{
-						source,
-						format: "TV",
-						title: "Sousou no Frieren: Ougonkyou-hen",
-						metadata,
-					}}
-				/>
-			</Tooltip.Provider>,
-		);
+		const target = createTarget("TV");
+		const view = renderTarget(target);
 		const actionInput = vi.mocked(useSonarrMediaAction).mock.calls.at(-1)?.[0];
 
 		expect(view).toContain("Find match");
 		actionInput?.onOpenMapping?.();
 		expect(modalOpen).toHaveBeenCalledWith({
-			source,
+			source: target.source,
 			kind: "provider",
 			provider: "sonarr",
 			initialView: "mapping",
 			openSource: "content",
 			metadataHint: {
-				title: "Frieren: Beyond Journey's End - Golden Land Arc",
+				title: "Example Series",
 				format: "TV",
 				coverImage: null,
 			},

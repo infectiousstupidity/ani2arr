@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import { parseTvdbId } from "@/providers/schemas";
-import type { ProviderCredentials } from "@/providers/types";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,
 	SonarrSeriesId,
 } from "@/providers/schemas";
+import { parseTvdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { sonarrHandlers } from "./sonarr.handlers";
 

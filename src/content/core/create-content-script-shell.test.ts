@@ -1,9 +1,8 @@
 /** Tests for shared content-script shell route reconciliation. */
-// src/content/core/create-content-script-shell.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContentScriptContext } from "wxt/utils/content-script-context";
-import type { PublicOptions } from "@/settings/types";
+import { createDefaultPublicOptions } from "@/settings/schema";
 import { createContentEntrypointShell } from "./create-content-script-shell";
 
 const getPublicOptionsSnapshotMock = vi.hoisted(() => vi.fn());
@@ -17,41 +16,6 @@ const ROOT_URL = "https://anilist.co/";
 const ANIME_URL = "https://anilist.co/anime/186497/Koori-no-Jouheki/";
 const MAL_GENRE_URL = "https://myanimelist.net/anime/genre/2/Adventure";
 const MAL_ANIME_URL = "https://myanimelist.net/anime/5114/Fullmetal_Alchemist_Brotherhood";
-
-const publicOptions = {
-	providers: {
-		sonarr: {
-			defaults: {},
-			isConfigured: false,
-		},
-		radarr: {
-			defaults: {},
-			isConfigured: false,
-		},
-	},
-	ui: {
-		preferredAniListTitleLanguage: "romaji",
-		browseCards: {
-			sonarr: {
-				enabled: true,
-				visibility: "always",
-			},
-			radarr: {
-				enabled: true,
-				visibility: "always",
-			},
-		},
-		animePages: {
-			sonarr: {
-				enabled: true,
-			},
-			radarr: {
-				enabled: true,
-			},
-		},
-	},
-	debugLogging: false,
-} as PublicOptions;
 
 function createFakeContentScriptContext(): ContentScriptContext {
 	return {
@@ -68,6 +32,12 @@ function createFakeContentScriptContext(): ContentScriptContext {
 	} as unknown as ContentScriptContext;
 }
 
+type ShellOptions = Parameters<typeof createContentEntrypointShell>[0];
+
+function startShell(options: ShellOptions): Promise<void> {
+	return createContentEntrypointShell(options)(createFakeContentScriptContext());
+}
+
 function dispatchLocationChange(url: string): void {
 	const event = new Event("wxt:locationchange") as Event & { newUrl: URL };
 	event.newUrl = new URL(url);
@@ -82,22 +52,22 @@ function dispatchPageShow(persisted: boolean): void {
 
 describe("createContentEntrypointShell", () => {
 	beforeEach(() => {
-		getPublicOptionsSnapshotMock.mockResolvedValue(publicOptions);
+		getPublicOptionsSnapshotMock.mockResolvedValue(createDefaultPublicOptions());
 		vi.stubGlobal("location", { href: ROOT_URL });
 		vi.stubGlobal("window", new EventTarget());
 	});
 
 	it("reconciles SPA route changes from WXT event newUrl instead of stale location.href", async () => {
 		const mountedUrls: string[] = [];
-		const shell = createContentEntrypointShell({
+		const options = {
 			isEligible: () => true,
 			mount: (context) => {
 				mountedUrls.push(context.url);
 			},
 			remove: vi.fn(),
-		});
+		} satisfies ShellOptions;
 
-		await shell(createFakeContentScriptContext());
+		await startShell(options);
 
 		dispatchLocationChange(ANIME_URL);
 
@@ -113,16 +83,16 @@ describe("createContentEntrypointShell", () => {
 		const remove = vi.fn(() => {
 			currentMounts = 0;
 		});
-		const shell = createContentEntrypointShell({
+		const options = {
 			isEligible: ({ url }) => url === MAL_GENRE_URL,
 			mount: ({ url }) => {
 				mountedUrls.push(url);
 				currentMounts += 1;
 			},
 			remove,
-		});
+		} satisfies ShellOptions;
 
-		await shell(createFakeContentScriptContext());
+		await startShell(options);
 		dispatchLocationChange(MAL_ANIME_URL);
 
 		await vi.waitFor(() => {
@@ -137,50 +107,33 @@ describe("createContentEntrypointShell", () => {
 			expect(mountedUrls).toEqual([MAL_GENRE_URL, MAL_GENRE_URL]);
 			expect(currentMounts).toBe(1);
 		});
+
+		dispatchPageShow(true);
+		await vi.waitFor(() => {
+			expect(mountedUrls).toEqual([
+				MAL_GENRE_URL,
+				MAL_GENRE_URL,
+				MAL_GENRE_URL,
+			]);
+			expect(currentMounts).toBe(1);
+			expect(remove).toHaveBeenCalledTimes(3);
+		});
 	});
 
 	it("ignores a non-persisted pageshow after the initial mount", async () => {
 		const mount = vi.fn();
 		const remove = vi.fn();
-		const shell = createContentEntrypointShell({
+		const options = {
 			isEligible: () => true,
 			mount,
 			remove,
-		});
+		} satisfies ShellOptions;
 
-		await shell(createFakeContentScriptContext());
+		await startShell(options);
 		dispatchPageShow(false);
 
 		expect(mount).toHaveBeenCalledTimes(1);
 		expect(remove).not.toHaveBeenCalled();
-	});
-
-	it("keeps one current mount across repeated persisted restorations", async () => {
-		vi.stubGlobal("location", { href: MAL_GENRE_URL });
-		let currentMounts = 0;
-		const mount = vi.fn(() => {
-			currentMounts += 1;
-		});
-		const remove = vi.fn(() => {
-			currentMounts = 0;
-		});
-		const shell = createContentEntrypointShell({
-			isEligible: () => true,
-			mount,
-			remove,
-		});
-
-		await shell(createFakeContentScriptContext());
-
-		for (const expectedMounts of [2, 3]) {
-			dispatchPageShow(true);
-			await vi.waitFor(() => {
-				expect(mount).toHaveBeenCalledTimes(expectedMounts);
-				expect(currentMounts).toBe(1);
-			});
-		}
-
-		expect(remove).toHaveBeenCalledTimes(2);
 	});
 
 	it("settles a stale async mount before restoring the current UI", async () => {
@@ -199,13 +152,13 @@ describe("createContentEntrypointShell", () => {
 		const remove = vi.fn(() => {
 			currentMounts = 0;
 		});
-		const shell = createContentEntrypointShell({
+		const options = {
 			isEligible: ({ url }) => url === MAL_GENRE_URL,
 			mount,
 			remove,
-		});
+		} satisfies ShellOptions;
 
-		await shell(createFakeContentScriptContext());
+		await startShell(options);
 		remove.mockClear();
 		dispatchLocationChange(MAL_GENRE_URL);
 

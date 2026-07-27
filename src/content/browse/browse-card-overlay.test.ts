@@ -1,19 +1,23 @@
 /** Tests for browse-card provider resolution inputs. */
-// src/content/browse/browse-card-overlay.test.ts
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import type { MappingIdentity } from "@/rpc/types";
-import type { HostMediaTarget } from "./types";
+import type { BrowseAdapter, HostMediaTarget } from "./types";
 import { resolveBrowseCardProvider } from "./browse-card-provider";
 import { BrowseCardOverlay } from "./browse-card-overlay";
 import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
 import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
 import { SeerrCardStackActions } from "@/features/media-overlay/seerr-card-overlay";
 import { createDefaultPublicOptions } from "@/settings/schema";
+import type { PublicOptions } from "@/settings/types";
 
 const mountTarget = {} as HTMLElement;
+const adapter: BrowseAdapter = {
+	cardSelector: ".card",
+	parseCard: () => null,
+};
 
 function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
 	const anilistId = parseAniListId(210_031);
@@ -24,6 +28,21 @@ function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
 		format,
 		mountTarget,
 	};
+}
+
+function createOverlay(
+	parsed: HostMediaTarget,
+	publicOptions?: PublicOptions,
+) {
+	return BrowseCardOverlay({
+		parsed,
+		adapter,
+		publicOptions,
+		mappedIdentities: [],
+		metadata: null,
+		onOpenMediaModal: () => {},
+		tooltipContainer: null,
+	});
 }
 
 describe("resolveBrowseCardProvider", () => {
@@ -80,22 +99,7 @@ describe("BrowseCardOverlay", () => {
 			mountTarget,
 		};
 
-		const overlay = BrowseCardOverlay({
-			parsed,
-			adapter: {
-				cardSelector: ".card",
-				parseCard: () => null,
-				getObserverRoot: () => document.body,
-				getScanRoot: () => document.body,
-				anchorCorner: "top-left",
-				stackDirection: "down",
-			},
-			publicOptions: undefined,
-			mappedIdentities: [],
-			metadata: null,
-			onOpenMediaModal: () => {},
-			tooltipContainer: null,
-		});
+		const overlay = createOverlay(parsed);
 
 		expect(overlay).not.toBeNull();
 		expect(overlay).toMatchObject({
@@ -122,18 +126,7 @@ describe("BrowseCardOverlay", () => {
 			publicOptions.ui.browseCards.primaryStatus = "seerr";
 			publicOptions.seerr.isConfigured = true;
 
-			const overlay = BrowseCardOverlay({
-				parsed,
-				adapter: {
-					cardSelector: ".card",
-					parseCard: () => null,
-				},
-				publicOptions,
-				mappedIdentities: [],
-				metadata: null,
-				onOpenMediaModal: () => {},
-				tooltipContainer: null,
-			});
+			const overlay = createOverlay(parsed, publicOptions);
 
 			expect(overlay).toMatchObject({
 				type: SonarrCardOverlay,

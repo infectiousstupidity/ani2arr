@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 /** Startup tests for the MyAnimeList content entrypoint. */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,26 +19,6 @@ import { runMyAnimeListContent } from "../entrypoints/myanimelist.content";
 
 const noop = (): void => {};
 
-class FakeDocument extends EventTarget {
-	body: HTMLElement | null = null;
-	readyState: DocumentReadyState = "loading";
-}
-
-class FakeMutationObserver {
-	static instances: FakeMutationObserver[] = [];
-
-	readonly disconnect = vi.fn();
-	readonly observe = vi.fn();
-
-	constructor(private readonly callback: MutationCallback) {
-		FakeMutationObserver.instances.push(this);
-	}
-
-	notify(): void {
-		this.callback([], this as unknown as MutationObserver);
-	}
-}
-
 function createContext(): ContentScriptContext {
 	return {
 		get isInvalid() {
@@ -54,26 +36,23 @@ function setLocation(url: string): void {
 }
 
 describe("runMyAnimeListContent", () => {
-	let doc: FakeDocument;
-
 	beforeEach(() => {
-		doc = new FakeDocument();
-		FakeMutationObserver.instances = [];
-		vi.stubGlobal("document", doc);
-		vi.stubGlobal("MutationObserver", FakeMutationObserver);
+		if (!document.body) document.documentElement.append(document.createElement("body"));
+		document.body.replaceChildren();
 	});
 
 	it("starts browse after body appears and before DOMContentLoaded", async () => {
 		setLocation("https://myanimelist.net/anime/genre/2/Adventure");
+		vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
+		document.body.remove();
 		const startup = runMyAnimeListContent(createContext());
 
 		expect(myAnimeListBrowseMainMock).not.toHaveBeenCalled();
 
-		doc.body = {} as HTMLElement;
-		FakeMutationObserver.instances[0]?.notify();
+		document.documentElement.append(document.createElement("body"));
 		await startup;
 
-		expect(doc.readyState).toBe("loading");
+		expect(document.readyState).toBe("loading");
 		expect(myAnimeListBrowseMainMock).toHaveBeenCalledOnce();
 		expect(myAnimeListAnimeMainMock).not.toHaveBeenCalled();
 	});

@@ -1,7 +1,8 @@
-/** Tests for MyAnimeList anime detail page DOM readers. */
-// src/content/myanimelist/anime-page/layout.test.ts
+// @vitest-environment happy-dom
 
-import { describe, expect, it, vi } from "vitest";
+/** Tests for MyAnimeList anime detail page DOM readers. */
+
+import { describe, expect, it } from "vitest";
 import {
 	ANCHOR_ID,
 	ensureActionsAnchor,
@@ -10,134 +11,54 @@ import {
 	removeLayoutArtifacts,
 } from "./layout";
 
-const MAIN_USER_STATUS_SELECTOR =
-	"#content .anime-detail-header-stats .js-user-status-block";
-const MAIN_USER_STATUS_FALLBACK_SELECTOR =
-	"#content .anime-detail-header-stats .user-status-block";
-
-type FakeElement = {
-	textContent?: string | null;
-	querySelector: (selector: string) => FakeElement | null;
-	querySelectorAll: (selector: string) => FakeElement[];
-};
-
-function createElement(input: {
-	textContent?: string;
-	children?: Record<string, FakeElement | null>;
-	lists?: Record<string, FakeElement[]>;
-}): FakeElement {
-	return {
-		textContent: input.textContent ?? null,
-		querySelector: (selector) => input.children?.[selector] ?? null,
-		querySelectorAll: (selector) => input.lists?.[selector] ?? [],
-	};
+function setBody(markup: string): void {
+	const fixture = new DOMParser().parseFromString(markup, "text/html");
+	document.body.replaceChildren(...fixture.body.childNodes);
 }
 
-function createDocument(input: {
-	title?: string;
+function renderAnimePage(input: {
+	title: string;
 	englishTitle?: string;
 	rows?: Array<{ label: string; value: string }>;
-}): Document {
-	const rows = (input.rows ?? []).map((row) =>
-		createElement({
-			textContent: `${row.label} ${row.value}`,
-			children: {
-				"span.dark_text": createElement({ textContent: row.label }),
-			},
-		}),
-	);
-	const leftside = createElement({
-		lists: {
-			".spaceit_pad": rows,
-		},
-	});
-	const title =
-		input.title === undefined
-			? null
-			: createElement({
-					textContent: `${input.title}${input.englishTitle ?? ""}`,
-					children: {
-						strong: createElement({ textContent: input.title }),
-					},
-				});
-	const englishTitle =
-		input.englishTitle === undefined
-			? null
-			: createElement({ textContent: input.englishTitle });
-	return createElement({
-		children: {
-			"h1.title-name": title,
-			"h1.title-name > strong": title?.querySelector("strong") ?? null,
-			"p.title-english": englishTitle,
-			"#content .leftside, .leftside": leftside,
-		},
-	}) as unknown as Document;
+}): void {
+	const rows = (input.rows ?? [])
+		.map(
+			({ label, value }) => `
+				<div class="spaceit_pad">
+					<span class="dark_text">${label}</span> ${value}
+				</div>
+			`,
+		)
+		.join("");
+
+	setBody(`
+		<div id="content">
+			<h1 class="title-name"><strong>${input.title}</strong></h1>
+			${input.englishTitle ? `<p class="title-english">${input.englishTitle}</p>` : ""}
+			<div class="leftside">${rows}</div>
+		</div>
+	`);
 }
 
-type FakeLayoutElement = {
-	id: string;
-	style: Record<string, string>;
-	after: ReturnType<typeof vi.fn>;
-	remove: ReturnType<typeof vi.fn>;
-};
-
-function createLayoutElement(id = ""): FakeLayoutElement {
-	return {
-		id,
-		style: {},
-		after: vi.fn(),
-		remove: vi.fn(),
-	};
-}
-
-function createLayoutDocument(
-	input: {
-		primaryStatus?: boolean;
-		fallbackStatus?: boolean;
-		existingAnchor?: FakeLayoutElement;
-		title?: boolean;
-		sidebarControl?: boolean;
-	} = {},
-) {
-	const primaryStatus = createLayoutElement();
-	const fallbackStatus = createLayoutElement();
-	const title = createLayoutElement();
-	const sidebarControl = createLayoutElement();
-	let anchor = input.existingAnchor ?? null;
-
-	const querySelector = vi.fn((selector: string) => {
-		if (selector === MAIN_USER_STATUS_SELECTOR) {
-			return input.primaryStatus ? primaryStatus : null;
-		}
-		if (selector === MAIN_USER_STATUS_FALLBACK_SELECTOR) {
-			return input.fallbackStatus ? fallbackStatus : null;
-		}
-		if (selector === `#${ANCHOR_ID}`) return anchor;
-		if (selector === "h1.title-name") return input.title ? title : null;
-		if (selector === ".profileRows") {
-			return input.sidebarControl ? sidebarControl : null;
-		}
-		return null;
-	});
-
-	const createElement = vi.fn(() => {
-		anchor = createLayoutElement();
-		return anchor;
-	});
-
-	return {
-		doc: { querySelector, createElement } as unknown as Document,
-		primaryStatus,
-		fallbackStatus,
-		title,
-		sidebarControl,
-		createElement,
-	};
+function renderActionLayout(input: {
+	primary?: boolean;
+	fallback?: boolean;
+	existingAnchor?: boolean;
+}): void {
+	setBody(`
+		<div id="content">
+			<div class="anime-detail-header-stats">
+				${input.primary ? '<div id="primary" class="js-user-status-block"></div>' : ""}
+				${input.fallback ? '<div id="fallback" class="user-status-block"></div>' : ""}
+			</div>
+		</div>
+		${input.existingAnchor ? `<div id="${ANCHOR_ID}"></div>` : ""}
+	`);
 }
 
 describe("MyAnimeList page readers", () => {
 	it("reads the real MAL 63816 titles, synonym, and format", () => {
-		const doc = createDocument({
+		renderAnimePage({
 			title: " Sousou no Frieren: Ougonkyou-hen ",
 			englishTitle: " Frieren: Beyond Journey's End - Golden Land Arc ",
 			rows: [
@@ -150,7 +71,7 @@ describe("MyAnimeList page readers", () => {
 			],
 		});
 
-		expect(readAnimePageData(doc)).toEqual({
+		expect(readAnimePageData()).toEqual({
 			title: "Sousou no Frieren: Ougonkyou-hen",
 			format: "TV",
 			metadata: {
@@ -166,10 +87,10 @@ describe("MyAnimeList page readers", () => {
 	});
 
 	it("handles missing optional labels", () => {
-		const doc = createDocument({ title: "Test" });
+		renderAnimePage({ title: "Test" });
 
-		expect(readLabeledFacts(doc).size).toBe(0);
-		expect(readAnimePageData(doc)).toEqual({
+		expect(readLabeledFacts().size).toBe(0);
+		expect(readAnimePageData()).toEqual({
 			title: "Test",
 			format: null,
 			metadata: {
@@ -182,79 +103,57 @@ describe("MyAnimeList page readers", () => {
 });
 
 describe("MyAnimeList action placement", () => {
-	it("creates the anchor below the main user-status row", () => {
-		const { doc, primaryStatus, fallbackStatus } = createLayoutDocument({
-			primaryStatus: true,
-			fallbackStatus: true,
-		});
+	it("creates the anchor below the primary user-status row", () => {
+		renderActionLayout({ primary: true, fallback: true });
+		const primary = document.querySelector("#primary");
+		const fallback = document.querySelector("#fallback");
 
-		const anchor = ensureActionsAnchor(doc);
+		const anchor = ensureActionsAnchor();
 
-		expect(anchor).not.toBeNull();
 		expect(anchor?.id).toBe(ANCHOR_ID);
 		expect(anchor?.style.display).toBe("block");
 		expect(anchor?.style.clear).toBe("both");
-		expect(anchor?.style.margin).toBe("8px 0 0");
-		expect(primaryStatus.after).toHaveBeenCalledOnce();
-		expect(primaryStatus.after).toHaveBeenCalledWith(anchor);
-		expect(fallbackStatus.after).not.toHaveBeenCalled();
+		expect(anchor?.style.marginTop).toBe("8px");
+		expect(primary?.nextElementSibling).toBe(anchor);
+		expect(fallback?.nextElementSibling).not.toBe(anchor);
 	});
 
 	it("uses the same-location user-status fallback", () => {
-		const { doc, fallbackStatus } = createLayoutDocument({
-			fallbackStatus: true,
-		});
+		renderActionLayout({ fallback: true });
+		const fallback = document.querySelector("#fallback");
 
-		const anchor = ensureActionsAnchor(doc);
+		const anchor = ensureActionsAnchor();
 
-		expect(anchor).not.toBeNull();
-		expect(fallbackStatus.after).toHaveBeenCalledWith(anchor);
+		expect(fallback?.nextElementSibling).toBe(anchor);
 	});
 
 	it("reuses and repositions an existing anchor", () => {
-		const existingAnchor = createLayoutElement(ANCHOR_ID);
-		const { doc, primaryStatus, createElement } = createLayoutDocument({
-			primaryStatus: true,
-			existingAnchor,
-		});
+		renderActionLayout({ primary: true, existingAnchor: true });
+		const existingAnchor = document.querySelector(`#${ANCHOR_ID}`);
 
-		const anchor = ensureActionsAnchor(doc);
+		const anchor = ensureActionsAnchor();
 
 		expect(anchor).toBe(existingAnchor);
-		expect(createElement).not.toHaveBeenCalled();
-		expect(existingAnchor.style).toEqual({
-			display: "block",
-			clear: "both",
-			margin: "8px 0 0",
-		});
-		expect(primaryStatus.after).toHaveBeenCalledWith(existingAnchor);
+		expect(anchor?.style.marginTop).toBe("8px");
+		expect(document.querySelector("#primary")?.nextElementSibling).toBe(anchor);
 	});
 
-	it("returns null and creates nothing without a main user-status row", () => {
-		const { doc, createElement } = createLayoutDocument();
+	it("does not fall back to title or sidebar controls", () => {
+		setBody(`
+			<h1 class="title-name">Title</h1>
+			<div class="profileRows">Sidebar controls</div>
+		`);
 
-		expect(ensureActionsAnchor(doc)).toBeNull();
-		expect(createElement).not.toHaveBeenCalled();
-	});
-
-	it("does not fall back to the title or sidebar controls", () => {
-		const { doc, title, sidebarControl, createElement } = createLayoutDocument({
-			title: true,
-			sidebarControl: true,
-		});
-
-		expect(ensureActionsAnchor(doc)).toBeNull();
-		expect(createElement).not.toHaveBeenCalled();
-		expect(title.after).not.toHaveBeenCalled();
-		expect(sidebarControl.after).not.toHaveBeenCalled();
+		expect(ensureActionsAnchor()).toBeNull();
+		expect(document.querySelector(`#${ANCHOR_ID}`)).toBeNull();
 	});
 
 	it("removes the injected anchor", () => {
-		const anchor = createLayoutElement(ANCHOR_ID);
-		const { doc } = createLayoutDocument({ existingAnchor: anchor });
+		renderActionLayout({ primary: true });
+		expect(ensureActionsAnchor()).not.toBeNull();
 
-		removeLayoutArtifacts(doc);
+		removeLayoutArtifacts();
 
-		expect(anchor.remove).toHaveBeenCalledOnce();
+		expect(document.querySelector(`#${ANCHOR_ID}`)).toBeNull();
 	});
 });

@@ -1,7 +1,8 @@
-/** DOM target tests for browse-card light-DOM portal containers. */
-// src/content/browse/use-browse-card-targets.test.ts
+// @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+/** DOM target tests for browse-card light-DOM portal containers. */
+
+import { beforeEach, describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import {
 	BROWSE_OVERLAY_CONTAINER_CLASS,
@@ -13,138 +14,27 @@ import {
 	scanBrowseCardTargets,
 } from "./use-browse-card-targets";
 
-class FakeNode {
-	parentElement: FakeElement | null = null;
-}
-
-class FakeElement extends FakeNode {
-	readonly children: FakeElement[] = [];
-	readonly attributes = new Map<string, string>();
-	readonly dataset: Record<string, string> = {};
-	readonly classList = {
-		contains: (className: string) =>
-			this.className.split(/\s+/).includes(className),
-	};
-	className = "";
-	textContent = "";
-	ownerDocument = fakeDocument;
-
-	constructor(readonly tagName: string) {
-		super();
-	}
-
-	append(child: FakeElement): void {
-		child.parentElement = this;
-		this.children.push(child);
-	}
-
-	prepend(child: FakeElement): void {
-		child.parentElement = this;
-		this.children.unshift(child);
-	}
-
-	remove(): void {
-		if (!this.parentElement) return;
-		const siblings = this.parentElement.children;
-		const index = siblings.indexOf(this);
-		if (index !== -1) siblings.splice(index, 1);
-		this.parentElement = null;
-	}
-
-	matches(selector: string): boolean {
-		if (selector.startsWith(".")) {
-			return this.classList.contains(selector.slice(1));
-		}
-		return this.tagName.toLowerCase() === selector.toLowerCase();
-	}
-
-	querySelectorAll(selector: string): FakeElement[] {
-		const matches: FakeElement[] = [];
-		for (const child of this.children) {
-			if (child.matches(selector)) matches.push(child);
-			matches.push(...child.querySelectorAll(selector));
-		}
-		return matches;
-	}
-
-	querySelector(selector: string): FakeElement | null {
-		for (const child of this.children) {
-			if (child.matches(selector)) return child;
-
-			const match = child.querySelector(selector);
-			if (match) return match;
-		}
-
-		return null;
-	}
-
-	setAttribute(name: string, value: string): void {
-		this.attributes.set(name, value);
-		if (name === "class") this.className = value;
-		if (name.startsWith("data-")) {
-			this.dataset[toDatasetKey(name)] = value;
-		}
-	}
-
-	getAttribute(name: string): string | null {
-		if (name === "class") return this.className;
-		return this.attributes.get(name) ?? null;
-	}
-
-	getAttributeNames(): string[] {
-		return [...this.attributes.keys()];
-	}
-
-	removeAttribute(name: string): void {
-		this.attributes.delete(name);
-		if (name.startsWith("data-")) {
-			delete this.dataset[toDatasetKey(name)];
-		}
-	}
-}
-
-function toDatasetKey(attributeName: string): string {
-	return attributeName
-		.slice("data-".length)
-		.replaceAll(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
-}
-
-const fakeDocument = {
-	body: null as FakeElement | null,
-	documentElement: null as FakeElement | null,
-	createElement(tagName: string): FakeElement {
-		return new FakeElement(tagName);
-	},
-	querySelector(selector: string): FakeElement | null {
-		return fakeDocument.body?.querySelector(selector) ?? null;
-	},
-};
-
-function createCard(input: {
-	id: number;
-	title: string;
-	href?: string;
-}): FakeElement {
-	const card = new FakeElement("div");
+function createCard(id: number, title = "Example"): HTMLElement {
+	const card = document.createElement("div");
 	card.className = "card";
-	card.dataset.id = String(input.id);
-	card.dataset.title = input.title;
+	card.dataset.id = String(id);
+	card.dataset.title = title;
 
-	const cover = new FakeElement("a");
+	const cover = document.createElement("a");
 	cover.className = "cover";
-	cover.setAttribute("href", input.href ?? `/anime/${input.id}`);
+	cover.href = `/anime/${id}`;
 	card.append(cover);
-
+	document.body.append(card);
 	return card;
 }
 
-function getCover(card: FakeElement): FakeElement {
-	const cover = card.querySelector(".cover");
+function getCover(card: Element): HTMLElement {
+	const cover = card.querySelector<HTMLElement>(".cover");
 	if (!cover) throw new Error("Expected cover");
 	return cover;
 }
 
-function getPlacementContainer(card: FakeElement): FakeElement | null {
+function getPlacementContainer(card: Element): HTMLElement | null {
 	return getCover(card).querySelector(`.${BROWSE_OVERLAY_CONTAINER_CLASS}`);
 }
 
@@ -154,52 +44,39 @@ function createAdapter(
 		presentation?: "status-column";
 	} = {},
 ): BrowseAdapter {
-	const adapter: BrowseAdapter = {
+	return {
 		cardSelector: ".card",
-		parseCard(card: Element): HostMediaTarget | null {
-			const fakeCard = card as unknown as FakeElement;
-			const mountTarget = fakeCard.querySelector(
+		parseCard(card): HostMediaTarget | null {
+			const mountTarget = card.querySelector<HTMLElement>(
 				input.presentation === "status-column" ? ".status" : ".cover",
 			);
 			if (!mountTarget) return null;
-			const anilistId = parseAniListId(Number(fakeCard.dataset.id));
+			const anilistId = parseAniListId(Number((card as HTMLElement).dataset.id));
 			return {
 				source: { source: "anilist", id: anilistId },
 				anilistId,
-				title: fakeCard.dataset.title ?? "",
+				title: (card as HTMLElement).dataset.title ?? "",
 				format: null,
-				mountTarget: mountTarget as unknown as HTMLElement,
+				mountTarget,
 				...(input.presentation ? { presentation: input.presentation } : {}),
 			};
 		},
-		getScanRoot: () => fakeDocument.body as unknown as Element,
-		getObserverRoot: () => fakeDocument.body as unknown as Node,
+		getScanRoot: () => document.body,
+		getObserverRoot: () => document.body,
+		...(input.anchorCorner ? { anchorCorner: input.anchorCorner } : {}),
 	};
-	if (input.anchorCorner) {
-		adapter.anchorCorner = input.anchorCorner;
-	}
-	return adapter;
-}
-
-function createOptions(adapter = createAdapter()) {
-	return { adapter };
 }
 
 describe("scanBrowseCardTargets", () => {
 	beforeEach(() => {
-		fakeDocument.body = new FakeElement("body");
-		fakeDocument.documentElement = fakeDocument.body;
-		vi.stubGlobal("document", fakeDocument);
-		vi.stubGlobal("Element", FakeElement);
-		vi.stubGlobal("HTMLElement", FakeElement);
+		document.body.replaceChildren();
 	});
 
 	it("creates, reuses, and cleans one portal target", () => {
-		const card = createCard({ id: 101, title: "First" });
-		fakeDocument.body?.append(card);
-		const options = createOptions(
-			createAdapter({ anchorCorner: "bottom-left" }),
-		);
+		const card = createCard(101);
+		const options = {
+			adapter: createAdapter({ anchorCorner: "bottom-left" }),
+		};
 
 		const firstTargets = scanBrowseCardTargets(options);
 		const firstContainer = getPlacementContainer(card);
@@ -219,55 +96,41 @@ describe("scanBrowseCardTargets", () => {
 	});
 
 	it("uses unique stable portal keys for duplicate media cards", () => {
-		const firstCard = createCard({
-			id: 147_105,
-			title: "Tongari Boushi no Atelier",
-			href: "/anime/147105/Tongari-Boushi-no-Atelier/",
-		});
-		const secondCard = createCard({
-			id: 147_105,
-			title: "Tongari Boushi no Atelier",
-			href: "/anime/147105/Tongari-Boushi-no-Atelier/",
-		});
-		fakeDocument.body?.append(firstCard);
-		fakeDocument.body?.append(secondCard);
-		const options = createOptions();
+		createCard(147_105, "Tongari Boushi no Atelier");
+		createCard(147_105, "Tongari Boushi no Atelier");
+		const options = { adapter: createAdapter() };
 
-		const firstTargets = scanBrowseCardTargets(options);
-		const firstKeys = firstTargets.map((target) => target.key);
-		const secondTargets = scanBrowseCardTargets(options);
-		const secondKeys = secondTargets.map((target) => target.key);
+		const firstKeys = scanBrowseCardTargets(options).map((target) => target.key);
+		const secondKeys = scanBrowseCardTargets(options).map((target) => target.key);
 
-		expect(firstTargets).toHaveLength(2);
 		expect(new Set(firstKeys).size).toBe(2);
 		expect(secondKeys).toEqual(firstKeys);
 	});
 
 	it("prepends, reuses, and cleans a status-column target", () => {
-		const card = createCard({ id: 52_991, title: "Sousou no Frieren" });
-		const statusCell = new FakeElement("td");
+		const card = createCard(52_991, "Sousou no Frieren");
+		const statusCell = document.createElement("td");
 		statusCell.className = "status";
-		const nativeButton = new FakeElement("a");
+		const nativeButton = document.createElement("a");
 		nativeButton.textContent = "Add to My List";
 		statusCell.append(nativeButton);
 		card.append(statusCell);
-		fakeDocument.body?.append(card);
-		const options = createOptions(
-			createAdapter({ presentation: "status-column" }),
-		);
+		const options = {
+			adapter: createAdapter({ presentation: "status-column" }),
+		};
 
 		const firstTargets = scanBrowseCardTargets(options);
-		const container = firstTargets[0]?.container as unknown as FakeElement;
+		const container = firstTargets[0]?.container;
 		const secondTargets = scanBrowseCardTargets(options);
 
 		expect(firstTargets).toHaveLength(1);
 		expect(secondTargets[0]?.container).toBe(container);
-		expect(container.dataset.presentation).toBe("status-column");
-		expect(statusCell.children).toEqual([container, nativeButton]);
+		expect(container?.dataset.presentation).toBe("status-column");
+		expect([...statusCell.children]).toEqual([container, nativeButton]);
 
 		cleanupBrowseCardTargets(firstTargets);
 
-		expect(statusCell.children).toEqual([nativeButton]);
+		expect([...statusCell.children]).toEqual([nativeButton]);
 		expect(statusCell.dataset.a2aProcessed).toBeUndefined();
 	});
 });
