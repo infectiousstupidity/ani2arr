@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseTmdbId } from "@/providers/schemas";
-import type { SeerrSearchResult, SeerrSeasonStatus } from "@/providers/seerr/types";
+import type {
+	SeerrSearchResult,
+	SeerrSeasonStatus,
+} from "@/providers/seerr/types";
 import {
 	filterSeerrSearchResults,
 	getDefaultSelectedSeasons,
@@ -22,7 +25,7 @@ function season(
 }
 
 describe("Seerr season selection helpers", () => {
-	it("defaults to requestable mapped seasons only", () => {
+	it("defaults to selectable mapped seasons only", () => {
 		expect(
 			getDefaultSelectedSeasons({
 				mappedSeasons: [1, 2],
@@ -32,18 +35,19 @@ describe("Seerr season selection helpers", () => {
 					season(3, "unknown"),
 				],
 			}),
-		).toEqual([2]);
+		).toEqual([1, 2]);
 	});
 
-	it("selects all requestable seasons only", () => {
+	it("selects all selectable seasons only", () => {
 		expect(
 			getRequestableSeasonNumbers([
 				season(0, "unknown"),
+				season(1, "partial"),
 				season(2, "unknown"),
 				season(2, "deleted"),
 				season(3, "available"),
 			]),
-		).toEqual([0, 2]);
+		).toEqual([0, 1, 2]);
 	});
 
 	it("summarizes availability counts from Seerr season rows", () => {

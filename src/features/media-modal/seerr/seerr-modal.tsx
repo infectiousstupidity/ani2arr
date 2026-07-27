@@ -2,14 +2,17 @@
 // src/features/media-modal/seerr/seerr-modal.tsx
 
 import { useState } from "react";
-import type { SeerrMediaDetails, SeerrSearchResult } from "@/providers/seerr/types";
+import type {
+	SeerrMediaDetails,
+	SeerrSearchResult,
+} from "@/providers/seerr/types";
 import {
 	useSeerrMediaDetails,
 	useSeerrPublicSettings,
 	useSeerrTarget,
 } from "@/queries/seerr";
-import type { SeerrRequestTarget } from "@/rpc/types";
 import { getDirectAniListId, sourceFromInput } from "@/rpc/source-input";
+import type { SeerrRequestTarget } from "@/rpc/types";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -87,7 +90,9 @@ export function SeerrModal({
 	);
 	const target = targetQuery.data ?? null;
 	const detailsQuery = useSeerrMediaDetails({
-		input: target ? { mediaType: target.mediaType, tmdbId: target.tmdbId } : null,
+		input: target
+			? { mediaType: target.mediaType, tmdbId: target.tmdbId }
+			: null,
 		enabled: isConfigured && target !== null,
 	});
 	const publicSettingsQuery = useSeerrPublicSettings({

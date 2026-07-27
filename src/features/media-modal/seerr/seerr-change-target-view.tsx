@@ -2,19 +2,13 @@
 // src/features/media-modal/seerr/seerr-change-target-view.tsx
 
 import {
-	useMemo,
-	useState,
 	type Dispatch,
 	type ReactNode,
 	type SetStateAction,
+	useMemo,
+	useState,
 } from "react";
 import type { AniListId } from "@/anilist/types";
-import type {
-	GetSeerrMediaDetailsInput,
-	SeerrRequestTarget,
-	SetManualSeerrTargetInput,
-	SourceRpcInput,
-} from "@/rpc/types";
 import type {
 	SeerrMediaDetails,
 	SeerrSearchResult,
@@ -25,19 +19,25 @@ import {
 	useSeerrSearch,
 	useSetManualSeerrTarget,
 } from "@/queries/seerr";
+import type {
+	GetSeerrMediaDetailsInput,
+	SeerrRequestTarget,
+	SetManualSeerrTargetInput,
+	SourceRpcInput,
+} from "@/rpc/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
-import type { AniListHeaderData, MediaModalContainer } from "../types";
 import { ModalShell } from "../chrome/modal-shell";
+import type { AniListHeaderData, MediaModalContainer } from "../types";
 import { SeerrChangeTargetInfoPane } from "./seerr-change-target-info-pane";
 import { SeerrChangeTargetMainPane } from "./seerr-change-target-main-pane";
 import { SeerrFooter } from "./seerr-footer";
 import {
 	getDefaultSelectedSeasons,
+	getRequestableSeasonNumbers,
 	getSeerrDetailsSeasonKey,
 	getSeerrTargetSeasonKey,
-	getRequestableSeasonNumbers,
-	toggleSeasonSelection,
 	type SeerrSeasonDraft,
+	toggleSeasonSelection,
 } from "./seerr-selection";
 
 function currentTargetDefaultSeasons(input: {
@@ -74,7 +74,10 @@ function buildTvManualTargetInput(input: {
 	selectedResult: SeerrSearchResult | null;
 	draftSeasons: readonly number[];
 }): SetManualSeerrTargetInput | null {
-	if (input.selectedResult?.mediaType !== "tv" || input.draftSeasons.length === 0) {
+	if (
+		input.selectedResult?.mediaType !== "tv" ||
+		input.draftSeasons.length === 0
+	) {
 		return null;
 	}
 
@@ -166,10 +169,7 @@ export function SeerrChangeTargetView(props: {
 		? getUserErrorMessage(search.error, "Failed to search Seerr.")
 		: null;
 	const saveError = setManualTarget.error
-		? getUserErrorMessage(
-				setManualTarget.error,
-				"Failed to save Seerr target.",
-			)
+		? getUserErrorMessage(setManualTarget.error, "Failed to save Seerr target.")
 		: null;
 	const saveTvTargetEnabled = canSaveTvTarget(selectedResult, draftSeasons);
 
@@ -205,10 +205,7 @@ export function SeerrChangeTargetView(props: {
 		});
 		if (!input) return;
 
-		setManualTarget.mutate(
-			input,
-			{ onSuccess: onBackToRequest },
-		);
+		setManualTarget.mutate(input, { onSuccess: onBackToRequest });
 	};
 	const handleEscapeKeyDown = (event: KeyboardEvent): void => {
 		event.preventDefault();

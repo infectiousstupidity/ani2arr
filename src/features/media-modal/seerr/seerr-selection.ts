@@ -35,12 +35,24 @@ export function getSeerrTargetSeasonKey(
 	].join("|");
 }
 
+export function isSelectableSeerrSeason(
+	season: Pick<SeerrSeasonStatus, "requestable" | "status">,
+): boolean {
+	return season.requestable || season.status === "partial";
+}
+
 export function getRequestableSeasonNumbers(
 	seasons: readonly SeerrSeasonStatus[] | undefined,
+	enableSpecialEpisodes = true,
 ): number[] {
 	return normalizeSeasonNumbers(
 		(seasons ?? [])
-			.filter((season) => season.requestable)
+			.filter(
+				(season) =>
+					isSelectableSeerrSeason(season) &&
+					season.episodeCount !== 0 &&
+					(enableSpecialEpisodes || season.seasonNumber !== 0),
+			)
 			.map((season) => season.seasonNumber),
 	);
 }
@@ -185,10 +197,19 @@ export function getDefaultSelectedSeasons(input: {
 	tmdbMappedSeasons?: readonly number[] | undefined;
 	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;
+	enableSpecialEpisodes?: boolean | undefined;
 }): number[] {
-	const requestable = new Set(getRequestableSeasonNumbers(input.seasons));
+	const requestableSeasons = getRequestableSeasonNumbers(
+		input.seasons,
+		input.enableSpecialEpisodes,
+	);
 	const mappedSeasons = getMappedSeasonsForDetails(input);
 
+	if (mappedSeasons.length === 0) {
+		return requestableSeasons;
+	}
+
+	const requestable = new Set(requestableSeasons);
 	return mappedSeasons.filter((season) => requestable.has(season));
 }
 

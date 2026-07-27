@@ -8,8 +8,8 @@ import type {
 	SeerrRequestTarget,
 } from "@/rpc/types";
 import { MappingLinkedEntries } from "../details/linked-entries";
-import { RIGHT_PANE_SCROLL_CLASS } from "./seerr-modal.constants";
 import { SeerrDetailCard } from "./seerr-detail-card";
+import { RIGHT_PANE_SCROLL_CLASS } from "./seerr-modal.constants";
 
 export function SeerrRequestInfoPane(props: {
 	anilistId?: AniListId | undefined;
