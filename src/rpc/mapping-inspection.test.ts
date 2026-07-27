@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-	parseAniListId,
 	type AniListId,
 	type AniListMetadata,
+	parseAniListId,
 } from "@/anilist/types";
 import type { MappingResult } from "@/mapping/types";
 import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
