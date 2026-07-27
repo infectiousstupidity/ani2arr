@@ -8,21 +8,18 @@ import { buildMyAnimeListAnimeUrl } from "@/myanimelist/url";
 import type { SeerrMediaDetails } from "@/providers/seerr/types";
 import type { SeerrRequestTarget } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
-import {
-	MappingOpenLink,
-	MappingPoster,
-} from "../chrome/header-mapping-card";
+import { MappingOpenLink, MappingPoster } from "../chrome/header-mapping-card";
 import {
 	MappingConnector,
 	type MappingConnectorState,
 } from "../chrome/mapping-connector";
 import { formatToken } from "../helpers";
 import type { AniListHeaderData } from "../types";
-import { getTmdbPosterUrl } from "./seerr-selection";
 import {
 	CHROME_BUTTON_CLASS,
 	HEADER_CARD_CLASS,
 } from "./seerr-modal.constants";
+import { getTmdbPosterUrl } from "./seerr-selection";
 
 type SeerrTargetIdLink = {
 	label: string;
@@ -104,8 +101,6 @@ export function SeerrHeader(props: {
 	const anilistMetaLine = joinMetaLine([
 		data.format ? formatToken(data.format) : null,
 		data.year ? String(data.year) : null,
-		data.episodeCount === undefined ? null : `${data.episodeCount} eps`,
-		data.status,
 	]);
 	const targetMetaLine = getTargetMetaLine(target);
 	const targetIdLinks = getTargetIdLinks(target);
@@ -116,7 +111,9 @@ export function SeerrHeader(props: {
 			<div
 				className="absolute inset-0 bg-bg-tertiary"
 				style={{
-					backgroundImage: data.bannerImage ? `url(${data.bannerImage})` : undefined,
+					backgroundImage: data.bannerImage
+						? `url(${data.bannerImage})`
+						: undefined,
 					backgroundPosition: "center",
 					backgroundRepeat: "no-repeat",
 					backgroundSize: "cover",
@@ -153,11 +150,6 @@ export function SeerrHeader(props: {
 								<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
 									{data.title}
 								</h2>
-								{data.synopsis ? (
-									<p className="mt-1 line-clamp-1 text-[10px] leading-4 text-text-secondary md:line-clamp-2 md:text-xs md:leading-5">
-										{data.synopsis}
-									</p>
-								) : null}
 
 								<div className="mt-auto min-w-0 pt-2 md:pt-3">
 									{anilistMetaLine ? (
@@ -190,7 +182,9 @@ export function SeerrHeader(props: {
 								<div className="relative min-w-0 flex-1 overflow-hidden">
 									<div className="a2a-fade-blur-in absolute inset-0 flex min-w-0 flex-col items-end p-3 text-right md:p-4">
 										<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
-											{isLoadingTarget ? "Loading Seerr target..." : targetTitle}
+											{isLoadingTarget
+												? "Loading Seerr target..."
+												: targetTitle}
 										</h2>
 
 										<div className="mt-auto min-w-0 pt-2 md:pt-3">

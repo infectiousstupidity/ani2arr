@@ -2,9 +2,9 @@
 // src/features/media-modal/anilist-modal-data.ts
 
 import {
+	type AniListTitleLanguage,
 	metadataHintFromAniListMetadata,
 	resolveTitlePreference,
-	type AniListTitleLanguage,
 } from "@/anilist/title";
 import type {
 	AniListId,
@@ -14,8 +14,8 @@ import type {
 } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import {
-	metadataHintFromMyAnimeListMetadata,
 	type MyAnimeListMetadata,
+	metadataHintFromMyAnimeListMetadata,
 } from "@/myanimelist/types";
 import type { GetAniListMetadataOutput } from "@/rpc/types";
 import type { AniListHeaderData, MediaModalMetadataHint } from "./types";
@@ -103,7 +103,10 @@ const mergeSynonyms = (
 	a: string[] | null | undefined,
 	b: string[] | null | undefined,
 ): string[] | null => {
-	const merged = [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]
+	const merged = [
+		...(Array.isArray(a) ? a : []),
+		...(Array.isArray(b) ? b : []),
+	]
 		.map((item) => item.trim())
 		.filter((item) => item.length > 0);
 
@@ -191,9 +194,7 @@ function getSourceMetadata(input: {
 } {
 	if (input.source.source === "mal") {
 		return {
-			canonical: metadataHintFromMyAnimeListMetadata(
-				input.myAnimeListMetadata,
-			),
+			canonical: metadataHintFromMyAnimeListMetadata(input.myAnimeListMetadata),
 			media: null,
 			status: input.launchMetadata,
 		};
@@ -298,15 +299,6 @@ function buildAniListHeaderData(input: {
 			anilistMedia: input.anilistMedia,
 			resolvedMetadata: input.resolvedMetadata,
 		}),
-		...(input.myAnimeListMetadata?.episodes == null
-			? {}
-			: { episodeCount: input.myAnimeListMetadata.episodes }),
-		...(input.myAnimeListMetadata?.status
-			? { status: input.myAnimeListMetadata.status }
-			: {}),
-		...(input.myAnimeListMetadata?.synopsis
-			? { synopsis: input.myAnimeListMetadata.synopsis }
-			: {}),
 	};
 }
 

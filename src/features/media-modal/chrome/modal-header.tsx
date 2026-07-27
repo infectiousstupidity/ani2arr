@@ -6,12 +6,12 @@ import type { MouseEvent, MouseEventHandler } from "react";
 import { buildAniListAnimeUrl } from "@/anilist/title";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import { buildMyAnimeListAnimeUrl } from "@/myanimelist/url";
-import type { Provider } from "@/providers/types";
 import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
 import { getProviderOpenTarget } from "@/providers/provider-links";
+import type { Provider } from "@/providers/types";
 import { openProviderPage } from "@/rpc/provider-page";
 import Button from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/utils/cn";
@@ -91,9 +91,6 @@ function SourceCard(props: {
 			coverImage,
 			format,
 			year,
-			episodeCount,
-			status,
-			synopsis,
 		},
 		source,
 	} = props;
@@ -101,8 +98,6 @@ function SourceCard(props: {
 	const anilistMetaLine = joinMetaLine([
 		format ? formatToken(format) : null,
 		year ? String(year) : null,
-		episodeCount === undefined ? null : `${episodeCount} eps`,
-		status,
 	]);
 	const sourceLabel = source.source === "anilist" ? "AniList" : "MAL";
 	const sourceLink =
@@ -118,11 +113,6 @@ function SourceCard(props: {
 				<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
 					{title}
 				</h2>
-				{synopsis ? (
-					<p className="mt-1 line-clamp-1 text-[10px] leading-4 text-text-secondary md:line-clamp-2 md:text-xs md:leading-5">
-						{synopsis}
-					</p>
-				) : null}
 
 				<div className="mt-auto min-w-0 pt-2 md:pt-3">
 					{anilistMetaLine ? (
@@ -248,13 +238,7 @@ function ProviderCardContent(props: {
 }
 
 function ProviderCard(props: ProviderCardProps): React.JSX.Element {
-	const {
-		provider,
-		target,
-		isLoading,
-		isDimmed,
-		isHighlighted,
-	} = props;
+	const { provider, target, isLoading, isDimmed, isHighlighted } = props;
 
 	const providerLabel = getProviderLabel(provider);
 	const display = getProviderCardDisplay({
@@ -295,9 +279,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 		<div
 			className={cn(
 				HEADER_CARD_CLASS,
-				isHighlighted
-					? "border-accent-primary/35 bg-accent-primary/8"
-					: null,
+				isHighlighted ? "border-accent-primary/35 bg-accent-primary/8" : null,
 			)}
 		>
 			<div
@@ -409,10 +391,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 					)}
 				>
 					<div className="a2a-modal-header-item min-w-0">
-						<SourceCard
-							anilistHeaderData={anilistHeaderData}
-							source={source}
-						/>
+						<SourceCard anilistHeaderData={anilistHeaderData} source={source} />
 					</div>
 					<div className="a2a-modal-header-item a2a-delay-50 min-w-0">
 						<MappingConnector state={connectorState} />

@@ -21,9 +21,6 @@ export type AniListHeaderData = {
 	coverImage: string | null;
 	format: AniListMediaFormat | null;
 	year: number | null;
-	episodeCount?: number;
-	status?: string;
-	synopsis?: string;
 };
 
 export type MediaModalTargetSummary = {
@@ -52,10 +49,10 @@ type MediaModalStateBase = {
 
 type ProviderMediaModalStateBase = MediaModalStateBase &
 	SourceRpcInput & {
-	kind: "provider";
-	provider: Provider;
-	initialView?: MediaModalView;
-};
+		kind: "provider";
+		provider: Provider;
+		initialView?: MediaModalView;
+	};
 
 export type SonarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "sonarr";
@@ -71,10 +68,7 @@ export type SeerrMediaModalState = MediaModalStateBase &
 	};
 
 export type MediaModalState =
-	| SonarrMediaModalState
-	| RadarrMediaModalState
-	| SeerrMediaModalState
-	| null;
+	SonarrMediaModalState | RadarrMediaModalState | SeerrMediaModalState | null;
 
 export type MediaModalOpenState = Exclude<MediaModalState, null>;
 
