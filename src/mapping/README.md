@@ -45,9 +45,10 @@ unmapped
 ```
 
 Manual mappings may match and therefore be reported as upstream, but user intent
-still wins. Automatic results never resolve upstream ambiguity. Every distinct
-Sonarr `(TVDB ID, season)` pair is preserved; several pairs use the existing
-ambiguous result instead of widening to an unscoped series.
+still wins. Automatic results never resolve upstream ambiguity. Sonarr targets
+are grouped by TVDB ID. A single scoped season stays scoped; multiple seasons
+for one TVDB ID widen to one unscoped series target. Different TVDB IDs remain
+ambiguous.
 
 AniBridge projections are derived on read:
 

@@ -3,6 +3,8 @@
 
 import { storage } from "wxt/utils/storage";
 import type { AniListId } from "@/anilist/types";
+import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
+import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
@@ -10,14 +12,12 @@ import {
 	type TvdbId,
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
-import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
-import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
+import { normalizeSeasonNumbers } from "./season-numbers";
 import {
 	parseSourceIdentityKey,
-	sourceIdentityKey,
 	type SourceIdentity,
+	sourceIdentityKey,
 } from "./source-identity";
-import { normalizeSeasonNumbers } from "./season-numbers";
 import type {
 	AniBridgeEntries,
 	AniBridgeTarget,
@@ -356,13 +356,15 @@ function projectUpstreamTargets(
 		provider: "radarr",
 		providerId,
 	}));
-	const sonarrTargets: UpstreamTarget[] = [...sonarrSeasonsById].flatMap(
-		([providerId, seasons]) =>
-			[...seasons].map((season) => ({
+	const sonarrTargets: UpstreamTarget[] = [...sonarrSeasonsById].map(
+		([providerId, seasons]): UpstreamTarget => {
+			const season = seasons.size === 1 ? [...seasons][0] : undefined;
+			return {
 				provider: "sonarr",
 				providerId,
 				...(season === undefined ? {} : { season }),
-			})),
+			};
+		},
 	);
 
 	return [...radarrTargets, ...sonarrTargets];

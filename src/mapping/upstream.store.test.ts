@@ -260,7 +260,7 @@ describe("refreshUpstreamMappings", () => {
 
 	it("normalizes Arr targets by provider ID", async () => {
 		await seedSnapshot({
-			"anilist:2": [
+			"anilist:21": [
 				{ kind: "tvdb-show", id: tvdb(81_797), season: 0 },
 				{ kind: "tvdb-show", id: tvdb(81_797), season: 1 },
 				{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
@@ -278,18 +278,14 @@ describe("refreshUpstreamMappings", () => {
 
 		await expect(
 			Promise.all([
-				getSourceUpstreamMapping("sonarr", anilistSource(2)),
+				getSourceUpstreamMapping("sonarr", anilistSource(21)),
 				getSourceUpstreamMapping("sonarr", anilistSource(3)),
 				getSourceUpstreamMapping("radarr", anilistSource(4)),
 			]),
 		).resolves.toEqual([
 			{
-				anilistId: aid(2),
-				targets: [
-					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
-					{ provider: "sonarr", providerId: tvdb(81_797), season: 1 },
-					{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
-				],
+				anilistId: aid(21),
+				targets: [{ provider: "sonarr", providerId: tvdb(81_797) }],
 			},
 			{
 				anilistId: aid(3),
