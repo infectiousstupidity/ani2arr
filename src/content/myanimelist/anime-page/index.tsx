@@ -1,32 +1,24 @@
 /** MyAnimeList anime-page content mount using MAL identity and AniBridge crosswalks. */
 // src/content/myanimelist/anime-page/index.tsx
 
-import { QueryClientProvider } from "@tanstack/react-query";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
 import {
 	createShadowRootUi,
 	type ShadowRootContentScriptUi,
 } from "wxt/utils/content-script-ui/shadow-root";
+import { type AnimePageTarget, ContentRoot } from "@/content/anime-page/root";
 import {
-	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
+	createContentEntrypointShell,
 } from "@/content/core/create-content-script-shell";
-import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import { queryKeys } from "@/queries/query-keys";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
-import {
-	ANCHOR_ID,
-	TITLE_SELECTOR,
-	UI_NAME,
-	ensureActionsAnchor,
-	readAnimePageData,
-	removeLayoutArtifacts,
-	waitForElement,
-} from "./layout";
+import { ACTIONS_HOST_SELECTOR, readAnimePageData, UI_NAME } from "./layout";
 
 const log = logger.create("MyAnimeList Content");
 const queryClient = createExtensionQueryClient();
@@ -41,31 +33,22 @@ const removeAnimeUI = (): void => {
 		log.error("Error removing MAL UI:", error);
 	}
 	ui = null;
-	removeLayoutArtifacts();
 };
 
 const isAnimePageUrl = (url: string): boolean =>
 	readMyAnimeListIdFromUrl(url) !== null;
 
-const isAnimePageShellEligible = async ({
+const isAnimePageShellEligible = ({
 	url,
 	publicOptions,
-	signal,
-}: Pick<
-	ContentEntrypointShellContext,
-	"url" | "publicOptions" | "signal"
->): Promise<boolean> => {
+}: Pick<ContentEntrypointShellContext, "url" | "publicOptions">): boolean => {
 	if (!MAL_PAGE.includes(url) || !isAnimePageUrl(url)) return false;
-	if (
+
+	return !(
 		(publicOptions.ui?.animePages.sonarr.enabled ?? true) === false &&
 		(publicOptions.ui?.animePages.radarr.enabled ?? true) === false &&
 		(publicOptions.ui?.animePages.seerr.enabled ?? true) === false
-	) {
-		return false;
-	}
-
-	await waitForElement(TITLE_SELECTOR, { signal });
-	return true;
+	);
 };
 
 async function mountAnimePageUI({
@@ -75,36 +58,28 @@ async function mountAnimePageUI({
 	publicOptions,
 }: ContentEntrypointShellContext): Promise<void> {
 	queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
+
 	const malId = readMyAnimeListIdFromUrl(url);
-	if (malId === null) return;
+	if (malId === null || !isCurrent()) return;
 
 	const source = { source: "mal", id: malId } as const;
-	const mountTarget = ensureActionsAnchor();
-	if (!mountTarget) return;
-	const pageData = readAnimePageData(document);
 
-	const target: AnimePageTarget = {
-		source,
-		...pageData,
-	};
-
-	if (!isCurrent()) {
-		removeAnimeUI();
-		return;
-	}
-
-	if (ui) {
-		ui.remove();
-		ui = null;
-	}
+	ui?.remove();
+	ui = null;
 
 	const nextUi = await createShadowRootUi(ctx, {
 		name: UI_NAME,
 		mode: "closed",
 		position: "inline",
-		anchor: `#${ANCHOR_ID}`,
-		append: "last",
+		anchor: ACTIONS_HOST_SELECTOR,
+		append: "after",
 		onMount: (uiContainer, _shadow, shadowHost): Root => {
+			const pageData = readAnimePageData(document);
+			const target: AnimePageTarget = {
+				source,
+				...pageData,
+			};
+
 			Object.assign(uiContainer.style, {
 				width: "300px",
 				maxWidth: "100%",
@@ -112,10 +87,12 @@ async function mountAnimePageUI({
 			Object.assign(shadowHost.style, {
 				display: "block",
 				position: "static",
+				clear: "both",
 				width: "100%",
 				maxWidth: "300px",
-				margin: "0",
+				margin: "8px 0 0",
 			});
+
 			const root = createRoot(uiContainer);
 			root.render(
 				<ExtensionErrorBoundary scope="myanimelist-anime-root">
