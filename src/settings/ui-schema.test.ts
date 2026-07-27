@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import * as v from "valibot";
+import { describe, expect, it } from "vitest";
 import { PublicOptionsSchema } from "@/settings/schema";
 import { createDefaultUiOptions } from "@/settings/ui-schema";
 

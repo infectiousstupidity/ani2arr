@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAniListId, type AniListMedia } from "@/anilist/types";
+import { type AniListMedia, parseAniListId } from "@/anilist/types";
 import { resolveMediaModalMetadata } from "./anilist-modal-data";
 
 function createMedia(overrides: Partial<AniListMedia> = {}): AniListMedia {
@@ -118,7 +118,9 @@ describe("resolveMediaModalMetadata", () => {
 
 		expect(result.providerRequestTitle).toBe("Frieren: Beyond Journey's End");
 		expect(result.statusTitle).toBe("Sousou no Frieren 3rd Season");
-		expect(result.statusMetadata?.titles).toEqual({ romaji: "Sousou no Frieren" });
+		expect(result.statusMetadata?.titles).toEqual({
+			romaji: "Sousou no Frieren",
+		});
 	});
 
 	it("does not let full AniList media alter status metadata", () => {
