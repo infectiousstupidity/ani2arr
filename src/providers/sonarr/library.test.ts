@@ -1,15 +1,15 @@
 /** Tests for Sonarr TVDB library status checks and cache updates. */
-// src/providers/sonarr/library.test.ts
-
 import { describe, expect, it, vi } from "vitest";
-
-import { parseTvdbId } from "@/providers/schemas";
-import type { ProviderCredentials } from "@/providers/types";
+import {
+	createDeferred,
+	createMemoryCache,
+} from "@/providers/provider-test-helpers";
 import type {
 	ProviderQualityProfileId,
 	SonarrSeriesId,
 } from "@/providers/schemas";
-import type { CacheHit, TtlCache } from "@/shared/cache/ttl-cache";
+import { parseTvdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
 
 import { SonarrClient } from "./client";
 import { SonarrLibrary, toSonarrSeriesSnapshot } from "./library";
@@ -28,8 +28,7 @@ const otherCredentials: ProviderCredentials = {
 	apiKey: "other-secret",
 };
 const seriesCacheKey = "series:https://sonarr.example.test";
-const otherSeriesCacheKey =
-	"series:https://other-sonarr.example.test/base";
+const otherSeriesCacheKey = "series:https://other-sonarr.example.test/base";
 
 const parseProviderQualityProfileId = (value: number) =>
 	value as ProviderQualityProfileId;
@@ -39,51 +38,6 @@ function createClient(): SonarrClient {
 	return new SonarrClient({
 		hasUrlPermission: () => Promise.resolve(true),
 	});
-}
-
-function createMemoryCache<T>(
-	initialEntries: ReadonlyArray<readonly [string, T]> = [],
-): TtlCache<T> & {
-	value: (key: string) => T | undefined;
-	keys: () => string[];
-} {
-	const values = new Map<string, T>(initialEntries);
-
-	return {
-		read: vi.fn(async (key: string): Promise<CacheHit<T> | null> => {
-			const value = values.get(key);
-			if (value === undefined) return null;
-
-			return {
-				value,
-				stale: false,
-				staleAt: Date.now() + 60_000,
-				expiresAt: Date.now() + 120_000,
-			};
-		}),
-		write: vi.fn(async (key: string, nextValue: T) => {
-			values.set(key, nextValue);
-		}),
-		remove: vi.fn(async (key: string) => {
-			values.delete(key);
-		}),
-		clear: vi.fn(async () => {
-			values.clear();
-		}),
-		value: (key: string) => values.get(key),
-		keys: () => [...values.keys()],
-	};
-}
-
-function createDeferred<T>(): {
-	promise: Promise<T>;
-	resolve: (value: T) => void;
-} {
-	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((promiseResolve) => {
-		resolve = promiseResolve;
-	});
-	return { promise, resolve };
 }
 
 function createSonarrSeries(input?: Partial<SonarrSeries>): SonarrSeries {
@@ -170,10 +124,6 @@ describe("SonarrLibrary library status", () => {
 
 		expect(cache.read).toHaveBeenCalledTimes(1);
 		expect(cache.keys()).toEqual([seriesCacheKey]);
-		expect(JSON.stringify(cache.keys())).not.toContain(credentials.apiKey);
-		expect(JSON.stringify(cache.keys())).not.toContain(
-			equivalentCredentials.apiKey,
-		);
 	});
 
 	it("keeps snapshots separate when the configured server changes", async () => {
@@ -192,9 +142,9 @@ describe("SonarrLibrary library status", () => {
 		await expect(library.getSeriesSnapshots(credentials)).resolves.toEqual([
 			firstSnapshot,
 		]);
-		await expect(
-			library.getSeriesSnapshots(otherCredentials),
-		).resolves.toEqual([secondSnapshot]);
+		await expect(library.getSeriesSnapshots(otherCredentials)).resolves.toEqual(
+			[secondSnapshot],
+		);
 		await expect(library.getSeriesSnapshots(credentials)).resolves.toEqual([
 			firstSnapshot,
 		]);

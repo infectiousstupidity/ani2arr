@@ -1,6 +1,4 @@
 /** Focused tests for provider connection validation and cache scope normalization. */
-// src/providers/settings/provider-connection.validation.test.ts
-
 /* eslint-disable unicorn/prefer-https */
 
 import { describe, expect, it } from "vitest";
@@ -24,55 +22,31 @@ describe("normalizeProviderConnectionUrl", () => {
 		});
 	});
 
-	it("preserves non-default ports", () => {
-		expect(
-			validateProviderConnectionUrl("http://192.168.50.166:8181/"),
-		).toEqual({
+	it.each([
+		["http://192.168.50.166:8181/", "http://192.168.50.166:8181"],
+		["https://arr.example:8443/radarr///", "https://arr.example:8443/radarr"],
+	])("normalizes %s", (input, expected) => {
+		expect(validateProviderConnectionUrl(input)).toEqual({
 			ok: true,
-			value: "http://192.168.50.166:8181",
+			value: expected,
 		});
 	});
 
-	it("preserves non-default ports and subfolders for API URLs", () => {
-		expect(
-			validateProviderConnectionUrl("https://arr.example:8443/radarr///"),
-		).toEqual({
-			ok: true,
-			value: "https://arr.example:8443/radarr",
-		});
-	});
-
-	it("rejects unsupported URL shapes", () => {
-		expect(validateProviderConnectionUrl("")).toEqual({
-			ok: false,
-			error: "URL cannot be empty.",
-		});
-		expect(validateProviderConnectionUrl("ftp://arr.example")).toEqual({
-			ok: false,
-			error: "URL must use http or https.",
-		});
-		expect(
-			validateProviderConnectionUrl("https://user:pass@arr.example"),
-		).toEqual({
-			ok: false,
-			error: "Credentials in URL are not supported.",
-		});
-		expect(
-			validateProviderConnectionUrl("https://arr.example?apiKey=secret"),
-		).toEqual({
-			ok: false,
-			error: "URL must not include query parameters or fragments.",
-		});
-		expect(
-			validateProviderConnectionUrl("https://arr.example/#settings"),
-		).toEqual({
-			ok: false,
-			error: "URL must not include query parameters or fragments.",
-		});
-		expect(validateProviderConnectionUrl("http://arr.example:0")).toEqual({
-			ok: false,
-			error: "Invalid port.",
-		});
+	it.each([
+		["", "URL cannot be empty."],
+		["ftp://arr.example", "URL must use http or https."],
+		["https://user:pass@arr.example", "Credentials in URL are not supported."],
+		[
+			"https://arr.example?apiKey=secret",
+			"URL must not include query parameters or fragments.",
+		],
+		[
+			"https://arr.example/#settings",
+			"URL must not include query parameters or fragments.",
+		],
+		["http://arr.example:0", "Invalid port."],
+	])("rejects unsupported URL %s", (input, error) => {
+		expect(validateProviderConnectionUrl(input)).toEqual({ ok: false, error });
 	});
 });
 
@@ -91,23 +65,16 @@ describe("validateProviderConnectionApiKey", () => {
 
 describe("getProviderConnectionScope", () => {
 	it("uses normalized URL only and never leaks API keys", () => {
-		const firstApiKey = "top-secret-key-one";
-		const secondApiKey = "top-secret-key-two";
-
 		const firstScope = getProviderConnectionScope({
 			url: "https://EXAMPLE.com:443/api///",
-			apiKey: firstApiKey,
+			apiKey: "top-secret-key-one",
 		});
 		const secondScope = getProviderConnectionScope({
 			url: "https://example.com/api",
-			apiKey: secondApiKey,
+			apiKey: "top-secret-key-two",
 		});
 
 		expect(firstScope).toBe("https://example.com/api");
 		expect(secondScope).toBe(firstScope);
-
-		const serializedScope = JSON.stringify(firstScope);
-		expect(serializedScope).not.toContain(firstApiKey);
-		expect(serializedScope).not.toContain(secondApiKey);
 	});
 });

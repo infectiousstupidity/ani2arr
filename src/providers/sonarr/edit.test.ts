@@ -1,15 +1,14 @@
 /** Tests for Sonarr edit workflow full-payload updates and monitoring actions. */
-// src/providers/sonarr/edit.test.ts
-
 import { describe, expect, it, vi } from "vitest";
-import { parseTvdbId } from "@/providers/schemas";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,
 	SonarrSeriesId,
 } from "@/providers/schemas";
-import { updateSonarrSeries } from "./edit";
+import { parseTvdbId } from "@/providers/schemas";
 import type { SonarrClient } from "./client";
+import { updateSonarrSeries } from "./edit";
+import type { SonarrSeries } from "./types";
 
 const credentials = {
 	url: "https://sonarr.example.test",
@@ -19,40 +18,37 @@ const parseProviderQualityProfileId = (value: number) =>
 	value as ProviderQualityProfileId;
 const parseProviderTagId = (value: number) => value as ProviderTagId;
 const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
+const seriesId = parseSonarrSeriesId(12);
+const tvdbId = parseTvdbId(34);
+
+function createSeries(overrides: Partial<SonarrSeries> = {}): SonarrSeries {
+	return {
+		id: seriesId,
+		title: "Example Series",
+		tvdbId,
+		titleSlug: "example-series",
+		qualityProfileId: parseProviderQualityProfileId(56),
+		rootFolderPath: "/series",
+		path: "/series/Example Series [tvdb-34]",
+		monitored: true,
+		monitorNewItems: "all",
+		seriesType: "standard",
+		seasonFolder: true,
+		tags: [],
+		...overrides,
+	};
+}
 
 describe("updateSonarrSeries", () => {
 	it("sends a merged full series payload, applies monitoring, and returns the refreshed series", async () => {
-		const seriesId = parseSonarrSeriesId(12);
-		const tvdbId = parseTvdbId(34);
-		const existingSeries = {
-			id: seriesId,
-			title: "Example Series",
-			tvdbId,
-			titleSlug: "example-series",
-			qualityProfileId: parseProviderQualityProfileId(56),
-			rootFolderPath: "/series",
+		const existingSeries = createSeries({
 			path: "/series/anime1",
-			monitored: true,
-			monitorNewItems: "all" as const,
-			seriesType: "standard" as const,
-			seasonFolder: true,
 			tags: [parseProviderTagId(1)],
 			statistics: { episodeCount: 12 },
-		};
-		const updatedSeries = {
-			...existingSeries,
-			qualityProfileId: parseProviderQualityProfileId(99),
-			rootFolderPath: "/series-4k",
-			path: "/series-4k/Example Series [tvdb-34]",
-			monitored: false,
-			monitorNewItems: "none" as const,
-			seriesType: "anime" as const,
-			seasonFolder: false,
-			tags: [parseProviderTagId(7)],
-		};
+		});
 		const refreshedSeries = {
-			...updatedSeries,
-			monitored: true,
+			...existingSeries,
+			title: "Refreshed Series",
 		};
 		const client = {
 			findSeriesByTvdbId: vi.fn(async () => existingSeries),
@@ -63,9 +59,11 @@ describe("updateSonarrSeries", () => {
 			getSeriesFolderName: vi.fn(async () => ({
 				folder: "Example Series [tvdb-34]",
 			})),
-			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
+			getTags: vi.fn(async () => [
+				{ id: parseProviderTagId(7), label: "Keep" },
+			]),
 			createTag: vi.fn(),
-			updateSeries: vi.fn(async () => updatedSeries),
+			updateSeries: vi.fn(async () => existingSeries),
 			setSeriesMonitorMode: vi.fn(async () => {}),
 		};
 
@@ -119,22 +117,7 @@ describe("updateSonarrSeries", () => {
 	});
 
 	it("throws a partial-success error when monitoring action fails after update", async () => {
-		const seriesId = parseSonarrSeriesId(12);
-		const tvdbId = parseTvdbId(34);
-		const existingSeries = {
-			id: seriesId,
-			title: "Example Series",
-			tvdbId,
-			titleSlug: "example-series",
-			qualityProfileId: parseProviderQualityProfileId(56),
-			rootFolderPath: "/series",
-			path: "/series/Example Series [tvdb-34]",
-			monitored: true,
-			monitorNewItems: "all" as const,
-			seriesType: "standard" as const,
-			seasonFolder: true,
-			tags: [],
-		};
+		const existingSeries = createSeries();
 		const client = {
 			findSeriesByTvdbId: vi.fn(async () => existingSeries),
 			getSeriesById: vi.fn(async () => existingSeries),

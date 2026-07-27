@@ -1,15 +1,14 @@
 /** Tests for Radarr edit workflow full-payload updates. */
-// src/providers/radarr/edit.test.ts
-
 import { describe, expect, it, vi } from "vitest";
-import { parseTmdbId } from "@/providers/schemas";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,
 	RadarrMovieId,
 } from "@/providers/schemas";
-import { updateRadarrMovie } from "./edit";
+import { parseTmdbId } from "@/providers/schemas";
 import type { RadarrClient } from "./client";
+import { updateRadarrMovie } from "./edit";
+import type { RadarrMovie } from "./types";
 
 const credentials = {
 	url: "https://radarr.example.test",
@@ -19,23 +18,30 @@ const parseProviderQualityProfileId = (value: number) =>
 	value as ProviderQualityProfileId;
 const parseProviderTagId = (value: number) => value as ProviderTagId;
 const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
+const movieId = parseRadarrMovieId(12);
+const tmdbId = parseTmdbId(34);
+
+function createMovie(overrides: Partial<RadarrMovie> = {}): RadarrMovie {
+	return {
+		id: movieId,
+		title: "Example Movie",
+		tmdbId,
+		qualityProfileId: parseProviderQualityProfileId(56),
+		rootFolderPath: "/movies",
+		path: "/movies/Example Movie [tmdb-34]",
+		monitored: true,
+		tags: [],
+		...overrides,
+	};
+}
 
 describe("updateRadarrMovie", () => {
 	it("sends a merged full movie payload, moves files when the path changes, and returns the updated movie", async () => {
-		const movieId = parseRadarrMovieId(12);
-		const tmdbId = parseTmdbId(34);
-		const existingMovie = {
-			id: movieId,
-			title: "Example Movie",
-			tmdbId,
+		const existingMovie = createMovie({
 			titleSlug: "example-movie",
-			qualityProfileId: parseProviderQualityProfileId(56),
-			rootFolderPath: "/movies",
-			path: "/movies/Example Movie [tmdb-34]",
-			monitored: true,
-			minimumAvailability: "announced" as const,
+			minimumAvailability: "announced",
 			tags: [parseProviderTagId(1)],
-		};
+		});
 		const updatedMovie = {
 			...existingMovie,
 			qualityProfileId: parseProviderQualityProfileId(99),
@@ -48,7 +54,9 @@ describe("updateRadarrMovie", () => {
 		const client = {
 			findMovieByTmdbId: vi.fn(async () => existingMovie),
 			getMovieById: vi.fn(async () => existingMovie),
-			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
+			getTags: vi.fn(async () => [
+				{ id: parseProviderTagId(7), label: "Keep" },
+			]),
 			createTag: vi.fn(),
 			updateMovie: vi.fn(async () => updatedMovie),
 		};
@@ -89,18 +97,9 @@ describe("updateRadarrMovie", () => {
 	});
 
 	it("uses the full fetched movie and preserves nested relative folders", async () => {
-		const movieId = parseRadarrMovieId(12);
-		const tmdbId = parseTmdbId(34);
-		const shallowMovie = {
-			id: movieId,
-			title: "Example Movie",
-			tmdbId,
-			qualityProfileId: parseProviderQualityProfileId(56),
-			rootFolderPath: "/movies",
+		const shallowMovie = createMovie({
 			path: "/movies/Old Folder",
-			monitored: true,
-			tags: [],
-		};
+		});
 		const fullMovie = {
 			...shallowMovie,
 			titleSlug: "example-movie",

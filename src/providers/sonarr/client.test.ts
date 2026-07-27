@@ -1,15 +1,13 @@
 /** Tests for Sonarr provider-domain client mutation transport endpoints. */
-// src/providers/sonarr/client.test.ts
-
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseTvdbId } from "@/providers/schemas";
-import type { ProviderCredentials } from "@/providers/types";
-import { ErrorCode } from "@/shared/errors/error.types";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,
 	SonarrSeriesId,
 } from "@/providers/schemas";
+import { parseTvdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { SonarrClient } from "./client";
 import type { SonarrAddSeriesPayload, SonarrSeries } from "./types";
 
@@ -107,9 +105,9 @@ describe("SonarrClient mutations", () => {
 			},
 		};
 
-		await expect(createClient().addSeries(payload, credentials)).resolves.toEqual(
-			series,
-		);
+		await expect(
+			createClient().addSeries(payload, credentials),
+		).resolves.toEqual(series);
 
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://sonarr.example/api/v3/series",
@@ -160,7 +158,9 @@ describe("SonarrClient mutations", () => {
 	});
 
 	it("rejects empty tag labels with a structured validation error", async () => {
-		await expect(createClient().createTag(" ", credentials)).rejects.toMatchObject({
+		await expect(
+			createClient().createTag(" ", credentials),
+		).rejects.toMatchObject({
 			code: ErrorCode.VALIDATION_ERROR,
 			userMessage: "Tag label cannot be empty.",
 		});

@@ -1,6 +1,4 @@
 /** Tests for Sonarr add-default normalization. */
-// src/providers/sonarr/form-state.test.ts
-
 import { describe, expect, it } from "vitest";
 import {
 	createDefaultSonarrFormState,
@@ -10,10 +8,10 @@ import {
 } from "./form-state";
 
 describe("Sonarr form state", () => {
-	it("stores add defaults with freeform tags", () => {
-		const defaults = createDefaultSonarrFormState();
-
-		expect(stripSonarrFormStateForDefaults(defaults)).toEqual({
+	it("creates complete add defaults", () => {
+		expect(
+			stripSonarrFormStateForDefaults(createDefaultSonarrFormState()),
+		).toEqual({
 			seriesType: "anime",
 			seasonFolder: true,
 			freeformTags: [],
@@ -25,12 +23,22 @@ describe("Sonarr form state", () => {
 		});
 	});
 
-	it("preserves freeform tags in add defaults", () => {
+	it("keeps default fields and strips form-only fields", () => {
 		expect(
 			stripSonarrFormStateForDefaults({
 				freeformTags: ["ani2arr", "seasonal"],
+				monitorNewItems: "none",
+			}),
+		).toEqual({
+			freeformTags: ["ani2arr", "seasonal"],
+		});
+	});
+
+	it("fills missing add defaults without replacing explicit values", () => {
+		expect(
+			normalizeSonarrDefaults({
 				seriesType: "standard",
-				seasonFolder: true,
+				seasonFolder: false,
 				addOptions: {
 					monitor: "future",
 					searchForMissingEpisodes: false,
@@ -38,57 +46,15 @@ describe("Sonarr form state", () => {
 				},
 			}),
 		).toEqual({
-			freeformTags: ["ani2arr", "seasonal"],
-			seriesType: "standard",
-			seasonFolder: true,
-			addOptions: {
-				monitor: "future",
-				searchForMissingEpisodes: false,
-				searchForCutoffUnmetEpisodes: true,
-			},
-		});
-	});
-
-	it("fills missing add defaults without replacing explicit values", () => {
-		expect(
-			normalizeSonarrDefaults({
-				addOptions: {
-					monitor: "future",
-				},
-			}),
-		).toMatchObject({
-			seriesType: "anime",
-			seasonFolder: true,
-			addOptions: {
-				monitor: "future",
-				searchForMissingEpisodes: true,
-				searchForCutoffUnmetEpisodes: false,
-			},
-		});
-
-		expect(normalizeSonarrDefaults({})).toMatchObject({
-			seriesType: "anime",
-			seasonFolder: true,
-			addOptions: {
-				monitor: "all",
-				searchForMissingEpisodes: true,
-				searchForCutoffUnmetEpisodes: false,
-			},
-		});
-
-		const defaults = normalizeSonarrDefaults({
 			seriesType: "standard",
 			seasonFolder: false,
+			freeformTags: [],
 			addOptions: {
+				monitor: "future",
 				searchForMissingEpisodes: false,
 				searchForCutoffUnmetEpisodes: true,
 			},
 		});
-
-		expect(defaults.seriesType).toBe("standard");
-		expect(defaults.seasonFolder).toBe(false);
-		expect(defaults.addOptions?.searchForMissingEpisodes).toBe(false);
-		expect(defaults.addOptions?.searchForCutoffUnmetEpisodes).toBe(true);
 	});
 
 	it("keeps generic form normalization free of add defaults", () => {

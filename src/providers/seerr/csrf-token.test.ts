@@ -1,12 +1,8 @@
 /** Tests for narrowly scoped Seerr XSRF cookie access. */
-// src/providers/seerr/csrf-token.test.ts
 
-import { browser } from "wxt/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	getSeerrXsrfToken,
-	SEERR_XSRF_COOKIE_NAME,
-} from "./csrf-token";
+import { browser } from "wxt/browser";
+import { getSeerrXsrfToken, SEERR_XSRF_COOKIE_NAME } from "./csrf-token";
 
 describe("getSeerrXsrfToken", () => {
 	afterEach(() => {

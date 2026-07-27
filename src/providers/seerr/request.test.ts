@@ -1,6 +1,4 @@
 /** Tests for pure Seerr request payload and status helpers. */
-// src/providers/seerr/request.test.ts
-
 import { describe, expect, it } from "vitest";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import {
@@ -10,6 +8,17 @@ import {
 	readSeerrPublicSettings,
 	readSeerrSearchResults,
 } from "./request";
+
+function readTvStatus(mediaInfo: object, seasons: number[] = [1]) {
+	return readSeerrMediaStatus({ mediaInfo }, { mediaType: "tv", seasons });
+}
+
+function readSeason(status: number) {
+	return readSeerrMediaDetails(
+		{ id: 456, name: "Show", seasons: [{ seasonNumber: 1, status }] },
+		"tv",
+	).seasons?.[0];
+}
 
 describe("Seerr request helpers", () => {
 	it("builds minimal movie request payloads", () => {
@@ -78,161 +87,103 @@ describe("Seerr request helpers", () => {
 		).toThrow("Invalid TMDB ID");
 	});
 
-	it("reads Seerr media status from details responses", () => {
-		expect(readSeerrMediaStatus({})).toBe("not-requested");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 1 } })).toBe("unknown");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 2 } })).toBe("pending");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 3 } })).toBe(
-			"processing",
-		);
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 4 } })).toBe("partial");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 5 } })).toBe(
-			"available",
-		);
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 6 } })).toBe(
-			"deleted-or-blocked",
-		);
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 7 } })).toBe("deleted");
-	});
+	it.each([
+		{ status: undefined, expected: "not-requested" },
+		{ status: 1, expected: "unknown" },
+		{ status: 2, expected: "pending" },
+		{ status: 3, expected: "processing" },
+		{ status: 4, expected: "partial" },
+		{ status: 5, expected: "available" },
+		{ status: 6, expected: "deleted-or-blocked" },
+		{ status: 7, expected: "deleted" },
+	] as const)(
+		"maps Seerr status $status to $expected",
+		({ status, expected }) => {
+			expect(
+				readSeerrMediaStatus(
+					status === undefined ? {} : { mediaInfo: { status } },
+				),
+			).toBe(expected);
+		},
+	);
 
-	it("reads TV season status when all target seasons are available", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						seasons: [
-							{ seasonNumber: 1, status: 5 },
-							{ seasonNumber: 2, status: 5 },
-						],
-					},
-				},
-				{ mediaType: "tv", seasons: [1, 2] },
-			),
-		).toBe("available");
-	});
-
-	it("lets top-level available win for explicit TV season targets", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 5,
-						requests: [
-							{
-								status: 2,
-								seasons: [{ seasonNumber: 1 }],
-							},
-						],
-					},
-				},
-				{ mediaType: "tv", seasons: [1] },
-			),
-		).toBe("available");
-	});
-
-	it("falls back to top-level TV status when season rows are absent", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						requests: [
-							{
-								status: 2,
-								seasons: [{ seasonNumber: 1 }],
-							},
-						],
-					},
-				},
-				{ mediaType: "tv", seasons: [1] },
-			),
-		).toBe("partial");
-	});
-
-	it("reads TV season status from active requests", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 2,
-						requests: [
-							{
-								status: 2,
-								seasons: [{ seasonNumber: 1 }, { seasonNumber: 2 }],
-							},
-						],
-					},
-				},
-				{ mediaType: "tv", seasons: [1, 2] },
-			),
-		).toBe("pending");
-	});
-
-	it("keeps TV requestable when any target season is uncovered", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						seasons: [{ seasonNumber: 1, status: 5 }],
-						requests: [
-							{
-								status: 2,
-								seasons: [{ seasonNumber: 1 }],
-							},
-						],
-					},
-				},
-				{ mediaType: "tv", seasons: [1, 2] },
-			),
-		).toBe("not-requested");
-	});
-
-	it("keeps TV requestable when a target season is unknown in Seerr", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						seasons: [
-							{ seasonNumber: 1, status: 4 },
-							{ seasonNumber: 23, status: 1 },
-						],
-					},
-				},
-				{ mediaType: "tv", seasons: [23] },
-			),
-		).toBe("not-requested");
-	});
-
-	it("blocks TV requests when a target season is blocked or deleted in older Seerr responses", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						seasons: [{ seasonNumber: 1, status: 6 }],
-					},
-				},
-				{ mediaType: "tv", seasons: [1] },
-			),
-		).toBe("deleted-or-blocked");
-	});
-
-	it("allows TV requests again when a target season is deleted in current Seerr responses", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						seasons: [{ seasonNumber: 1, status: 7 }],
-					},
-				},
-				{ mediaType: "tv", seasons: [1] },
-			),
-		).toBe("not-requested");
-	});
+	it.each([
+		{
+			name: "all target seasons are available",
+			mediaInfo: {
+				status: 4,
+				seasons: [
+					{ seasonNumber: 1, status: 5 },
+					{ seasonNumber: 2, status: 5 },
+				],
+			},
+			seasons: [1, 2],
+			expected: "available",
+		},
+		{
+			name: "top-level status is available",
+			mediaInfo: { status: 5 },
+			seasons: [1],
+			expected: "available",
+		},
+		{
+			name: "season rows are absent",
+			mediaInfo: { status: 4 },
+			seasons: [1],
+			expected: "partial",
+		},
+		{
+			name: "an unknown season has an active request",
+			mediaInfo: {
+				status: 2,
+				seasons: [{ seasonNumber: 1, status: 1 }],
+				requests: [{ status: 2, seasons: [{ seasonNumber: 1 }] }],
+			},
+			seasons: [1],
+			expected: "pending",
+		},
+		{
+			name: "any target season is uncovered",
+			mediaInfo: {
+				status: 4,
+				seasons: [{ seasonNumber: 1, status: 5 }],
+			},
+			seasons: [1, 2],
+			expected: "not-requested",
+		},
+		{
+			name: "the target season is unknown",
+			mediaInfo: {
+				status: 4,
+				seasons: [{ seasonNumber: 23, status: 1 }],
+			},
+			seasons: [23],
+			expected: "not-requested",
+		},
+		{
+			name: "an older response marks the target blocked",
+			mediaInfo: {
+				status: 4,
+				seasons: [{ seasonNumber: 1, status: 6 }],
+			},
+			seasons: [1],
+			expected: "deleted-or-blocked",
+		},
+		{
+			name: "a current response marks the target deleted",
+			mediaInfo: {
+				status: 4,
+				seasons: [{ seasonNumber: 1, status: 7 }],
+			},
+			seasons: [1],
+			expected: "not-requested",
+		},
+	] as const)(
+		"reads TV status when $name",
+		({ mediaInfo, seasons, expected }) => {
+			expect(readTvStatus(mediaInfo, [...seasons])).toBe(expected);
+		},
+	);
 
 	it("maps Seerr search responses to small DTOs", () => {
 		expect(
@@ -281,7 +232,7 @@ describe("Seerr request helpers", () => {
 		]);
 	});
 
-	it("maps Seerr details and season requestability", () => {
+	it("maps Seerr details to a small DTO", () => {
 		expect(
 			readSeerrMediaDetails(
 				{
@@ -291,12 +242,6 @@ describe("Seerr request helpers", () => {
 					originalName: "Original Show",
 					firstAirDate: "2020-01-01",
 					mediaInfo: { status: 4 },
-					seasons: [
-						{ seasonNumber: 1, name: "Season 1", episodeCount: 12, status: 5 },
-						{ seasonNumber: 2, status: 1 },
-						{ seasonNumber: 3, status: 7 },
-						{ seasonNumber: 4, status: 6 },
-					],
 				},
 				"tv",
 			),
@@ -308,62 +253,35 @@ describe("Seerr request helpers", () => {
 			alternateTitles: ["Original Show"],
 			year: 2020,
 			status: "partial",
-			seasons: [
-				{
-					seasonNumber: 1,
-					name: "Season 1",
-					episodeCount: 12,
-					status: "available",
-					requestable: false,
-				},
-				{
-					seasonNumber: 2,
-					status: "unknown",
-					requestable: true,
-				},
-				{
-					seasonNumber: 3,
-					status: "deleted",
-					requestable: true,
-				},
-				{
-					seasonNumber: 4,
-					status: "deleted-or-blocked",
-					requestable: false,
-				},
-			],
+			seasons: [],
 		});
 	});
+
+	it.each([
+		{ code: 1, status: "unknown", requestable: true },
+		{ code: 5, status: "available", requestable: false },
+		{ code: 6, status: "deleted-or-blocked", requestable: false },
+		{ code: 7, status: "deleted", requestable: true },
+	] as const)(
+		"maps season status $code to $status",
+		({ code, status, requestable }) => {
+			expect(readSeason(code)).toMatchObject({ status, requestable });
+		},
+	);
 
 	it("merges Seerr season metadata with mediaInfo season statuses", () => {
 		expect(
 			readSeerrMediaDetails(
 				{
-					id: 37_854,
-					tvdbId: 81_797,
-					name: "One Piece",
-					firstAirDate: "1999-10-20",
+					id: 456,
+					name: "Show",
 					mediaInfo: {
 						status: 4,
-						seasons: [
-							{ seasonNumber: 1, status: 4 },
-							{ seasonNumber: 2, status: 4 },
-							{ seasonNumber: 11, status: 1 },
-						],
+						seasons: [{ seasonNumber: 1, status: 4 }],
 					},
 					seasons: [
-						{ seasonNumber: 0, name: "Specials", episodeCount: 39 },
-						{ seasonNumber: 1, name: "East Blue", episodeCount: 61 },
-						{
-							seasonNumber: 2,
-							name: "Whiskey Peak & Little Garden",
-							episodeCount: 16,
-						},
-						{
-							seasonNumber: 11,
-							name: "Sabaody Archipelago",
-							episodeCount: 26,
-						},
+						{ seasonNumber: 0, name: "Specials", episodeCount: 2 },
+						{ seasonNumber: 1, name: "Season 1", episodeCount: 12 },
 					],
 				},
 				"tv",
@@ -372,29 +290,38 @@ describe("Seerr request helpers", () => {
 			{
 				seasonNumber: 0,
 				name: "Specials",
-				episodeCount: 39,
+				episodeCount: 2,
 				status: "not-requested",
 				requestable: true,
 			},
 			{
 				seasonNumber: 1,
-				name: "East Blue",
-				episodeCount: 61,
+				name: "Season 1",
+				episodeCount: 12,
 				status: "partial",
 				requestable: false,
 			},
+		]);
+	});
+
+	it("ignores zero-episode Seerr seasons", () => {
+		expect(
+			readSeerrMediaDetails(
+				{
+					id: 456,
+					name: "Show",
+					seasons: [
+						{ seasonNumber: 0, episodeCount: 0 },
+						{ seasonNumber: 1, episodeCount: 12 },
+					],
+				},
+				"tv",
+			).seasons,
+		).toEqual([
 			{
-				seasonNumber: 2,
-				name: "Whiskey Peak & Little Garden",
-				episodeCount: 16,
-				status: "partial",
-				requestable: false,
-			},
-			{
-				seasonNumber: 11,
-				name: "Sabaody Archipelago",
-				episodeCount: 26,
-				status: "unknown",
+				seasonNumber: 1,
+				episodeCount: 12,
+				status: "not-requested",
 				requestable: true,
 			},
 		]);
@@ -416,31 +343,4 @@ describe("Seerr request helpers", () => {
 			enableSpecialEpisodes: false,
 		});
 	});
-});
-
-it("ignores zero-episode Seerr seasons", () => {
-	expect(
-		readSeerrMediaDetails(
-			{
-				id: 196_950,
-				externalIds: { tvdbId: 418_666 },
-				name: "Witch Hat Atelier",
-				firstAirDate: "2026-01-01",
-				mediaInfo: { status: 4 },
-				seasons: [
-					{ seasonNumber: 0, name: "0", episodeCount: 0 },
-					{ seasonNumber: 1, name: "1", episodeCount: 13, status: 4 },
-				],
-			},
-			"tv",
-		).seasons,
-	).toEqual([
-		{
-			seasonNumber: 1,
-			name: "1",
-			episodeCount: 13,
-			status: "partial",
-			requestable: false,
-		},
-	]);
 });

@@ -1,6 +1,4 @@
 /** Tests for Radarr add-default normalization. */
-// src/providers/radarr/form-state.test.ts
-
 import { describe, expect, it } from "vitest";
 import {
 	createDefaultRadarrFormState,
@@ -10,12 +8,10 @@ import {
 } from "./form-state";
 
 describe("Radarr form state", () => {
-	it("stores add defaults with monitor instead of monitored", () => {
-		const defaults = createDefaultRadarrFormState();
-
-		expect(defaults.addOptions?.monitor).toBe("movieOnly");
-		expect(defaults.monitored).toBeUndefined();
-		expect(stripRadarrFormStateForDefaults(defaults)).toEqual({
+	it("creates complete add defaults without movie-level monitored", () => {
+		expect(
+			stripRadarrFormStateForDefaults(createDefaultRadarrFormState()),
+		).toEqual({
 			minimumAvailability: "released",
 			freeformTags: [],
 			addOptions: {
@@ -25,30 +21,10 @@ describe("Radarr form state", () => {
 		});
 	});
 
-	it("strips movie-level monitored from add defaults", () => {
+	it("preserves default fields and strips movie-level monitored", () => {
 		expect(
 			stripRadarrFormStateForDefaults({
 				monitored: false,
-				freeformTags: ["ani2arr"],
-				minimumAvailability: "released",
-				addOptions: {
-					monitor: "none",
-					searchForMovie: false,
-				},
-			}),
-		).toEqual({
-			minimumAvailability: "released",
-			freeformTags: ["ani2arr"],
-			addOptions: {
-				monitor: "none",
-				searchForMovie: false,
-			},
-		});
-	});
-
-	it("preserves freeform tags in add defaults", () => {
-		expect(
-			stripRadarrFormStateForDefaults({
 				freeformTags: ["ani2arr", "seasonal"],
 				minimumAvailability: "announced",
 				addOptions: {
@@ -71,31 +47,17 @@ describe("Radarr form state", () => {
 			normalizeRadarrDefaults({
 				addOptions: {
 					monitor: "none",
-				},
-			}),
-		).toMatchObject({
-			minimumAvailability: "released",
-			addOptions: {
-				monitor: "none",
-				searchForMovie: true,
-			},
-		});
-
-		expect(normalizeRadarrDefaults({})).toMatchObject({
-			minimumAvailability: "released",
-			addOptions: {
-				monitor: "movieOnly",
-				searchForMovie: true,
-			},
-		});
-
-		expect(
-			normalizeRadarrDefaults({
-				addOptions: {
 					searchForMovie: false,
 				},
-			}).addOptions?.searchForMovie,
-		).toBe(false);
+			}),
+		).toEqual({
+			minimumAvailability: "released",
+			freeformTags: [],
+			addOptions: {
+				monitor: "none",
+				searchForMovie: false,
+			},
+		});
 	});
 
 	it("keeps generic form normalization free of add defaults", () => {

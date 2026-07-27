@@ -1,14 +1,12 @@
 /** Tests for Radarr provider-domain client response validation and transport. */
-// src/providers/radarr/client.test.ts
-
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseTmdbId } from "@/providers/schemas";
-import type { ProviderCredentials } from "@/providers/types";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,
 	RadarrMovieId,
 } from "@/providers/schemas";
+import { parseTmdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
 import { RadarrClient } from "./client";
 import type { RadarrAddMoviePayload, RadarrMovie } from "./types";
 
@@ -32,6 +30,16 @@ const movie: RadarrMovie = {
 	monitored: false,
 	minimumAvailability: "released",
 	tags: [parseProviderTagId(7)],
+};
+const movieResource = {
+	id: 20,
+	tmdbId: 456,
+	title: "Existing Movie",
+	path: "/movies/Existing Movie",
+	rootFolderPath: "/movies",
+	qualityProfileId: 2,
+	monitored: true,
+	tags: [7],
 };
 
 function createJsonResponse(body: unknown): Response {
@@ -61,22 +69,7 @@ describe("RadarrClient", () => {
 	it("parses full movie resources without fallback titles or unknown fields", async () => {
 		mockJson([
 			{
-				id: 20,
-				tmdbId: 456,
-				title: "Existing Movie",
-				path: "/movies/Existing Movie",
-				rootFolderPath: "/movies",
-				qualityProfileId: 2,
-				monitored: true,
-				folder: " Movie Folder ",
-				tags: [7],
-				movieFile: {
-					id: 99,
-					path: " /movies/file.mkv ",
-					relativePath: " file.mkv ",
-					size: 1000,
-					quality: { quality: { name: "HD" } },
-				},
+				...movieResource,
 				images: [{ coverType: " poster ", remoteUrl: " https://image " }],
 				customArrField: "preserved",
 			},
@@ -98,32 +91,12 @@ describe("RadarrClient", () => {
 	});
 
 	it("rejects movie resources with blank or missing titles", async () => {
-		mockJson([
-			{
-				id: 20,
-				tmdbId: 456,
-				title: "",
-				path: "/movies/Existing Movie",
-				rootFolderPath: "/movies",
-				qualityProfileId: 2,
-				monitored: true,
-				tags: [],
-			},
-		]);
+		mockJson([{ ...movieResource, title: "" }]);
 
 		await expect(createClient().getAllMovies(credentials)).rejects.toThrow();
 
-		mockJson([
-			{
-				id: 20,
-				tmdbId: 456,
-				path: "/movies/Existing Movie",
-				rootFolderPath: "/movies",
-				qualityProfileId: 2,
-				monitored: true,
-				tags: [],
-			},
-		]);
+		const { title: _title, ...withoutTitle } = movieResource;
+		mockJson([withoutTitle]);
 
 		await expect(createClient().getAllMovies(credentials)).rejects.toThrow();
 	});
@@ -144,17 +117,17 @@ describe("RadarrClient", () => {
 			},
 		]);
 
-		await expect(createClient().lookupMovies("movie", credentials)).resolves.toEqual(
-			[
-				{
-					id: 0,
-					title: " Lookup Movie ",
-					tmdbId: 789,
-					remotePoster: " https://image.example/poster.jpg ",
-					hasFile: true,
-				},
-			],
-		);
+		await expect(
+			createClient().lookupMovies("movie", credentials),
+		).resolves.toEqual([
+			{
+				id: 0,
+				title: " Lookup Movie ",
+				tmdbId: 789,
+				remotePoster: " https://image.example/poster.jpg ",
+				hasFile: true,
+			},
+		]);
 	});
 
 	it("rejects lookup resources without required title or TMDB ID", async () => {
@@ -172,18 +145,7 @@ describe("RadarrClient", () => {
 	});
 
 	it("rejects invalid required branded IDs", async () => {
-		mockJson([
-			{
-				id: 20,
-				tmdbId: 0,
-				title: "Broken",
-				path: "/movies/Broken",
-				rootFolderPath: "/movies",
-				qualityProfileId: 2,
-				monitored: true,
-				tags: [],
-			},
-		]);
+		mockJson([{ ...movieResource, tmdbId: 0 }]);
 
 		await expect(createClient().getAllMovies(credentials)).rejects.toThrow();
 	});
@@ -222,9 +184,9 @@ describe("RadarrClient", () => {
 			addOptions: { monitor: "movieOnly", searchForMovie: true },
 		};
 
-		await expect(createClient().addMovie(payload, credentials)).resolves.toEqual(
-			movie,
-		);
+		await expect(
+			createClient().addMovie(payload, credentials),
+		).resolves.toEqual(movie);
 
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://radarr.example/api/v3/movie",
@@ -257,12 +219,12 @@ describe("RadarrClient", () => {
 	it("creates trimmed tags", async () => {
 		const fetchMock = mockJson({ id: 10, label: "anime" });
 
-		await expect(createClient().createTag(" anime ", credentials)).resolves.toEqual(
-			{
-				id: 10,
-				label: "anime",
-			},
-		);
+		await expect(
+			createClient().createTag(" anime ", credentials),
+		).resolves.toEqual({
+			id: 10,
+			label: "anime",
+		});
 
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://radarr.example/api/v3/tag",
