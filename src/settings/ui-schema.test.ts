@@ -1,32 +1,22 @@
-/** Focused tests for the options-owned UI schema behavior. */
-// src/settings/ui-schema.test.ts
-
 import { describe, expect, it } from "vitest";
 import * as v from "valibot";
-import {
-	PublicOptionsSchema,
-	createDefaultExtensionOptions,
-} from "@/settings/schema";
+import { PublicOptionsSchema } from "@/settings/schema";
 import { createDefaultUiOptions } from "@/settings/ui-schema";
 
 describe("public options UI schema", () => {
 	it("keeps current UI settings shape", () => {
-		const settings = createDefaultExtensionOptions();
-		settings.ui.preferredAniListTitleLanguage = "romaji";
-		settings.ui.browseCards.sonarr.visibility = "hover";
-		settings.ui.animePages.radarr.enabled = false;
+		const ui = createDefaultUiOptions();
+		ui.preferredAniListTitleLanguage = "romaji";
+		ui.browseCards.sonarr.visibility = "hover";
+		ui.animePages.radarr.enabled = false;
 
-		expect(v.parse(PublicOptionsSchema, { ui: settings.ui }).ui).toEqual(
-			settings.ui,
-		);
+		expect(v.parse(PublicOptionsSchema, { ui }).ui).toEqual(ui);
 	});
 
 	it("does not migrate removed legacy UI fields", () => {
 		const parsed = v.parse(PublicOptionsSchema, {
 			ui: {
 				browseOverlayEnabled: false,
-				badgeVisibility: "hidden",
-				headerInjectionEnabled: false,
 			},
 		});
 

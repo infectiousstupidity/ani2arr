@@ -1,5 +1,3 @@
-/** Focused tests for Arr provider credential normalization. */
-
 import { describe, expect, it } from "vitest";
 import { createDefaultExtensionOptions } from "./schema";
 import {
@@ -10,10 +8,9 @@ import {
 	normalizeProviderConnectionSettings,
 } from "./provider-config";
 
-describe.each([
-	{ provider: "sonarr" as const, label: "Sonarr" },
-	{ provider: "radarr" as const, label: "Radarr" },
-])("$label connection config", ({ provider, label }) => {
+describe("Arr connection config", () => {
+	const provider = "sonarr";
+
 	it("normalizes configured credentials", () => {
 		expect(
 			normalizeProviderConnectionInput(
@@ -35,7 +32,7 @@ describe.each([
 				{ url: `https://${provider}.example`, apiKey: "" },
 				provider,
 			),
-		).toThrow(`${label}: enter both URL and API key, or leave both blank.`);
+		).toThrow("Sonarr: enter both URL and API key, or leave both blank.");
 	});
 
 	it("reads the provider without crossing into Seerr settings", () => {

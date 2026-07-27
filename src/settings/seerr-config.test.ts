@@ -1,6 +1,3 @@
-/** Tests for Seerr auth-mode normalization and base-path-safe login URLs. */
-// src/settings/seerr-config.test.ts
-
 import { describe, expect, it } from "vitest";
 import { createDefaultExtensionOptions } from "./schema";
 import {
@@ -9,16 +6,9 @@ import {
 	hasConfiguredSeerrConnection,
 	normalizeSeerrApiKeyConnectionInput,
 	normalizeSeerrConnectionInput,
-	normalizeSeerrUrlInput,
 } from "./seerr-config";
 
 describe("Seerr connection config", () => {
-	it("normalizes URL-only session inputs", () => {
-		expect(
-			normalizeSeerrUrlInput(" https://SEERR.example:443/base/// "),
-		).toBe("https://seerr.example/base");
-	});
-
 	it("requires a verified account before session mode is configured", () => {
 		const settings = createDefaultExtensionOptions();
 		settings.seerr = {

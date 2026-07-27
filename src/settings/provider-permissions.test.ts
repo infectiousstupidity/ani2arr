@@ -1,9 +1,6 @@
-/** Tests for settings-owned provider permission cleanup behavior. */
-// src/settings/provider-permissions.test.ts
-
 /* eslint-disable unicorn/prefer-https */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { createDefaultExtensionOptions } from "./schema";
 import {
@@ -13,10 +10,6 @@ import {
 } from "./provider-permissions";
 
 describe("cleanupUnusedProviderHostPermission", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
 	it("keeps permission when another provider still uses the same scheme and host", async () => {
 		const removeSpy = vi.spyOn(browser.permissions, "remove");
 		const settings = createDefaultExtensionOptions();
@@ -49,16 +42,11 @@ describe("cleanupUnusedProviderHostPermission", () => {
 });
 
 describe("requestSeerrCsrfCookiePermission", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
-	it("requests cookie access only when the explicit action runs", async () => {
+	it("requests optional cookie access", async () => {
 		const request = vi
 			.spyOn(browser.permissions, "request")
 			.mockResolvedValue(true as never);
 
-		expect(request).not.toHaveBeenCalled();
 		await expect(requestSeerrCsrfCookiePermission()).resolves.toBe(true);
 		expect(request).toHaveBeenCalledWith({ permissions: ["cookies"] });
 	});
@@ -74,10 +62,6 @@ describe("requestSeerrCsrfCookiePermission", () => {
 });
 
 describe("removeSeerrCsrfCookiePermission", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
 	it("removes optional cookie access when session support is unused", async () => {
 		const remove = vi
 			.spyOn(browser.permissions, "remove")

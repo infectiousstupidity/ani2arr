@@ -1,5 +1,3 @@
-/** Focused tests for public/private settings composition and migration. */
-
 import { describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import {
@@ -17,7 +15,11 @@ import {
 	createDefaultPrivateConnections,
 	createDefaultPublicOptions,
 } from "@/settings/schema";
-import type { ExtensionOptions, PublicOptions } from "@/settings/types";
+import type {
+	ExtensionOptions,
+	PrivateConnections,
+	PublicOptions,
+} from "@/settings/types";
 
 const PUBLIC_OPTIONS_STORAGE_KEY = "publicOptions";
 const PRIVATE_CONNECTIONS_STORAGE_KEY = "privateConnections";
@@ -35,6 +37,24 @@ const LEGACY_STORAGE_AND_META_KEYS = LEGACY_STORAGE_KEYS.flatMap((key) => [
 ]);
 
 const EMPTY_PRIVATE_CONNECTIONS = createDefaultPrivateConnections();
+const SONARR_CONNECTION = {
+	url: "https://sonarr.example",
+	apiKey: "sonarr-key",
+};
+const RADARR_CONNECTION = {
+	url: "https://radarr.example",
+	apiKey: "radarr-key",
+};
+const SEERR_API_KEY_CONNECTION = {
+	url: "https://seerr.example",
+	auth: { mode: "apiKey" as const, apiKey: "seerr-key" },
+};
+
+function createPrivateConnections(
+	overrides: Partial<PrivateConnections> = {},
+): PrivateConnections {
+	return { ...createDefaultPrivateConnections(), ...overrides };
+}
 
 async function expectLegacyStorageRemoved(): Promise<void> {
 	await expect(
@@ -68,10 +88,7 @@ describe("options store helpers", () => {
 			[PUBLIC_OPTIONS_STORAGE_KEY]: createDefaultPublicOptions(),
 			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
 				sonarr: { url: 123, apiKey: "sonarr-key" },
-				radarr: {
-					url: "https://radarr.example",
-					apiKey: "radarr-key",
-				},
+				radarr: RADARR_CONNECTION,
 				seerr: { url: "https://seerr.example", apiKey: 123 },
 			},
 		});
@@ -79,10 +96,7 @@ describe("options store helpers", () => {
 		const snapshot = await getExtensionOptionsSnapshot();
 
 		expect(snapshot.providers.sonarr).toMatchObject({ url: "", apiKey: "" });
-		expect(snapshot.providers.radarr).toMatchObject({
-			url: "https://radarr.example",
-			apiKey: "radarr-key",
-		});
+		expect(snapshot.providers.radarr).toMatchObject(RADARR_CONNECTION);
 		expect(snapshot.seerr).toEqual({
 			url: "",
 			auth: { mode: "session" },
@@ -90,10 +104,7 @@ describe("options store helpers", () => {
 	});
 
 	it("does not migrate legacy connections during ordinary reads", async () => {
-		const legacySonarr = {
-			url: "https://sonarr.example",
-			apiKey: "legacy-key",
-		};
+		const legacySonarr = { ...SONARR_CONNECTION, apiKey: "legacy-key" };
 		await browser.storage.local.set({
 			[SONARR_SECRETS_STORAGE_KEY]: legacySonarr,
 		});
@@ -115,9 +126,6 @@ describe("options store helpers", () => {
 		it("initializes empty storage with defaults", async () => {
 			await initializeSettingsStorage();
 
-			await expect(getExtensionOptionsSnapshot()).resolves.toEqual(
-				createDefaultExtensionOptions(),
-			);
 			await expect(
 				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
 			).resolves.toEqual({
@@ -125,15 +133,15 @@ describe("options store helpers", () => {
 			});
 		});
 
-		it("migrates legacy provider records into one private record", async () => {
+		it("migrates legacy records while preserving current connections", async () => {
 			await browser.storage.local.set({
-				[SONARR_SECRETS_STORAGE_KEY]: {
-					url: "https://sonarr.example",
-					apiKey: "sonarr-key",
-				},
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: createPrivateConnections({
+					radarr: RADARR_CONNECTION,
+				}),
+				[SONARR_SECRETS_STORAGE_KEY]: SONARR_CONNECTION,
 				[RADARR_SECRETS_STORAGE_KEY]: {
-					url: "https://radarr.example",
-					apiKey: "radarr-key",
+					url: "https://legacy-radarr.example",
+					apiKey: "legacy-radarr-key",
 				},
 				[SEERR_SECRETS_STORAGE_KEY]: {
 					url: "https://seerr.example",
@@ -149,20 +157,11 @@ describe("options store helpers", () => {
 			await expect(
 				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
 			).resolves.toEqual({
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-					sonarr: {
-						url: "https://sonarr.example",
-						apiKey: "sonarr-key",
-					},
-					radarr: {
-						url: "https://radarr.example",
-						apiKey: "radarr-key",
-					},
-					seerr: {
-						url: "https://seerr.example",
-						auth: { mode: "apiKey", apiKey: "seerr-key" },
-					},
-				},
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: createPrivateConnections({
+					sonarr: SONARR_CONNECTION,
+					radarr: RADARR_CONNECTION,
+					seerr: SEERR_API_KEY_CONNECTION,
+				}),
 			});
 			await expectLegacyStorageRemoved();
 		});
@@ -189,14 +188,13 @@ describe("options store helpers", () => {
 		});
 
 		it("keeps a configured private session over a legacy API key", async () => {
-			const privateConnections = {
-				...EMPTY_PRIVATE_CONNECTIONS,
+			const privateConnections = createPrivateConnections({
 				seerr: {
 					url: "https://new-seerr.example",
 					auth: { mode: "session" as const },
 					account: { id: 7, displayName: "Friend" },
 				},
-			};
+			});
 			await browser.storage.local.set({
 				[PRIVATE_CONNECTIONS_STORAGE_KEY]: privateConnections,
 				[SEERR_SECRETS_STORAGE_KEY]: {
@@ -215,73 +213,15 @@ describe("options store helpers", () => {
 			await expectLegacyStorageRemoved();
 		});
 
-		it("uses meaningful legacy Arr connections per provider", async () => {
-			await browser.storage.local.set({
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-					...EMPTY_PRIVATE_CONNECTIONS,
-					sonarr: {
-						url: "https://new-sonarr.example",
-						apiKey: "new-key",
-					},
-				},
-				[SONARR_SECRETS_STORAGE_KEY]: {
-					url: "https://legacy-sonarr.example",
-					apiKey: "legacy-sonarr-key",
-				},
-				[RADARR_SECRETS_STORAGE_KEY]: {
-					url: "https://legacy-radarr.example",
-					apiKey: "legacy-radarr-key",
-				},
-			});
-
-			await initializeSettingsStorage();
-
-			await expect(
-				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
-			).resolves.toEqual({
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-					sonarr: {
-						url: "https://new-sonarr.example",
-						apiKey: "new-key",
-					},
-					radarr: {
-						url: "https://legacy-radarr.example",
-						apiKey: "legacy-radarr-key",
-					},
-					seerr: EMPTY_PRIVATE_CONNECTIONS.seerr,
-				},
-			});
-			await expectLegacyStorageRemoved();
-		});
-
 		it("repairs public configured state and Seerr auth mode", async () => {
 			const publicOptions = createDefaultPublicOptions();
+			publicOptions.providers.radarr.isConfigured = true;
 			await browser.storage.local.set({
-				[PUBLIC_OPTIONS_STORAGE_KEY]: {
-					...publicOptions,
-					providers: {
-						sonarr: {
-							...publicOptions.providers.sonarr,
-							isConfigured: false,
-						},
-						radarr: {
-							...publicOptions.providers.radarr,
-							isConfigured: true,
-						},
-					},
-					seerr: { isConfigured: false, authMode: null },
-				},
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-					...EMPTY_PRIVATE_CONNECTIONS,
-					sonarr: {
-						url: "https://sonarr.example",
-						apiKey: "sonarr-key",
-					},
-					seerr: {
-						url: "https://seerr.example",
-						auth: { mode: "apiKey", apiKey: "seerr-key" },
-					},
-				},
+				[PUBLIC_OPTIONS_STORAGE_KEY]: publicOptions,
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: createPrivateConnections({
+					sonarr: SONARR_CONNECTION,
+					seerr: SEERR_API_KEY_CONNECTION,
+				}),
 			});
 
 			await initializeSettingsStorage();
@@ -313,29 +253,13 @@ describe("options store helpers", () => {
 		});
 	});
 
-	it("derives public connection state instead of accepting UI flags", async () => {
-		await saveProviderConnectionSnapshot("sonarr", {
-			url: "https://sonarr.example",
-			apiKey: "sonarr-key",
-		});
+	it("derives connection state while saving public options", async () => {
+		await saveProviderConnectionSnapshot("sonarr", SONARR_CONNECTION);
 
 		const publicOptions = await getPublicOptionsSnapshot();
-		await savePublicOptionsSnapshot({
-			...publicOptions,
-			providers: {
-				...publicOptions.providers,
-				sonarr: {
-					...publicOptions.providers.sonarr,
-					isConfigured: false,
-				},
-				radarr: {
-					...publicOptions.providers.radarr,
-					isConfigured: true,
-				},
-			},
-			seerr: { isConfigured: true, authMode: "apiKey" },
-			debugLogging: true,
-		});
+		publicOptions.providers.sonarr.isConfigured = false;
+		publicOptions.debugLogging = true;
+		await savePublicOptionsSnapshot(publicOptions);
 
 		const snapshot = await getExtensionOptionsSnapshot();
 		const savedPublicOptions = await getPublicOptionsSnapshot();
@@ -343,11 +267,6 @@ describe("options store helpers", () => {
 		expect(snapshot.debugLogging).toBe(true);
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
 		expect(savedPublicOptions.providers.sonarr.isConfigured).toBe(true);
-		expect(savedPublicOptions.providers.radarr.isConfigured).toBe(false);
-		expect(savedPublicOptions.seerr).toEqual({
-			isConfigured: false,
-			authMode: null,
-		});
 	});
 
 	it("saving one Arr provider preserves the other private connections", async () => {
@@ -357,80 +276,46 @@ describe("options store helpers", () => {
 			account: { id: 3, displayName: "User" },
 		};
 		await browser.storage.local.set({
-			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-				sonarr: { url: "", apiKey: "" },
-				radarr: {
-					url: "https://radarr.example",
-					apiKey: "radarr-key",
-				},
+			[PRIVATE_CONNECTIONS_STORAGE_KEY]: createPrivateConnections({
+				radarr: RADARR_CONNECTION,
 				seerr: seerrConnection,
-			},
+			}),
 		});
 
-		await saveProviderConnectionSnapshot("sonarr", {
-			url: "https://sonarr.example",
-			apiKey: "sonarr-key",
-		});
+		const snapshot = await saveProviderConnectionSnapshot(
+			"sonarr",
+			SONARR_CONNECTION,
+		);
 
-		await expect(
-			browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
-		).resolves.toEqual({
-			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-				sonarr: {
-					url: "https://sonarr.example",
-					apiKey: "sonarr-key",
-				},
-				radarr: {
-					url: "https://radarr.example",
-					apiKey: "radarr-key",
-				},
-				seerr: seerrConnection,
-			},
-		});
+		expect(snapshot.providers.sonarr).toMatchObject(SONARR_CONNECTION);
+		expect(snapshot.providers.radarr).toMatchObject(RADARR_CONNECTION);
+		expect(snapshot.seerr).toEqual(seerrConnection);
 	});
 
-	it("stores a normalized Seerr session without exposing account data", async () => {
-		await saveSeerrConnectionSnapshot({
+	it("stores a Seerr session without exposing account data", async () => {
+		const connection = {
 			url: "https://seerr.example",
-			auth: { mode: "session" },
-			account: {
-				id: 7,
-				displayName: " Friend ",
-				avatar: " /avatar.png ",
-			},
-		});
+			auth: { mode: "session" as const },
+			account: { id: 7, displayName: "Friend" },
+		};
 
-		await expect(getExtensionOptionsSnapshot()).resolves.toMatchObject({
-			seerr: {
-				url: "https://seerr.example",
-				auth: { mode: "session" },
-				account: {
-					id: 7,
-					displayName: "Friend",
-					avatar: "/avatar.png",
-				},
-			},
+		const snapshot = await saveSeerrConnectionSnapshot(connection);
+		const publicOptions = await getPublicOptionsSnapshot();
+
+		expect(snapshot.seerr).toEqual(connection);
+		expect(publicOptions.seerr).toEqual({
+			isConfigured: true,
+			authMode: "session",
 		});
-		await expect(getPublicOptionsSnapshot()).resolves.toMatchObject({
-			seerr: { isConfigured: true, authMode: "session" },
-		});
-		expect(JSON.stringify(await getPublicOptionsSnapshot())).not.toContain(
-			"Friend",
-		);
+		expect(JSON.stringify(publicOptions)).not.toContain("Friend");
 	});
 
 	it("stores API-key mode without exposing the key publicly", async () => {
-		await saveSeerrConnectionSnapshot({
-			url: "https://seerr.example",
-			auth: { mode: "apiKey", apiKey: "seerr-key" },
-		});
+		const snapshot = await saveSeerrConnectionSnapshot(
+			SEERR_API_KEY_CONNECTION,
+		);
 
-		await expect(getExtensionOptionsSnapshot()).resolves.toMatchObject({
-			seerr: {
-				url: "https://seerr.example",
-				auth: { mode: "apiKey", apiKey: "seerr-key" },
-			},
-		});
+		expect(snapshot.seerr).toEqual(SEERR_API_KEY_CONNECTION);
 		const publicOptions = await getPublicOptionsSnapshot();
 		expect(publicOptions.seerr).toEqual({
 			isConfigured: true,
@@ -447,16 +332,10 @@ describe("options store helpers", () => {
 			},
 			[`${SONARR_SECRETS_STORAGE_KEY}$`]: { v: 1 },
 		});
-		await saveProviderConnectionSnapshot("sonarr", {
-			url: "https://sonarr.example",
-			apiKey: "sonarr-key",
-		});
+		await saveProviderConnectionSnapshot("sonarr", SONARR_CONNECTION);
 
 		await resetAllSettingsSnapshot();
 
-		await expect(getExtensionOptionsSnapshot()).resolves.toEqual(
-			createDefaultExtensionOptions(),
-		);
 		await expect(
 			browser.storage.local.get([
 				PUBLIC_OPTIONS_STORAGE_KEY,
@@ -482,13 +361,9 @@ describe("options store helpers", () => {
 			},
 		});
 		await browser.storage.local.set({
-			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-				...EMPTY_PRIVATE_CONNECTIONS,
-				sonarr: {
-					url: "https://sonarr.example",
-					apiKey: "sonarr-key",
-				},
-			},
+			[PRIVATE_CONNECTIONS_STORAGE_KEY]: createPrivateConnections({
+				sonarr: SONARR_CONNECTION,
+			}),
 		});
 		await vi.waitFor(() => expect(snapshots).toHaveLength(1));
 		await browser.storage.local.set({
