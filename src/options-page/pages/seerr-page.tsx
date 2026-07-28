@@ -1,7 +1,7 @@
 /** Seerr options page section for request-backend connection settings. */
 // src/options-page/pages/seerr-page.tsx
 
-import { SeerrIcon } from "@/features/provider-ui/provider-icons";
+import { Info } from "lucide-react";
 import { SeerrConnectionForm } from "../components/seerr-connection-form";
 import { SettingsSection } from "../components/settings-section";
 import type { SeerrConnectionFailure } from "../hooks/seerr-connection-actions";
@@ -40,14 +40,19 @@ export const SeerrPage = ({
 		/>
 		<SettingsSection
 			title="Request behavior"
-			description="ani2arr sends the smallest Seerr request and lets Seerr use its own Sonarr/Radarr defaults."
-			icon={<SeerrIcon className="h-4 w-4" />}
+			icon={<Info className="h-4 w-4" />}
 			divider="top"
 		>
-			<p className="py-5 text-sm text-text-secondary">
-				Seerr actions appear only when Seerr is connected and ani2arr already
-				has a TMDb movie ID.
-			</p>
+			<div className="-mt-4 max-w-4xl space-y-2 text-sm leading-relaxed text-text-secondary md:-mt-5">
+				<p>
+					ani2arr sends the smallest Seerr request and lets Seerr use its own
+					Sonarr/Radarr defaults.
+				</p>
+				<p>
+					Seerr actions appear only when Seerr is connected and ani2arr already
+					has a TMDb movie ID.
+				</p>
+			</div>
 		</SettingsSection>
 	</div>
 );

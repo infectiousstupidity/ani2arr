@@ -157,7 +157,7 @@ function SeerrConnectionMethodFieldset(props: {
 					<label
 						key={option.method}
 						className={cn(
-							"flex cursor-pointer items-start gap-3 rounded-lg border bg-bg-secondary p-4 transition-colors hover:border-accent-primary/55 focus-within:ring-2 focus-within:ring-accent-primary",
+							"flex cursor-pointer select-none items-start gap-3 rounded-lg border bg-bg-secondary p-4 transition-colors hover:border-accent-primary/55 focus-within:ring-2 focus-within:ring-accent-primary",
 							props.connectionMethod === option.method
 								? "border-accent-primary bg-accent-primary/10"
 								: "border-border-primary",
