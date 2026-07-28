@@ -1,8 +1,9 @@
-/** Seerr browser-session and advanced API-key connection controls. */
+/** Seerr browser-session and API-key connection controls. */
 // src/options-page/components/seerr-connection-form.tsx
 
 import { useState, type SubmitEvent } from "react";
 import { ExternalLink, KeyRound, LogIn, Plug } from "lucide-react";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import { isPublicHttpProviderUrl } from "@/providers/settings/insecure-url";
 import { useExtensionOptions } from "@/queries/options";
 import {
@@ -11,9 +12,12 @@ import {
 } from "@/settings/seerr-config";
 import Button from "@/shared/ui/primitives/button";
 import { Input, PasswordInput } from "@/shared/ui/primitives/input";
+import { cn } from "@/shared/utils/cn";
 import type { SeerrConnectionFailure } from "../hooks/seerr-connection-actions";
 import { SettingsRow, SettingsSection } from "./settings-section";
 import { getSeerrSessionControl } from "./seerr-connection-state";
+
+type SeerrConnectionMethod = SeerrConnection["auth"]["mode"];
 
 interface SeerrConnectionFormProps {
 	onCheckSession: (url: string) => Promise<void>;
@@ -33,7 +37,7 @@ function getSeerrApiKeyButtonLabel(input: {
 	if (input.isConnecting) return "Connecting...";
 	return input.isApiKeyConnection
 		? "Reconnect with API key"
-		: "Use global API key";
+		: "Connect with API key";
 }
 
 export const SeerrConnectionForm = ({
@@ -51,6 +55,7 @@ export const SeerrConnectionForm = ({
 	const savedConnection = getSeerrConnection(savedSettings);
 	const savedApiKey =
 		savedDraft.auth.mode === "apiKey" ? savedDraft.auth.apiKey : "";
+	const savedMethod: SeerrConnectionMethod = savedDraft.auth.mode;
 
 	return (
 		<SeerrConnectionDraft
@@ -70,6 +75,7 @@ export const SeerrConnectionForm = ({
 			showCsrfSupport={showCsrfSupport}
 			savedApiKey={savedApiKey}
 			savedConnection={savedConnection}
+			savedMethod={savedMethod}
 			savedUrl={savedDraft.url}
 		/>
 	);
@@ -79,6 +85,7 @@ interface SeerrConnectionDraftProps extends SeerrConnectionFormProps {
 	savedUrl: string;
 	savedApiKey: string;
 	savedConnection: ReturnType<typeof getSeerrConnection>;
+	savedMethod: SeerrConnectionMethod;
 }
 
 function SeerrCsrfSupportPanel(props: {
@@ -116,16 +123,97 @@ function SeerrCsrfSupportPanel(props: {
 	);
 }
 
-function SeerrSessionFeedback(props: {
-	savedConnection: ReturnType<typeof getSeerrConnection>;
-	failure: SeerrConnectionFailure | null;
-	showCsrfSupport: boolean;
-	isCsrfSupportEnabled: boolean;
+function SeerrConnectionMethodFieldset(props: {
+	connectionMethod: SeerrConnectionMethod;
 	isConnecting: boolean;
+	onChange: (method: SeerrConnectionMethod) => void;
+}): React.JSX.Element {
+	return (
+		<fieldset aria-describedby="seerr-connection-method-description">
+			<legend className="text-lg font-semibold text-text-primary">
+				Connection method
+			</legend>
+			<p
+				id="seerr-connection-method-description"
+				className="mt-1 text-sm text-text-secondary"
+			>
+				Choose how ani2arr connects to your Seerr instance.
+			</p>
+			<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+				{(
+					[
+						{
+							method: "session",
+							title: "Existing Seerr session",
+							description: "Use your current Seerr session via browser.",
+						},
+						{
+							method: "apiKey",
+							title: "Global API key",
+							description: "Use a global API key to connect.",
+						},
+					] as const
+				).map((option) => (
+					<label
+						key={option.method}
+						className={cn(
+							"flex cursor-pointer items-start gap-3 rounded-lg border bg-bg-secondary p-4 transition-colors hover:border-accent-primary/55 focus-within:ring-2 focus-within:ring-accent-primary",
+							props.connectionMethod === option.method
+								? "border-accent-primary bg-accent-primary/10"
+								: "border-border-primary",
+						)}
+					>
+						<input
+							type="radio"
+							name="seerr-connection-method"
+							value={option.method}
+							checked={props.connectionMethod === option.method}
+							onChange={() => props.onChange(option.method)}
+							disabled={props.isConnecting}
+							className="mt-1 h-4 w-4 shrink-0 accent-accent-primary"
+						/>
+						<span className="min-w-0">
+							<span className="flex flex-wrap items-center gap-2">
+								<span className="text-sm font-semibold text-text-primary">
+									{option.title}
+								</span>
+								{option.method === "session" ? (
+									<span className="rounded-md bg-accent-primary/15 px-2 py-0.5 text-xs font-medium text-accent-primary">
+										Recommended
+									</span>
+								) : null}
+							</span>
+							<span className="mt-1 block text-xs text-text-secondary">
+								{option.description}
+							</span>
+						</span>
+					</label>
+				))}
+			</div>
+		</fieldset>
+	);
+}
+
+function SeerrSessionConnectionFields(props: {
+	isConnecting: boolean;
+	isCsrfSupportEnabled: boolean;
 	onEnableCsrfSupport: () => Promise<void>;
+	savedConnection: ReturnType<typeof getSeerrConnection>;
+	showCsrfSupport: boolean;
+	showPublicHttpWarning: boolean;
 }): React.JSX.Element {
 	return (
 		<>
+			{props.showPublicHttpWarning ? (
+				<p
+					className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+					role="alert"
+				>
+					This Seerr connection uses unencrypted HTTP. Use HTTPS outside
+					trusted localhost or LAN setups.
+				</p>
+			) : null}
+
 			{props.savedConnection?.auth.mode === "session" ? (
 				<div className="rounded-lg border border-success/25 bg-success/5 px-4 py-3">
 					<p className="text-sm font-semibold text-text-primary">
@@ -136,22 +224,6 @@ function SeerrSessionFeedback(props: {
 						the session cookie.
 					</p>
 				</div>
-			) : null}
-
-			{props.savedConnection?.auth.mode === "apiKey" ? (
-				<div className="rounded-lg border border-border-primary/50 bg-bg-tertiary/30 px-4 py-3 text-sm text-text-secondary">
-					Currently connected with the global Seerr API key. Check the browser
-					session above to switch to user-scoped requests.
-				</div>
-			) : null}
-
-			{props.failure ? (
-				<p
-					className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold text-error"
-					role="alert"
-				>
-					{props.failure.message}
-				</p>
 			) : null}
 
 			{props.showCsrfSupport &&
@@ -166,6 +238,102 @@ function SeerrSessionFeedback(props: {
 	);
 }
 
+function SeerrApiKeyConnectionFields(props: {
+	draftApiKey: string;
+	isConnecting: boolean;
+	onApiKeyChange: (apiKey: string) => void;
+	savedConnection: ReturnType<typeof getSeerrConnection>;
+	showPublicHttpWarning: boolean;
+}): React.JSX.Element {
+	return (
+		<>
+			<p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+				The global Seerr API key is a privileged server credential. Do not
+				share it with untrusted users.
+			</p>
+
+			<SettingsRow
+				id="seerr-api-key"
+				label="Global Seerr API key"
+				description="Find this in Seerr Settings > General."
+			>
+				<PasswordInput
+					id="seerr-api-key"
+					value={props.draftApiKey}
+					onChange={(event) => props.onApiKeyChange(event.target.value)}
+					placeholder="Your Seerr API key"
+					disabled={props.isConnecting}
+				/>
+			</SettingsRow>
+
+			{props.showPublicHttpWarning ? (
+				<p
+					className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+					role="alert"
+				>
+					HTTP sends this privileged API key without transport encryption.
+				</p>
+			) : null}
+
+			{props.savedConnection?.auth.mode === "apiKey" ? (
+				<div className="rounded-lg border border-border-primary/50 bg-bg-tertiary/30 px-4 py-3 text-sm text-text-secondary">
+					Currently connected with the global Seerr API key.
+				</div>
+			) : null}
+		</>
+	);
+}
+
+function SeerrConnectionActionRow(props: {
+	apiKeyButtonLabel: string;
+	connectionMethod: SeerrConnectionMethod;
+	draftUrl: string;
+	hasValueChanges: boolean;
+	isConnecting: boolean;
+	isSubmitDisabled: boolean;
+	onCancel: () => void;
+	onOpenLogin: (url: string) => Promise<void>;
+	sessionControl: ReturnType<typeof getSeerrSessionControl> | null;
+}): React.JSX.Element {
+	return (
+		<div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+			{props.hasValueChanges ? (
+				<Button
+					type="button"
+					variant="ghost"
+					onClick={props.onCancel}
+					disabled={props.isConnecting}
+				>
+					Cancel
+				</Button>
+			) : null}
+			{props.sessionControl?.showLoginActions ? (
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => void props.onOpenLogin(props.draftUrl)}
+					disabled={props.isConnecting || !props.draftUrl}
+				>
+					<ExternalLink className="mr-2 h-4 w-4" />
+					Open Seerr login
+				</Button>
+			) : null}
+			<Button
+				type="submit"
+				variant="primary"
+				disabled={props.isSubmitDisabled}
+			>
+				{props.connectionMethod === "session" ? (
+					<LogIn className="mr-2 h-4 w-4" />
+				) : (
+					<KeyRound className="mr-2 h-4 w-4" />
+				)}
+				{props.sessionControl?.buttonLabel ?? props.apiKeyButtonLabel}
+			</Button>
+		</div>
+	);
+}
+
 const SeerrConnectionDraft = ({
 	failure,
 	isConnecting,
@@ -177,39 +345,55 @@ const SeerrConnectionDraft = ({
 	showCsrfSupport,
 	savedApiKey,
 	savedConnection,
+	savedMethod,
 	savedUrl,
 }: SeerrConnectionDraftProps) => {
 	const [draftUrl, setDraftUrl] = useState(savedUrl);
 	const [draftApiKey, setDraftApiKey] = useState(savedApiKey);
+	const [connectionMethod, setConnectionMethod] = useState(savedMethod);
 	const hasUrlChanges = draftUrl !== savedUrl;
-	const hasApiKeyChanges = draftApiKey !== savedApiKey;
-	const sessionControl = getSeerrSessionControl({
-		connection: savedConnection,
-		isConnecting,
-		errorCode: failure?.code ?? null,
-		hasUrlChanges,
-	});
+	const hasValueChanges =
+		draftUrl !== savedUrl || draftApiKey !== savedApiKey;
+	const activeFailure =
+		failure?.scope === "global" || failure?.scope === connectionMethod
+			? failure
+			: null;
+	const sessionControl =
+		connectionMethod === "session"
+			? getSeerrSessionControl({
+					connection: savedConnection,
+					isConnecting,
+					errorCode: activeFailure?.code ?? null,
+					hasUrlChanges,
+				})
+			: null;
 	const showPublicHttpWarning = isPublicHttpProviderUrl(draftUrl);
 	const apiKeyButtonLabel = getSeerrApiKeyButtonLabel({
 		isConnecting,
 		isApiKeyConnection: savedConnection?.auth.mode === "apiKey",
 	});
+	const isSubmitDisabled =
+		isConnecting ||
+		!draftUrl ||
+		(connectionMethod === "apiKey" && !draftApiKey);
 
-	const handleSessionSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
+	const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
+
+		if (connectionMethod === "apiKey") {
+			if (isConnecting || !draftUrl || !draftApiKey) return;
+			await onConnectApiKey(draftUrl, draftApiKey);
+			return;
+		}
+
 		if (isConnecting || !draftUrl) return;
 		await onCheckSession(draftUrl);
-	};
-
-	const handleApiKeySubmit = async (event: SubmitEvent<HTMLFormElement>) => {
-		event.preventDefault();
-		if (isConnecting || !draftUrl || !draftApiKey) return;
-		await onConnectApiKey(draftUrl, draftApiKey);
 	};
 
 	const handleCancel = () => {
 		setDraftUrl(savedUrl);
 		setDraftApiKey(savedApiKey);
+		setConnectionMethod(savedMethod);
 	};
 
 	return (
@@ -219,139 +403,71 @@ const SeerrConnectionDraft = ({
 			hideHeaderOnDesktop
 		>
 			<form
-				onSubmit={(event) => void handleSessionSubmit(event)}
+				onSubmit={(event) => void handleSubmit(event)}
 				className="flex flex-col gap-6"
 			>
-				<SettingsRow
-					id="seerr-url"
-					label="Seerr URL"
-					description="Hostname, IP address, or reverse-proxy base path."
-				>
-					<Input
-						id="seerr-url"
-						value={draftUrl}
-						onChange={(event) => setDraftUrl(event.target.value)}
-						placeholder="http://localhost:5055"
-						disabled={isConnecting}
-					/>
-				</SettingsRow>
-
-				{showPublicHttpWarning ? (
-					<p
-						className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
-						role="alert"
-					>
-						This Seerr connection uses unencrypted HTTP. Use HTTPS outside
-						trusted localhost or LAN setups.
-					</p>
-				) : null}
-
-				<SeerrSessionFeedback
-					savedConnection={savedConnection}
-					failure={failure}
-					showCsrfSupport={showCsrfSupport}
-					isCsrfSupportEnabled={isCsrfSupportEnabled}
+				<SeerrConnectionMethodFieldset
+					connectionMethod={connectionMethod}
 					isConnecting={isConnecting}
-					onEnableCsrfSupport={onEnableCsrfSupport}
+					onChange={setConnectionMethod}
 				/>
 
-				<div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-					{hasUrlChanges ? (
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={handleCancel}
+				<div className="flex flex-col gap-5 rounded-lg border border-border-primary/50 bg-bg-tertiary/15 px-4 py-5">
+					<SettingsRow
+						id="seerr-url"
+						label="Seerr URL"
+						description="The base URL of your Seerr instance."
+					>
+						<Input
+							id="seerr-url"
+							value={draftUrl}
+							onChange={(event) => setDraftUrl(event.target.value)}
+							placeholder="http://localhost:5055"
 							disabled={isConnecting}
+						/>
+					</SettingsRow>
+
+					{connectionMethod === "session" ? (
+						<SeerrSessionConnectionFields
+							isConnecting={isConnecting}
+							isCsrfSupportEnabled={isCsrfSupportEnabled}
+							onEnableCsrfSupport={onEnableCsrfSupport}
+							savedConnection={savedConnection}
+							showCsrfSupport={showCsrfSupport}
+							showPublicHttpWarning={showPublicHttpWarning}
+						/>
+					) : (
+						<SeerrApiKeyConnectionFields
+							draftApiKey={draftApiKey}
+							isConnecting={isConnecting}
+							onApiKeyChange={setDraftApiKey}
+							savedConnection={savedConnection}
+							showPublicHttpWarning={showPublicHttpWarning}
+						/>
+					)}
+
+					{activeFailure ? (
+						<p
+							className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold text-error"
+							role="alert"
 						>
-							Cancel
-						</Button>
+							{activeFailure.message}
+						</p>
 					) : null}
-					{sessionControl.showLoginActions ? (
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => void onOpenLogin(draftUrl)}
-							disabled={isConnecting || !draftUrl}
-						>
-							<ExternalLink className="mr-2 h-4 w-4" />
-							Open Seerr login
-						</Button>
-					) : null}
-					<Button
-						type="submit"
-						variant="primary"
-						disabled={isConnecting || !draftUrl}
-					>
-						<LogIn className="mr-2 h-4 w-4" />
-						{sessionControl.buttonLabel}
-					</Button>
 				</div>
+
+				<SeerrConnectionActionRow
+					apiKeyButtonLabel={apiKeyButtonLabel}
+					connectionMethod={connectionMethod}
+					draftUrl={draftUrl}
+					hasValueChanges={hasValueChanges}
+					isConnecting={isConnecting}
+					isSubmitDisabled={isSubmitDisabled}
+					onCancel={handleCancel}
+					onOpenLogin={onOpenLogin}
+					sessionControl={sessionControl}
+				/>
 			</form>
-
-			<details
-				open={savedConnection?.auth.mode === "apiKey"}
-				className="rounded-lg border border-border-primary/50 bg-bg-tertiary/15"
-			>
-				<summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-text-primary">
-					Advanced connection
-				</summary>
-				<div className="border-t border-border-primary/40 px-4 py-5">
-					<div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-						The global Seerr API key acts as a privileged server credential.
-						Do not give it to untrusted users.
-					</div>
-
-					<form
-						onSubmit={(event) => void handleApiKeySubmit(event)}
-						className="mt-5 flex flex-col gap-5"
-					>
-						<SettingsRow
-							id="seerr-api-key"
-							label="Global Seerr API key"
-							description="Find this in Seerr Settings > General."
-						>
-							<PasswordInput
-								id="seerr-api-key"
-								value={draftApiKey}
-								onChange={(event) => setDraftApiKey(event.target.value)}
-								placeholder="Your Seerr API key"
-								disabled={isConnecting}
-							/>
-						</SettingsRow>
-
-						{showPublicHttpWarning ? (
-							<p
-								className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
-								role="alert"
-							>
-								HTTP sends this privileged API key without transport
-								encryption.
-							</p>
-						) : null}
-
-						<div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-							{hasUrlChanges || hasApiKeyChanges ? (
-								<Button
-									type="button"
-									variant="ghost"
-									onClick={handleCancel}
-									disabled={isConnecting}
-								>
-									Cancel
-								</Button>
-							) : null}
-							<Button
-								type="submit"
-								variant="outline"
-								disabled={isConnecting || !draftUrl || !draftApiKey}
-							>
-								<KeyRound className="mr-2 h-4 w-4" />
-								{apiKeyButtonLabel}
-							</Button>
-						</div>
-					</form>
-				</div>
-			</details>
 		</SettingsSection>
 	);
 };

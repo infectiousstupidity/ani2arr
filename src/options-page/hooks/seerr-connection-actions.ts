@@ -21,9 +21,12 @@ import {
 import { createError, getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 
+export type SeerrFailureScope = "session" | "apiKey" | "global";
+
 export type SeerrConnectionFailure = {
 	message: string;
 	code: ErrorCode | null;
+	scope: SeerrFailureScope;
 };
 
 function getExtensionErrorCode(error: unknown): ErrorCode | null {
@@ -34,10 +37,12 @@ function getExtensionErrorCode(error: unknown): ErrorCode | null {
 function getFailure(
 	error: unknown,
 	fallbackMessage: string,
+	scope: SeerrFailureScope,
 ): SeerrConnectionFailure {
 	return {
 		message: getUserErrorMessage(error, fallbackMessage),
 		code: getExtensionErrorCode(error),
+		scope,
 	};
 }
 
@@ -91,8 +96,13 @@ export function useSeerrConnectionActions() {
 							code: ErrorCode.SEERR_SESSION_UNAVAILABLE,
 							message:
 								"Could not use your Seerr browser session. Make sure you signed in, check third-party-cookie settings for this server, or use API-key mode when Seerr CSRF protection is disabled.",
+							scope: "session",
 						}
-					: getFailure(error, "Failed to check the Seerr browser session."),
+					: getFailure(
+							error,
+							"Failed to check the Seerr browser session.",
+							"session",
+						),
 			);
 		} finally {
 			setIsConnecting(false);
@@ -131,7 +141,11 @@ export function useSeerrConnectionActions() {
 			setIsCsrfSupportEnabled(false);
 		} catch (error) {
 			setFailure(
-				getFailure(error, "Failed to connect to Seerr with the API key."),
+				getFailure(
+					error,
+					"Failed to connect to Seerr with the API key.",
+					"apiKey",
+				),
 			);
 		} finally {
 			setIsConnecting(false);
@@ -147,7 +161,9 @@ export function useSeerrConnectionActions() {
 			await browser.tabs.create({ url: buildSeerrLoginUrl(draftUrl) });
 			setOpenedLoginUrl(normalizedUrl);
 		} catch (error) {
-			setFailure(getFailure(error, "Failed to open the Seerr login page."));
+			setFailure(
+				getFailure(error, "Failed to open the Seerr login page.", "session"),
+			);
 		} finally {
 			setIsConnecting(false);
 		}
@@ -173,7 +189,9 @@ export function useSeerrConnectionActions() {
 			await getAni2arrApi().checkConfiguredSeerrCsrfSupport();
 			setIsCsrfSupportEnabled(true);
 		} catch (error) {
-			setFailure(getFailure(error, "Failed to enable Seerr CSRF support."));
+			setFailure(
+				getFailure(error, "Failed to enable Seerr CSRF support.", "session"),
+			);
 		} finally {
 			setIsConnecting(false);
 		}
@@ -192,7 +210,7 @@ export function useSeerrConnectionActions() {
 			setIsCsrfSupportEnabled(false);
 			return true;
 		} catch (error) {
-			setFailure(getFailure(error, "Failed to disconnect Seerr."));
+			setFailure(getFailure(error, "Failed to disconnect Seerr.", "global"));
 			return false;
 		} finally {
 			setIsConnecting(false);

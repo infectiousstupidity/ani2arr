@@ -113,6 +113,7 @@ const OptionsPageContent = () => {
       ? {
           message: seerrConnectionQuery.error.userMessage,
           code: seerrConnectionQuery.error.code,
+          scope: seerrConnection?.auth.mode ?? "global",
         }
       : null);
 

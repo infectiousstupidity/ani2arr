@@ -46,7 +46,7 @@ export const SeerrPage = ({
 		>
 			<p className="py-5 text-sm text-text-secondary">
 				Seerr actions appear only when Seerr is connected and ani2arr already
-				has a TMDB movie ID.
+				has a TMDb movie ID.
 			</p>
 		</SettingsSection>
 	</div>
