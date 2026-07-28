@@ -1,21 +1,30 @@
 /** Responsive options-page navigation, page header, and mobile command bars. */
 // src/options-page/components/options-navigation.tsx
 
-import { Link2, Palette, Plug, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import {
+	Link2,
+	Palette,
+	Plug,
+	ShieldCheck,
+	SlidersHorizontal,
+} from "lucide-react";
 import { browser } from "wxt/browser";
 import ani2arrIconUrl from "@/assets/icon.png";
-import type { Provider } from "@/providers/types";
-import type { ProviderConnectionStatusView } from "../hooks/provider-connection-status";
-import { cn } from "@/shared/utils/cn";
-import type { PageId } from "../navigation";
 import {
 	RadarrIcon,
 	SeerrIcon,
 	SonarrIcon,
 } from "@/features/provider-ui/provider-icons";
+import type { Provider } from "@/providers/types";
+import { cn } from "@/shared/utils/cn";
+import type { ProviderConnectionStatusView } from "../hooks/provider-connection-status";
+import type { PageId } from "../navigation";
 
 type ConnectionPage = Provider | "seerr";
-type ProviderStatusLookup = Record<ConnectionPage, ProviderConnectionStatusView>;
+type ProviderStatusLookup = Record<
+	ConnectionPage,
+	ProviderConnectionStatusView
+>;
 
 interface PageCommandProps {
 	activePage: PageId;
@@ -24,14 +33,59 @@ interface PageCommandProps {
 	isDisconnecting: boolean;
 }
 
-const NAV_GROUPS = ["Providers", "Extension"] as const;
+const NAV_GROUPS = ["Providers", "Extension settings"] as const;
 const NAV_ITEMS = [
-	{ id: "sonarr", title: "Sonarr", sidebarLabel: "Sonarr", bottomLabel: "Sonarr", group: "Providers", icon: SonarrIcon, connection: "sonarr" },
-	{ id: "radarr", title: "Radarr", sidebarLabel: "Radarr", bottomLabel: "Radarr", group: "Providers", icon: RadarrIcon, connection: "radarr" },
-	{ id: "seerr", title: "Seerr", sidebarLabel: "Seerr", bottomLabel: "Seerr", group: "Providers", icon: SeerrIcon, connection: "seerr" },
-	{ id: "mappings", title: "Manage mappings", sidebarLabel: "Manage mappings", bottomLabel: "Mappings", group: "Extension", icon: Link2 },
-	{ id: "ui", title: "UI & Actions", sidebarLabel: "UI & actions", bottomLabel: "UI & Actions", group: "Extension", icon: Palette },
-	{ id: "advanced", title: "Advanced", sidebarLabel: "Advanced", bottomLabel: "Advanced", group: "Extension", icon: SlidersHorizontal },
+	{
+		id: "sonarr",
+		title: "Sonarr",
+		sidebarLabel: "Sonarr",
+		bottomLabel: "Sonarr",
+		group: "Providers",
+		icon: SonarrIcon,
+		connection: "sonarr",
+	},
+	{
+		id: "radarr",
+		title: "Radarr",
+		sidebarLabel: "Radarr",
+		bottomLabel: "Radarr",
+		group: "Providers",
+		icon: RadarrIcon,
+		connection: "radarr",
+	},
+	{
+		id: "seerr",
+		title: "Seerr",
+		sidebarLabel: "Seerr",
+		bottomLabel: "Seerr",
+		group: "Providers",
+		icon: SeerrIcon,
+		connection: "seerr",
+	},
+	{
+		id: "mappings",
+		title: "Manage mappings",
+		sidebarLabel: "Manage mappings",
+		bottomLabel: "Mappings",
+		group: "Extension settings",
+		icon: Link2,
+	},
+	{
+		id: "ui",
+		title: "UI & Actions",
+		sidebarLabel: "UI & actions",
+		bottomLabel: "UI & Actions",
+		group: "Extension settings",
+		icon: Palette,
+	},
+	{
+		id: "advanced",
+		title: "Advanced",
+		sidebarLabel: "Advanced",
+		bottomLabel: "Advanced",
+		group: "Extension settings",
+		icon: SlidersHorizontal,
+	},
 ] as const;
 
 const extensionVersion = browser.runtime.getManifest()?.version ?? "unknown";
@@ -103,8 +157,15 @@ export function DesktopSidebar({
 		<aside className="hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-border-primary bg-bg-secondary px-4 py-8 md:flex md:flex-col">
 			<div className="px-4">
 				<div className="flex items-center gap-3">
-					<img src={ani2arrIconUrl} alt="" aria-hidden="true" className="h-8 w-8 shrink-0" />
-					<div className="text-2xl font-bold leading-none text-text-primary">ani2arr</div>
+					<img
+						src={ani2arrIconUrl}
+						alt=""
+						aria-hidden="true"
+						className="h-8 w-8 shrink-0"
+					/>
+					<div className="text-2xl font-bold leading-none text-text-primary">
+						ani2arr
+					</div>
 				</div>
 			</div>
 
@@ -132,9 +193,16 @@ export function DesktopSidebar({
 												: "text-text-secondary hover:bg-bg-tertiary/50 hover:text-text-primary",
 										)}
 									>
-										<Icon className={cn("h-5 w-5 shrink-0", active && "text-text-primary")} />
+										<Icon
+											className={cn(
+												"h-5 w-5 shrink-0",
+												active && "text-text-primary",
+											)}
+										/>
 										<span className="min-w-0 flex flex-col justify-center">
-											<span className="block truncate font-medium">{item.sidebarLabel}</span>
+											<span className="block truncate font-medium">
+												{item.sidebarLabel}
+											</span>
 											{status ? <ProviderStatus status={status} /> : null}
 										</span>
 									</button>
@@ -154,7 +222,9 @@ export function DesktopSidebar({
 					<ShieldCheck className="h-5 w-5 shrink-0" />
 					<span className="font-medium">Privacy</span>
 				</button>
-				<div className="px-4 pt-4 text-xs font-medium text-text-secondary/60">v{extensionVersion}</div>
+				<div className="px-4 pt-4 text-xs font-medium text-text-secondary/60">
+					v{extensionVersion}
+				</div>
 			</div>
 		</aside>
 	);
@@ -176,7 +246,9 @@ export function DesktopPageHeader({
 		<header className="mb-6 hidden items-center justify-between gap-8 border-b border-border-primary/50 pb-5 md:mb-8 md:flex">
 			<div className="min-w-0 flex items-center gap-3">
 				<Icon className="h-5 w-5 shrink-0 text-text-secondary" />
-				<h1 className="truncate text-xl font-semibold text-text-primary md:text-lg">{title}</h1>
+				<h1 className="truncate text-xl font-semibold text-text-primary md:text-lg">
+					{title}
+				</h1>
 				{status ? (
 					<div className="ml-3 flex shrink-0 items-center gap-3">
 						<ProviderStatus status={status} compact />
@@ -216,7 +288,9 @@ export function MobileTopBar({
 			<div className="flex min-w-0 flex-1 items-center gap-3">
 				<Icon className="h-6 w-6 shrink-0 text-text-primary" />
 				<div className="min-w-0 flex flex-col">
-					<h1 className="truncate text-base font-bold leading-tight text-text-primary">{meta.title}</h1>
+					<h1 className="truncate text-base font-bold leading-tight text-text-primary">
+						{meta.title}
+					</h1>
 					{status ? <ProviderStatus status={status} /> : null}
 				</div>
 			</div>
@@ -255,7 +329,9 @@ export function MobileBottomNav({
 							onClick={() => onPageSelect(item.id)}
 							className={cn(
 								"relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors",
-								active ? "text-text-primary" : "text-text-secondary hover:text-text-primary",
+								active
+									? "text-text-primary"
+									: "text-text-secondary hover:text-text-primary",
 							)}
 						>
 							<span
