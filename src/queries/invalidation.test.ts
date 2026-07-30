@@ -9,11 +9,14 @@ import { parseTmdbId } from "@/providers/schemas";
 import {
 	invalidateAfterMappingChange,
 	invalidateAfterMappingsRevision,
+	invalidateAfterProviderLibraryChange,
+	invalidateAfterSeerrRequest,
 } from "./invalidation";
 import {
 	normalizeMappingInspectionRequest,
 	normalizeProviderLookupRequest,
 	normalizeRadarrStatusRequest,
+	normalizeSeerrMediaStatusRequest,
 	normalizeSonarrStatusRequest,
 	queryKeys,
 } from "./query-keys";
@@ -132,5 +135,72 @@ describe("query invalidation", () => {
 		invalidateAfterMappingsRevision(client);
 
 		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
+	});
+
+	it("invalidates one provider's library-dependent caches", () => {
+		const client = createClient();
+		const affected = [
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerLookup(
+				"sonarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+			queryKeys.mappings(),
+		];
+		const unaffected = [
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerLookup(
+				"radarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+		];
+
+		seed(client, [...affected, ...unaffected]);
+		invalidateAfterProviderLibraryChange(client, "sonarr");
+
+		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
+		expect(unaffected.some((key) => isInvalidated(client, key))).toBe(false);
+	});
+
+	it("invalidates every Seerr status scope and details for one media item", () => {
+		const client = createClient();
+		const statusKey = (
+			mediaType: "movie" | "tv",
+			tmdbId: ReturnType<typeof tmdb>,
+			seasons?: number[],
+		) =>
+			queryKeys.seerrMediaStatus(
+				normalizeSeerrMediaStatusRequest({
+					mediaType,
+					tmdbId,
+					...(mediaType === "tv" && seasons !== undefined ? { seasons } : {}),
+				}),
+			);
+		const affected = [
+			statusKey("tv", tmdb(100)),
+			statusKey("tv", tmdb(100), [1]),
+			statusKey("tv", tmdb(100), [1, 2]),
+			queryKeys.seerrMediaDetails({ mediaType: "tv", tmdbId: tmdb(100) }),
+		];
+		const unaffected = [
+			statusKey("tv", tmdb(101), [1]),
+			statusKey("movie", tmdb(100)),
+			queryKeys.seerrMediaDetails({ mediaType: "tv", tmdbId: tmdb(101) }),
+		];
+
+		seed(client, [...affected, ...unaffected]);
+		invalidateAfterSeerrRequest(client, {
+			mediaType: "tv",
+			tmdbId: tmdb(100),
+		});
+
+		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
+		expect(unaffected.some((key) => isInvalidated(client, key))).toBe(false);
 	});
 });

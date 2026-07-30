@@ -34,6 +34,7 @@ import {
 	normalizeSeerrTargetRequest,
 	queryKeys,
 } from "./query-keys";
+import { invalidateAfterSeerrRequest } from "./invalidation";
 
 const NON_RETRYABLE_SEERR_ERRORS = new Set<ErrorCode>([
 	ErrorCode.SEERR_AUTH_REQUIRED,
@@ -236,9 +237,7 @@ export const useRequestInSeerr = () => {
 				target: "pending",
 				overall: "pending",
 			} satisfies GetSeerrMediaStatusOutput);
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seerrMediaDetails(variables),
-			});
+			invalidateAfterSeerrRequest(queryClient, variables);
 		},
 	});
 };

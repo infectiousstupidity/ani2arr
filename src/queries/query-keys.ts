@@ -272,6 +272,18 @@ const providerMediaStatusItemKey = (
 		sourceKeyFromInput(input),
 	] as const;
 
+const seerrMediaStatusItemKey = (
+	mediaType: SeerrMediaType,
+	tmdbId: TmdbId,
+) =>
+	[
+		...rootQueryKey,
+		"seerr",
+		"mediaStatus",
+		mediaType,
+		tmdbId,
+	] as const;
+
 export const queryKeys = {
 	all: rootQueryKey,
 	options: () => [...rootQueryKey, "options", "extension"] as const,
@@ -316,13 +328,14 @@ export const queryKeys = {
 		[...seerrTargetsRootKey(), "single", input] as const,
 	seerrTargets: (ids: readonly AniListId[]) =>
 		[...seerrTargetsRootKey(), "batch", normalizeMetadataIds(ids)] as const,
+	seerrMediaStatusItem: seerrMediaStatusItemKey,
 	seerrMediaStatus: (input: NormalizedSeerrMediaStatusRequest | null) =>
-		[
-			...rootQueryKey,
-			"seerr",
-			"mediaStatus",
-			input,
-		] as const,
+		input === null
+			? ([...rootQueryKey, "seerr", "mediaStatus", null] as const)
+			: ([
+					...seerrMediaStatusItemKey(input.mediaType, input.tmdbId),
+					input.mediaType === "tv" ? input.seasons : undefined,
+				] as const),
 	seerrMediaDetails: (input: SeerrMediaDetailsKeyInput | null) =>
 		[
 			...rootQueryKey,

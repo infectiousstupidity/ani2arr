@@ -286,18 +286,36 @@ describe("query keys", () => {
 			tmdbId: tmdb(10),
 			seasons: "all",
 		});
-		const explicit = normalizeSeerrMediaStatusRequest({
+		const oneSeason = normalizeSeerrMediaStatusRequest({
 			mediaType: "tv",
 			tmdbId: tmdb(10),
 			seasons: [1],
 		});
+		const multipleSeasons = normalizeSeerrMediaStatusRequest({
+			mediaType: "tv",
+			tmdbId: tmdb(10),
+			seasons: [2, 1],
+		});
+		const itemKey = queryKeys.seerrMediaStatusItem("tv", tmdb(10));
+		const scopedKeys = [omitted, oneSeason, multipleSeasons].map((request) =>
+			queryKeys.seerrMediaStatus(request),
+		);
 
 		expect(all).toEqual(omitted);
 		expect(queryKeys.seerrMediaStatus(all)).toEqual(
 			queryKeys.seerrMediaStatus(omitted),
 		);
-		expect(queryKeys.seerrMediaStatus(explicit)).not.toEqual(
-			queryKeys.seerrMediaStatus(omitted),
+		expect(
+			scopedKeys.every((key) =>
+				key.slice(0, itemKey.length).every((part, index) => part === itemKey[index]),
+			),
+		).toBe(true);
+		expect(new Set(scopedKeys.map((key) => JSON.stringify(key))).size).toBe(3);
+	});
+
+	it("keeps movie and TV Seerr status item prefixes separate", () => {
+		expect(queryKeys.seerrMediaStatusItem("movie", tmdb(10))).not.toEqual(
+			queryKeys.seerrMediaStatusItem("tv", tmdb(10)),
 		);
 	});
 

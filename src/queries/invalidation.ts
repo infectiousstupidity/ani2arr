@@ -4,6 +4,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
+import type { TmdbId } from "@/providers/schemas";
+import type { SeerrMediaType } from "@/providers/seerr/types";
 import { PROVIDERS, type Provider } from "@/providers/types";
 import { queryKeys } from "@/queries/query-keys";
 
@@ -62,6 +64,18 @@ export function invalidateAfterProviderLibraryChange(
 		queryKey: queryKeys.providerLookupRoot(provider),
 	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
+}
+
+export function invalidateAfterSeerrRequest(
+	queryClient: QueryClient,
+	input: { mediaType: SeerrMediaType; tmdbId: TmdbId },
+): void {
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seerrMediaStatusItem(input.mediaType, input.tmdbId),
+	});
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seerrMediaDetails(input),
+	});
 }
 
 export function invalidateAfterProviderMediaChange(
