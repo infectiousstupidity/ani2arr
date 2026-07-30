@@ -19,7 +19,7 @@ export function invalidateAfterMappingChange(
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input),
+		queryKey: queryKeys.mappingInspectionItem(input.provider, input),
 	});
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(input.provider),
@@ -72,7 +72,7 @@ export function invalidateAfterProviderMediaChange(
 		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input),
+		queryKey: queryKeys.mappingInspectionItem(input.provider, input),
 	});
 }
 

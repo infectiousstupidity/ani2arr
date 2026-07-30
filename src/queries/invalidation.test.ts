@@ -10,7 +10,13 @@ import {
 	invalidateAfterMappingChange,
 	invalidateAfterMappingsRevision,
 } from "./invalidation";
-import { queryKeys } from "./query-keys";
+import {
+	normalizeMappingInspectionRequest,
+	normalizeProviderLookupRequest,
+	normalizeRadarrStatusRequest,
+	normalizeSonarrStatusRequest,
+	queryKeys,
+} from "./query-keys";
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
@@ -45,18 +51,23 @@ describe("query invalidation", () => {
 		} as const;
 
 		const affected = [
-			queryKeys.providerMediaStatus("radarr", {
-				source,
-				title: "Title A",
-			}),
-			queryKeys.providerMediaStatus("radarr", {
-				source,
-				title: "Title B",
-			}),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ source, title: "Title A" }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ source, title: "Title B" }),
+			),
 			queryKeys.mappings(),
 			queryKeys.mappingIdentities([aid(21)]),
-			queryKeys.mappingInspection("radarr", source),
-			queryKeys.providerLookup("radarr", "test"),
+			queryKeys.mappingInspection(
+				normalizeMappingInspectionRequest("radarr", { source }),
+			),
+			queryKeys.providerLookup(
+				"radarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
 			queryKeys.seerrTargets([aid(21)]),
 			queryKeys.seerrLinkedAniListEntries({
 				mediaType: "movie",
@@ -64,12 +75,14 @@ describe("query invalidation", () => {
 			}),
 		];
 		const unaffected = [
-			queryKeys.providerMediaStatus("sonarr", {
-				source,
-			}),
-			queryKeys.providerMediaStatus("radarr", {
-				anilistId: aid(22),
-			}),
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ source }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ anilistId: aid(22) }),
+			),
 		];
 
 		seed(client, [...affected, ...unaffected]);
@@ -88,21 +101,31 @@ describe("query invalidation", () => {
 		const client = createClient();
 		const affected = [
 			queryKeys.mappings(),
-			queryKeys.mappingInspection("sonarr", aid(1)),
+			queryKeys.mappingInspection(
+				normalizeMappingInspectionRequest("sonarr", aid(1)),
+			),
 			queryKeys.mappingIdentities([aid(1)]),
 			queryKeys.seerrTargets([aid(1)]),
 			queryKeys.seerrLinkedAniListEntries({
 				mediaType: "tv",
 				tmdbId: tmdb(100),
 			}),
-			queryKeys.providerMediaStatus("sonarr", {
-				anilistId: aid(1),
-			}),
-			queryKeys.providerMediaStatus("radarr", {
-				anilistId: aid(1),
-			}),
-			queryKeys.providerLookup("sonarr", "test"),
-			queryKeys.providerLookup("radarr", "test"),
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerLookup(
+				"sonarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+			queryKeys.providerLookup(
+				"radarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
 		];
 
 		seed(client, affected);

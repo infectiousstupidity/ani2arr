@@ -24,7 +24,12 @@ import type {
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
-import { normalizeMetadataIds, normalizeSourceKeys, queryKeys } from "./query-keys";
+import {
+	normalizeMappingInspectionRequest,
+	normalizeMetadataIds,
+	normalizeSourceKeys,
+	queryKeys,
+} from "./query-keys";
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
@@ -144,11 +149,6 @@ export const useSourceAniListIdMap = (
 	});
 };
 
-const inspectionSourceInput = (
-	input: AniListId | SourceRpcInput,
-): SourceRpcInput =>
-	typeof input === "number" ? { anilistId: input } : input;
-
 export const mappingInspectionInput = (
 	anilistId: AniListId | undefined,
 	source: SourceIdentity | undefined,
@@ -164,14 +164,10 @@ export const useMappingInspection = (
 	provider: Provider,
 	input: AniListId | SourceRpcInput,
 ) => {
-	const sourceInput = inspectionSourceInput(input);
+	const request = normalizeMappingInspectionRequest(provider, input);
 	return useQuery<GetMappingInspectionOutput, ExtensionError>({
-		queryKey: queryKeys.mappingInspection(provider, sourceInput),
-		queryFn: () =>
-			getAni2arrApi().getMappingInspection({
-				provider,
-				...sourceInput,
-			}),
+		queryKey: queryKeys.mappingInspection(request),
+		queryFn: () => getAni2arrApi().getMappingInspection(request),
 		staleTime: 15 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

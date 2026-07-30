@@ -3,7 +3,8 @@
 
 import {
 	type AniListId,
-	type AniListMediaHint,
+	type AniListMediaFormat,
+	type AniListTitles,
 	isAniListId,
 } from "@/anilist/types";
 import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
@@ -13,10 +14,17 @@ import {
 } from "@/mapping/source-identity";
 import type { MyAnimeListId } from "@/myanimelist/types";
 import type { TmdbId } from "@/providers/schemas";
-import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
+import type { SeerrMediaType } from "@/providers/seerr/types";
 import type { Provider } from "@/providers/types";
 import { type SourceInputLike, sourceFromInput } from "@/rpc/source-input";
-import type { GetSeerrTargetInput, StatusInput } from "@/rpc/types";
+import type {
+	GetMappingInspectionInput,
+	GetSeerrMediaStatusInput,
+	GetSeerrTargetInput,
+	SearchSeerrMediaInput,
+	SourceRpcInput,
+	StatusInput,
+} from "@/rpc/types";
 
 const rootQueryKey = ["a2a"] as const;
 const configuredScope = "configured";
@@ -24,15 +32,6 @@ const mappingRootKey = () => [...rootQueryKey, "mapping"] as const;
 const seerrTargetsRootKey = () =>
 	[...rootQueryKey, "seerr", "targets"] as const;
 
-type MediaStatusKeyInput = Pick<
-	StatusInput,
-	"anilistId" | "metadata" | "source" | "title"
->;
-type SeerrMediaStatusKeyInput = {
-	mediaType: SeerrMediaType;
-	tmdbId: TmdbId;
-	seasons?: SeerrTvSeasons;
-};
 type SeerrMediaDetailsKeyInput = {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
@@ -43,15 +42,185 @@ type SeerrLinkedAniListEntriesKeyInput = {
 };
 type SourceKeyInput = SourceInputLike | SourceIdentity | AniListId;
 
-export type NormalizedSeerrTargetInput = {
-	source: SourceIdentity;
-	anilistId?: AniListId;
-	title: string | null;
-	metadata: AniListMediaHint | null;
-	forceRetry: boolean;
+type NormalizedResolverMetadata = {
+	titles?: {
+		english?: string;
+		romaji?: string;
+		native?: string;
+	};
+	synonyms?: string[];
+	startYear?: number;
+	format?: AniListMediaFormat;
+	relationPrequelIds?: AniListId[];
 };
 
-const normalizeText = (value: string): string => value.trim().toLowerCase();
+type NormalizedSourceRequest = {
+	source: SourceIdentity;
+	anilistId?: AniListId;
+};
+
+type NormalizedMediaStatusRequest = NormalizedSourceRequest & {
+	title?: string;
+	metadata?: NormalizedResolverMetadata;
+};
+
+type NormalizedSeerrTargetRequest = NormalizedSourceRequest & {
+	title?: string;
+	metadata?: NormalizedResolverMetadata;
+};
+
+type NormalizedMappingInspectionRequest = GetMappingInspectionInput &
+	NormalizedSourceRequest;
+
+type NormalizedProviderLookupRequest = { term: string };
+
+type NormalizedSeerrSearchRequest = SearchSeerrMediaInput;
+
+type NormalizedSeerrMediaStatusRequest =
+	| { mediaType: "movie"; tmdbId: TmdbId }
+	| { mediaType: "tv"; tmdbId: TmdbId; seasons?: number[] };
+
+const normalizeResourceText = (value: string): string | undefined => {
+	const normalized = value.trim().replaceAll(/\s+/g, " ");
+	return normalized.length === 0 ? undefined : normalized;
+};
+
+const normalizeTextList = (values: readonly string[]): string[] =>
+	[
+		...new Set(
+			values
+				.map((value) => normalizeResourceText(value))
+				.filter((value): value is string => value !== undefined),
+		),
+	].toSorted();
+
+const normalizeResolverTitles = (
+	titles: AniListTitles | null | undefined,
+): NormalizedResolverMetadata["titles"] => {
+	const english = normalizeResourceText(titles?.english ?? "");
+	const romaji = normalizeResourceText(titles?.romaji ?? "");
+	const native = normalizeResourceText(titles?.native ?? "");
+	const normalized = {
+		...(english === undefined ? {} : { english }),
+		...(romaji === undefined ? {} : { romaji }),
+		...(native === undefined ? {} : { native }),
+	};
+	return Object.keys(normalized).length === 0 ? undefined : normalized;
+};
+
+const normalizeResolverMetadata = (
+	metadata: StatusInput["metadata"],
+	includeRelationPrequelIds: boolean,
+): NormalizedResolverMetadata | undefined => {
+	if (!metadata) return undefined;
+
+	const titles = normalizeResolverTitles(metadata.titles);
+	const synonyms = normalizeTextList(metadata.synonyms ?? []);
+	const relationPrequelIds =
+		includeRelationPrequelIds && metadata.relationPrequelIds
+			? [...new Set(metadata.relationPrequelIds.filter(isAniListId))].toSorted(
+				(left, right) => left - right,
+			)
+			: [];
+	const normalized: NormalizedResolverMetadata = {
+		...(titles === undefined ? {} : { titles }),
+		...(synonyms.length === 0 ? {} : { synonyms }),
+		...(typeof metadata.startYear === "number"
+			? { startYear: metadata.startYear }
+			: {}),
+		...(metadata.format == null ? {} : { format: metadata.format }),
+		...(relationPrequelIds.length === 0 ? {} : { relationPrequelIds }),
+	};
+
+	return Object.keys(normalized).length === 0 ? undefined : normalized;
+};
+
+const normalizeSourceRequest = (
+	input: SourceInputLike,
+): NormalizedSourceRequest => {
+	const source = sourceFromInput(input);
+	const anilistId =
+		source.source === "anilist" ? source.id : input.anilistId;
+	return {
+		source,
+		...(anilistId === undefined ? {} : { anilistId }),
+	};
+};
+
+const normalizeMediaStatusRequest = (
+	input: SourceRpcInput & Pick<StatusInput, "metadata" | "title">,
+	includeRelationPrequelIds: boolean,
+): NormalizedMediaStatusRequest => {
+	const title = normalizeResourceText(input.title ?? "");
+	const metadata = normalizeResolverMetadata(
+		input.metadata,
+		includeRelationPrequelIds,
+	);
+	return {
+		...normalizeSourceRequest(input),
+		...(title === undefined ? {} : { title }),
+		...(metadata === undefined ? {} : { metadata }),
+	};
+};
+
+export const normalizeSonarrStatusRequest = (
+	input: SourceRpcInput & Pick<StatusInput, "metadata" | "title">,
+): NormalizedMediaStatusRequest => normalizeMediaStatusRequest(input, true);
+
+export const normalizeRadarrStatusRequest = (
+	input: SourceRpcInput & Pick<StatusInput, "metadata" | "title">,
+): NormalizedMediaStatusRequest => normalizeMediaStatusRequest(input, false);
+
+export function normalizeSeerrTargetRequest(
+	input: GetSeerrTargetInput | AniListId,
+): NormalizedSeerrTargetRequest {
+	const sourceInput = typeof input === "number" ? { anilistId: input } : input;
+	const title = normalizeResourceText(sourceInput.title ?? "");
+	const metadata = normalizeResolverMetadata(sourceInput.metadata, false);
+	return {
+		...normalizeSourceRequest(sourceInput),
+		...(title === undefined ? {} : { title }),
+		...(metadata === undefined ? {} : { metadata }),
+	};
+}
+
+export const normalizeSeerrMediaStatusRequest = (
+	input: GetSeerrMediaStatusInput,
+): NormalizedSeerrMediaStatusRequest => {
+	if (input.mediaType === "movie") {
+		return { mediaType: "movie", tmdbId: input.tmdbId };
+	}
+	if (input.seasons === undefined || input.seasons === "all") {
+		return { mediaType: "tv", tmdbId: input.tmdbId };
+	}
+	return {
+		mediaType: "tv",
+		tmdbId: input.tmdbId,
+		seasons: normalizeSeasonNumbers(input.seasons),
+	};
+};
+
+export const normalizeMappingInspectionRequest = (
+	provider: Provider,
+	input: AniListId | SourceRpcInput,
+): NormalizedMappingInspectionRequest => ({
+	provider,
+	...normalizeSourceRequest(
+		typeof input === "number" ? { anilistId: input } : input,
+	),
+});
+
+export const normalizeProviderLookupRequest = (
+	input: { term: string },
+): NormalizedProviderLookupRequest => ({
+	term: normalizeResourceText(input.term) ?? "",
+});
+
+export const normalizeSeerrSearchRequest = (
+	input: SearchSeerrMediaInput,
+): NormalizedSeerrSearchRequest => ({
+	query: normalizeResourceText(input.query) ?? "",
+});
 
 export const normalizeMetadataIds = (
 	ids: readonly AniListId[],
@@ -70,22 +239,6 @@ export const normalizeSourceKeys = (
 	].toSorted();
 };
 
-export function normalizeSeerrTargetInput(
-	input: GetSeerrTargetInput | AniListId,
-): NormalizedSeerrTargetInput {
-	const sourceInput = typeof input === "number" ? { anilistId: input } : input;
-	const title = sourceInput.title?.trim() || null;
-	return {
-		source: sourceFromInput(sourceInput),
-		...(sourceInput.anilistId === undefined
-			? {}
-			: { anilistId: sourceInput.anilistId }),
-		title,
-		metadata: sourceInput.metadata ?? null,
-		forceRetry: sourceInput.forceRetry === true,
-	};
-}
-
 const sourceKeyFromInput = (input: SourceKeyInput): string => {
 	if (typeof input === "number") {
 		return normalizeSourceKey({ source: "anilist", id: input });
@@ -95,6 +248,29 @@ const sourceKeyFromInput = (input: SourceKeyInput): string => {
 	}
 	return normalizeSourceKey(sourceFromInput(input));
 };
+
+const mappingInspectionItemKey = (
+	provider: Provider,
+	input: SourceKeyInput,
+) =>
+	[
+		...mappingRootKey(),
+		"inspection",
+		provider,
+		sourceKeyFromInput(input),
+	] as const;
+
+const providerMediaStatusItemKey = (
+	provider: Provider,
+	input: SourceKeyInput,
+) =>
+	[
+		...rootQueryKey,
+		"provider",
+		provider,
+		"mediaStatus",
+		sourceKeyFromInput(input),
+	] as const;
 
 export const queryKeys = {
 	all: rootQueryKey,
@@ -125,13 +301,9 @@ export const queryKeys = {
 			[...new Set(sourceKeys)].toSorted(),
 		] as const,
 	mappingInspectionRoot: () => [...mappingRootKey(), "inspection"] as const,
-	mappingInspection: (provider: Provider, input: SourceKeyInput) =>
-		[
-			...mappingRootKey(),
-			"inspection",
-			provider,
-			sourceKeyFromInput(input),
-		] as const,
+	mappingInspectionItem: mappingInspectionItemKey,
+	mappingInspection: (input: NormalizedMappingInspectionRequest) =>
+		[...mappingInspectionItemKey(input.provider, input), input] as const,
 	providerRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider] as const,
 	providerConnection: (provider: Provider, scope = configuredScope) =>
@@ -140,28 +312,16 @@ export const queryKeys = {
 	seerrConnection: (scope = configuredScope) =>
 		[...rootQueryKey, "seerr", "connection", scope] as const,
 	seerrTargetsRoot: seerrTargetsRootKey,
-	seerrTarget: (input: NormalizedSeerrTargetInput) =>
+	seerrTarget: (input: NormalizedSeerrTargetRequest) =>
 		[...seerrTargetsRootKey(), "single", input] as const,
 	seerrTargets: (ids: readonly AniListId[]) =>
 		[...seerrTargetsRootKey(), "batch", normalizeMetadataIds(ids)] as const,
-	seerrMediaStatus: (input: SeerrMediaStatusKeyInput | null) =>
+	seerrMediaStatus: (input: NormalizedSeerrMediaStatusRequest | null) =>
 		[
 			...rootQueryKey,
 			"seerr",
 			"mediaStatus",
-			input === null
-				? null
-				: {
-						mediaType: input.mediaType,
-						tmdbId: input.tmdbId,
-						...(input.seasons === undefined
-							? {}
-							: {
-									seasons: Array.isArray(input.seasons)
-										? normalizeSeasonNumbers(input.seasons)
-										: input.seasons,
-								}),
-					},
+			input,
 		] as const,
 	seerrMediaDetails: (input: SeerrMediaDetailsKeyInput | null) =>
 		[
@@ -193,40 +353,25 @@ export const queryKeys = {
 						tmdbId: input.tmdbId,
 					},
 		] as const,
-	seerrSearch: (query: string) =>
-		[...rootQueryKey, "seerr", "search", normalizeText(query)] as const,
+	seerrSearch: (input: NormalizedSeerrSearchRequest) =>
+		[...rootQueryKey, "seerr", "search", input] as const,
 	providerFormResources: (provider: Provider, scope = configuredScope) =>
 		[...rootQueryKey, "provider", provider, "formResources", scope] as const,
 	providerLookupRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "lookup"] as const,
-	providerLookup: (provider: Provider, term: string) =>
+	providerLookup: (provider: Provider, input: NormalizedProviderLookupRequest) =>
 		[
 			...rootQueryKey,
 			"provider",
 			provider,
 			"lookup",
-			normalizeText(term),
+			input,
 		] as const,
 	providerMediaStatusRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "mediaStatus"] as const,
-	providerMediaStatusItem: (provider: Provider, input: SourceKeyInput) =>
-		[
-			...rootQueryKey,
-			"provider",
-			provider,
-			"mediaStatus",
-			sourceKeyFromInput(input),
-		] as const,
-	providerMediaStatus: (provider: Provider, input: MediaStatusKeyInput) =>
-		[
-			...rootQueryKey,
-			"provider",
-			provider,
-			"mediaStatus",
-			sourceKeyFromInput(input),
-			{
-				...(input.title === undefined ? {} : { title: input.title }),
-				...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-			},
-		] as const,
+	providerMediaStatusItem: providerMediaStatusItemKey,
+	providerMediaStatus: (
+		provider: Provider,
+		input: NormalizedMediaStatusRequest,
+	) => [...providerMediaStatusItemKey(provider, input), input] as const,
 };

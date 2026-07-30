@@ -12,6 +12,7 @@ import type {
 	GetSeerrPublicSettingsOutput,
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrLinkedAniListEntriesOutput,
+	GetSeerrMediaStatusInput,
 	GetSeerrMediaStatusOutput,
 	GetSeerrTargetInput,
 	RequestInSeerrInput,
@@ -28,7 +29,9 @@ import {
 } from "@/shared/errors/error.types";
 import {
 	normalizeMetadataIds,
-	normalizeSeerrTargetInput,
+	normalizeSeerrMediaStatusRequest,
+	normalizeSeerrSearchRequest,
+	normalizeSeerrTargetRequest,
 	queryKeys,
 } from "./query-keys";
 
@@ -70,30 +73,29 @@ export const useConfiguredSeerrConnectionCheck = (options: {
 	});
 
 export const useSeerrMediaStatus = (options: {
-	requestInput: RequestInSeerrInput | null;
+	requestInput: GetSeerrMediaStatusInput | RequestInSeerrInput | null;
 	enabled?: boolean;
-}) =>
-	useQuery<GetSeerrMediaStatusOutput, ExtensionError>({
-		queryKey: queryKeys.seerrMediaStatus(options.requestInput),
+}) => {
+	const request =
+		options.requestInput === null
+			? null
+			: normalizeSeerrMediaStatusRequest(options.requestInput);
+
+	return useQuery<GetSeerrMediaStatusOutput, ExtensionError>({
+		queryKey: queryKeys.seerrMediaStatus(request),
 		queryFn: async () => {
-			const requestInput = options.requestInput;
-			if (requestInput === null) {
+			if (request === null) {
 				throw new Error("Seerr request input is required to check media status.");
 			}
 
-			return getAni2arrApi().getSeerrMediaStatus({
-				mediaType: requestInput.mediaType,
-				tmdbId: requestInput.tmdbId,
-				...(requestInput.mediaType === "tv" && requestInput.seasons !== undefined
-					? { seasons: requestInput.seasons }
-					: {}),
-			});
+			return getAni2arrApi().getSeerrMediaStatus(request);
 		},
-		enabled: (options.enabled ?? true) && options.requestInput !== null,
+		enabled: (options.enabled ?? true) && request !== null,
 		staleTime: 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: shouldRetrySeerrQuery,
 	});
+};
 
 export const useSeerrTargets = (
 	ids: readonly AniListId[],
@@ -114,12 +116,18 @@ export const useSeerrTarget = (
 	input: GetSeerrTargetInput | AniListId,
 	options?: { enabled?: boolean },
 ) => {
-	const resolverInput = normalizeSeerrTargetInput(input);
+	const request = normalizeSeerrTargetRequest(input);
+	const forceRetry = typeof input !== "number" && input.forceRetry === true;
 	return useQuery<SeerrRequestTarget | null, ExtensionError>({
-		queryKey: queryKeys.seerrTarget(resolverInput),
-		queryFn: () => getAni2arrApi().getSeerrTarget(resolverInput),
+		queryKey: queryKeys.seerrTarget(request),
+		queryFn: () =>
+			getAni2arrApi().getSeerrTarget({
+				...request,
+				...(forceRetry ? { forceRetry: true } : {}),
+			}),
 		enabled: options?.enabled ?? true,
-		staleTime: 10 * 60 * 1000,
+		staleTime: forceRetry ? 0 : 10 * 60 * 1000,
+		...(forceRetry ? { refetchOnMount: "always" as const } : {}),
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
@@ -177,12 +185,12 @@ export const useSeerrSearch = (options: {
 	query: string;
 	enabled?: boolean;
 }) => {
-	const query = options.query.trim();
+	const request = normalizeSeerrSearchRequest(options);
 
 	return useQuery<SearchSeerrMediaOutput, ExtensionError>({
-		queryKey: queryKeys.seerrSearch(query),
-		queryFn: () => getAni2arrApi().searchSeerrMedia({ query }),
-		enabled: (options.enabled ?? true) && query.length > 0,
+		queryKey: queryKeys.seerrSearch(request),
+		queryFn: () => getAni2arrApi().searchSeerrMedia(request),
+		enabled: (options.enabled ?? true) && request.query.length > 0,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: shouldRetrySeerrQuery,
@@ -223,7 +231,8 @@ export const useRequestInSeerr = () => {
 	return useMutation<RequestInSeerrOutput, ExtensionError, RequestInSeerrInput>({
 		mutationFn: (input) => getAni2arrApi().requestInSeerr(input),
 		onSuccess: (_request, variables) => {
-			queryClient.setQueryData(queryKeys.seerrMediaStatus(variables), {
+			const statusRequest = normalizeSeerrMediaStatusRequest(variables);
+			queryClient.setQueryData(queryKeys.seerrMediaStatus(statusRequest), {
 				target: "pending",
 				overall: "pending",
 			} satisfies GetSeerrMediaStatusOutput);

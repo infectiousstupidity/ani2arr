@@ -8,7 +8,6 @@ import type { Provider } from "@/providers/types";
 import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";
 import type { SourceRpcInput, StatusInput } from "@/rpc/types";
-import { sourceFromInput } from "@/rpc/source-input";
 import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
 type MediaActionIdentity =
@@ -98,11 +97,11 @@ export function mediaActionSourceInput(
 export function buildMediaActionStatusQuery(
 	input: MediaActionInputBase<unknown>,
 ): {
-	payload: Pick<StatusInput, "metadata" | "source" | "title">;
+	payload: SourceRpcInput & Pick<StatusInput, "metadata" | "title">;
 	options: MediaActionStatusOptions;
 } {
-	const payload: Pick<StatusInput, "metadata" | "source" | "title"> = {
-		source: sourceFromInput(mediaActionSourceInput(input)),
+	const payload: SourceRpcInput & Pick<StatusInput, "metadata" | "title"> = {
+		...mediaActionSourceInput(input),
 		metadata: input.metadata,
 	};
 	if (input.providerTitle !== null) {
