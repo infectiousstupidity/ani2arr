@@ -13,11 +13,21 @@ import {
 	normalizeSonarrStatusRequest,
 	queryKeys,
 } from "./query-keys";
-import { useSeerrMediaStatus, useSeerrSearch, useSeerrTarget } from "./seerr";
+import {
+	useRequestInSeerr,
+	useSeerrMediaStatus,
+	useSeerrSearch,
+	useSeerrTarget,
+} from "./seerr";
 import { useSeriesStatus, useSonarrLookupSearch } from "./sonarr";
 
 const mocks = vi.hoisted(() => ({
+	useMutation: vi.fn(),
 	useQuery: vi.fn(),
+	queryClient: {
+		setQueryData: vi.fn(),
+		invalidateQueries: vi.fn(),
+	},
 	api: {
 		getSeriesStatus: vi.fn(),
 		getSeerrTarget: vi.fn(),
@@ -28,9 +38,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-	useMutation: vi.fn(),
+	useMutation: mocks.useMutation,
 	useQuery: mocks.useQuery,
-	useQueryClient: vi.fn(),
+	useQueryClient: () => mocks.queryClient,
 }));
 
 vi.mock("@/rpc", () => ({
@@ -139,6 +149,23 @@ describe("normalized query resource hooks", () => {
 		expect(query.queryKey).toEqual(queryKeys.seerrMediaStatus(resource));
 		await query.queryFn();
 		expect(mocks.api.getSeerrMediaStatus).toHaveBeenCalledWith(resource);
+	});
+
+	it("invalidates Seerr status after seeding a successful request", () => {
+		const requested = {
+			mediaType: "tv",
+			tmdbId: tmdb(10),
+			seasons: [1],
+		} satisfies RequestInSeerrInput;
+		useRequestInSeerr();
+		mocks.useMutation.mock.lastCall?.[0]?.onSuccess?.({}, requested);
+
+		expect(mocks.queryClient.invalidateQueries).toHaveBeenCalledWith({
+			queryKey: queryKeys.seerrMediaStatusItem("tv", tmdb(10)),
+		});
+		expect(mocks.queryClient.setQueryData).toHaveBeenCalledBefore(
+			mocks.queryClient.invalidateQueries,
+		);
 	});
 
 	it("uses normalized search requests for keys and RPC", async () => {
