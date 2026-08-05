@@ -8,6 +8,7 @@ import {
 	parseAniListId,
 } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
+import { captureAutomaticWriteToken } from "../auto.store";
 import { createAutomaticResolver } from "./resolve";
 
 const setAutoResultMock = vi.hoisted(() => vi.fn());
@@ -23,6 +24,7 @@ const malIdentity = {
 } as const;
 
 vi.mock("../auto.store", () => ({
+	captureAutomaticWriteToken: vi.fn(() => 0),
 	setAutoResult: setAutoResultMock,
 }));
 
@@ -47,6 +49,7 @@ function setup(defaults: Partial<ResolveRequest> = {}) {
 	const deps = createDeps();
 	const identity = defaults.identity ?? defaultIdentity;
 	const request: ResolveRequest = {
+		writeToken: defaults.writeToken ?? captureAutomaticWriteToken(),
 		provider: defaults.provider ?? "sonarr",
 		identity,
 		anilistId:
@@ -92,6 +95,7 @@ function createMedia(input: {
 describe("createAutomaticResolver", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		setAutoResultMock.mockResolvedValue(true);
 	});
 
 	it("maps from title lookup before fetching AniList media", async () => {
@@ -107,7 +111,7 @@ describe("createAutomaticResolver", () => {
 			"Kagurabachi",
 		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_000,
 			matchedTitle: "Kagurabachi",
@@ -139,6 +143,16 @@ describe("createAutomaticResolver", () => {
 			"sonarr",
 			"Page Match",
 		);
+	});
+
+	it("reports a guarded store rejection", async () => {
+		const { deps, resolve } = setup({ title: "Kagurabachi" });
+		deps.searchProviderCandidates.mockResolvedValue([
+			{ providerId: 450_000, title: "Kagurabachi", year: 2026 },
+		]);
+		setAutoResultMock.mockResolvedValue(false);
+
+		await expect(resolve()).resolves.toBe(false);
 	});
 
 	it("does not cache unmapped when AniList fallback fails", async () => {
@@ -189,7 +203,7 @@ describe("createAutomaticResolver", () => {
 			"Next Title",
 		);
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_001,
 			matchedTitle: "Next Title",
@@ -209,7 +223,7 @@ describe("createAutomaticResolver", () => {
 		await resolve();
 
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(3);
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "unmapped",
 		});
 	});
@@ -226,7 +240,7 @@ describe("createAutomaticResolver", () => {
 
 		await resolve();
 
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_001,
 			matchedTitle: "Kagurabachi",
@@ -258,7 +272,7 @@ describe("createAutomaticResolver", () => {
 		]);
 		expect(deps.loadMyAnimeListMetadata).not.toHaveBeenCalled();
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 424_536,
 			matchedTitle: "Frieren: Beyond Journeys End",
@@ -298,7 +312,7 @@ describe("createAutomaticResolver", () => {
 		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_020,
 			matchedTitle: "Jikan Match",
@@ -335,7 +349,7 @@ describe("createAutomaticResolver", () => {
 		await expect(resolve()).resolves.toBe(true);
 
 		expect(deps.anilistMedia.iteratePrequelChain).toHaveBeenCalledWith(media);
-		expect(setAutoResultMock).toHaveBeenLastCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenLastCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_002,
 			matchedTitle: "Matching Prequel",
@@ -347,7 +361,7 @@ describe("createAutomaticResolver", () => {
 		await expect(resolve({ provider: "radarr" })).resolves.toBe(true);
 
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("radarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "radarr", identity, {
 			kind: "unmapped",
 		});
 	});
@@ -376,7 +390,7 @@ describe("createAutomaticResolver", () => {
 			prequelId,
 		);
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_003,
 			matchedTitle: "Matching Prequel",

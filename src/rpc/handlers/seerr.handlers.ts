@@ -5,17 +5,15 @@ import { resolveTitlePreference } from "@/anilist/title";
 import type { AniListId, AniListMetadata } from "@/anilist/types";
 import {
 	anilistMetadataStore,
+	mappingService,
 	resolveSeerrAutomaticTarget,
 	seerrClient,
 } from "@/background/api-services";
 import { requireSeerrConnection } from "@/background/provider-config";
 import {
 	clearManualSeerrTarget,
-	getEffectiveSeerrTarget,
-	listAllEffectiveSeerrTargets,
-	listEffectiveSeerrTargets,
 	setManualSeerrTarget,
-} from "@/mapping/seerr-target.store";
+} from "@/mapping/manual.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import { resolveAniListIdFromInput, sourceFromInput } from "@/rpc/source-input";
@@ -81,6 +79,7 @@ export const seerrHandlers = {
 		) {
 			return resolveSeerrAutomaticTarget({
 				source: identity.identity,
+				mediaType: input.mediaType,
 				...(identity.anilistId === undefined
 					? {}
 					: { anilistId: identity.anilistId }),
@@ -91,31 +90,38 @@ export const seerrHandlers = {
 					: { forceRetry: input.forceRetry }),
 			});
 		}
-		return getEffectiveSeerrTarget(identity);
+		return mappingService.getSeerrTarget(identity.identity, input.mediaType);
 	},
 
 	async getSeerrTargets(input: GetSeerrTargetsInput) {
-		return listEffectiveSeerrTargets(input);
+		return mappingService.listSeerrTargets(input);
 	},
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {
-		await setManualSeerrTarget({
-			...(await resolveSeerrTargetIdentity(input)),
-			...(input.mediaType === "movie"
+		const identity = await resolveSeerrTargetIdentity(input);
+		await setManualSeerrTarget(
+			identity.identity,
+			input.mediaType === "movie"
 				? { mediaType: "movie", tmdbId: input.tmdbId }
 				: {
 						mediaType: "tv",
 						tmdbId: input.tmdbId,
 						...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
 						...(input.seasons === undefined ? {} : { seasons: input.seasons }),
-					}),
-		});
+					},
+			identity.anilistId,
+		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualSeerrTarget(input: GetSeerrTargetInput) {
-		await clearManualSeerrTarget(await resolveSeerrTargetIdentity(input));
+		const identity = await resolveSeerrTargetIdentity(input);
+		await clearManualSeerrTarget(
+			identity.identity,
+			input.mediaType,
+			identity.anilistId,
+		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
@@ -149,7 +155,7 @@ export const seerrHandlers = {
 	},
 
 	async getSeerrLinkedAniListEntries(input: GetSeerrLinkedAniListEntriesInput) {
-		const targets = await listAllEffectiveSeerrTargets();
+		const targets = await mappingService.listAllSeerrTargets(input.mediaType);
 		const ids = targets
 			.filter((target) => seerrTargetsMatch(input, target))
 			.map((target) => target.anilistId);

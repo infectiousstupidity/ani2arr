@@ -65,7 +65,7 @@ export async function downloadAniBridgeMappings(
 		}
 
 		const parsed = parseAniBridgeData(parsedJson);
-		if (Object.keys(parsed.entries).length === 0) {
+		if (Object.keys(parsed.records).length === 0) {
 			throw new Error(
 				"AniBridge mappings payload did not contain valid mappings.",
 			);

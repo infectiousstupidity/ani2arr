@@ -39,9 +39,11 @@ const MAL_SOURCE = { source: "mal", id: MAL_ID } as const;
 
 function upstreamSnapshot(fetchedAt: number) {
 	return {
-		entries: {},
-		aniListCrosswalks: {
-			[`mal:${MAL_ID}`]: ANILIST_ID,
+		records: {
+			[`mal:${MAL_ID}`]: {
+				linkedAniListId: ANILIST_ID,
+				targets: [],
+			},
 		},
 		fetchedAt,
 	};
@@ -81,12 +83,12 @@ describe("canonical mapping regression", () => {
 		const stored = await browser.storage.local.get("mapping:manual");
 		const manualBeforeRefresh = stored["mapping:manual"];
 		expect(manualBeforeRefresh).toEqual({
-			sonarr: {
+			version: 1,
+			records: {
 				[`anilist:${ANILIST_ID}`]: {
-					mapping: { providerId: MAL_TVDB_ID },
+					facts: { tvdbShow: MAL_TVDB_ID },
 				},
 			},
-			radarr: {},
 		});
 		await expect(
 			mappingService.getMapping("sonarr", {

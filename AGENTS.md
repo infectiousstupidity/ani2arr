@@ -8,13 +8,12 @@ Ani2arr is a WXT browser extension for AniList/AniChart pages with Sonarr, Radar
 
 Relevant skills:
 
-- `caveman` always
 - `wxt-browser-extension` for extension runtime, entrypoints, storage, messaging, manifest, and content-script work.
 - `react-best-practices` for React UI work.
 - `boring-architecture` for boundary or data-flow changes.
 - `security-scanning` for audit, Gitleaks, Semgrep, or dependency security work.
 - `simplicity-review` for code, folder, architecture, and plan simplification.
-- `find-docs` for up to date dependency and API docs. Do not rely on your training data.
+- `Context7` for up to date dependency and API docs. Do not rely on your training data.
 
 ## Commands
 
@@ -39,6 +38,7 @@ Relevant skills:
 Respect folder ownership:
 
 - `anilist`: AniList IDs, API, metadata, cache.
+- `myanimelist`: MyAnimeList IDs, API, metadata, cache.
 - `mapping`: AniList ID to provider ID mappings.
 - `providers`: Sonarr, Radarr, Seerr clients, IDs, metadata, search, library, cache.
 - `settings`: persisted extension settings and provider config.

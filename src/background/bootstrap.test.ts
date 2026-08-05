@@ -8,6 +8,7 @@ const initializeSettingsStorageMock = vi.hoisted(() => vi.fn());
 const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn());
 const registerAni2arrApiMock = vi.hoisted(() => vi.fn());
 const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
+const migrateMappingStorageMock = vi.hoisted(() => vi.fn());
 const hasConfiguredProviderCredentialsMock = vi.hoisted(() => vi.fn());
 const hasConfiguredSeerrConnectionMock = vi.hoisted(() => vi.fn());
 const loggerConfigureMock = vi.hoisted(() => vi.fn());
@@ -38,6 +39,10 @@ vi.mock("@/background/mapping-refresh", () => ({
 	refreshMappingPipeline: refreshMappingPipelineMock,
 }));
 
+vi.mock("@/mapping/migrate", () => ({
+	migrateMappingStorage: migrateMappingStorageMock,
+}));
+
 vi.mock("@/shared/utils/logger", () => ({
 	logger: {
 		configure: loggerConfigureMock,
@@ -64,18 +69,23 @@ describe("bootstrapBackground", () => {
 		hasConfiguredProviderCredentialsMock.mockReturnValue(false);
 		hasConfiguredSeerrConnectionMock.mockReturnValue(false);
 		getExtensionOptionsSnapshotMock.mockResolvedValue({ debugLogging: true });
+		migrateMappingStorageMock.mockImplementation(async () => {});
 	});
 
-	it("registers immediately but delays settings work", async () => {
+	it("registers RPC and starts mapping migration without waiting", async () => {
 		const initialization = createDeferred();
+		const migration = createDeferred();
 		initializeSettingsStorageMock.mockReturnValue(initialization.promise);
+		migrateMappingStorageMock.mockReturnValue(migration.promise);
 
 		bootstrapBackground();
 
 		expect(initializeSettingsStorageMock).toHaveBeenCalledOnce();
 		expect(registerAni2arrApiMock).toHaveBeenCalledOnce();
-		expect(getExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
-
+		expect(migrateMappingStorageMock).toHaveBeenCalledOnce();
+		expect(registerAni2arrApiMock.mock.invocationCallOrder[0]!).toBeLessThan(
+			migrateMappingStorageMock.mock.invocationCallOrder[0]!,
+		);
 		expect(getExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
 
 		initialization.resolve();
@@ -84,6 +94,7 @@ describe("bootstrapBackground", () => {
 			expect(getExtensionOptionsSnapshotMock).toHaveBeenCalledOnce();
 		});
 		expect(loggerConfigureMock).toHaveBeenCalledWith({ enabled: true });
+		migration.resolve();
 	});
 
 	it("runs the background mapping refresh workflow on startup", async () => {

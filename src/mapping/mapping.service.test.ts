@@ -1,477 +1,233 @@
-/** Tests for mapping precedence and linked AniList ID discovery. */
-// src/mapping/mapping.service.test.ts
+/** Shared mapping composition behavior. */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type AniListId, parseAniListId } from "@/anilist/types";
+import { browser } from "wxt/browser";
+import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
-import type { Provider } from "@/providers/types";
-import { getAutoResult } from "./auto.store";
-import { getManualFacts, type ManualFacts } from "./manual.store";
-import { MappingService } from "./mapping.service";
 import {
-	collectEffectiveMappingRecords,
-	type EffectiveMappingRecord,
-} from "./mapping-facts";
-import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
-import { getSourceUpstreamMapping } from "./upstream.store";
-
-vi.mock("./manual.store", () => ({
-	getManualFacts: vi.fn(),
-	listAniListManualFacts: vi.fn(),
-	clearIgnored: vi.fn(),
-	clearManualMapping: vi.fn(),
-	clearRejectedAutoCandidate: vi.fn(),
-	rejectAutoCandidate: vi.fn(),
-	setIgnored: vi.fn(),
-	setManualMapping: vi.fn(),
-}));
-
-vi.mock("./auto.store", () => ({
-	getAutoResult: vi.fn(),
-	listAniListAutoResults: vi.fn(),
-}));
-
-vi.mock("./upstream.store", () => ({
-	getSourceUpstreamMapping: vi.fn(),
-	listAniListUpstreamMappings: vi.fn(),
-}));
-
-vi.mock("./mapping-facts", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./mapping-facts")>();
-	return {
-		...actual,
-		collectEffectiveMappingRecords: vi.fn(),
-	};
-});
+	captureAutomaticWriteToken,
+	clearAutoResults,
+	setAutoResult,
+} from "./auto.store";
+import {
+	clearManualFacts,
+	clearManualSeerrTarget,
+	setManualMapping,
+	setManualSeerrTarget,
+} from "./manual.store";
+import { MappingService } from "./mapping.service";
+import { clearUpstreamMappings } from "./upstream.store";
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
-const anilistSource = (id: AniListId) => ({ source: "anilist", id }) as const;
 
-const getManualFactsMock = vi.mocked(getManualFacts);
-const getAutoResultMock = vi.mocked(getAutoResult);
-const getSourceUpstreamMappingMock = vi.mocked(getSourceUpstreamMapping);
-const collectEffectiveMappingRecordsMock = vi.mocked(
-	collectEffectiveMappingRecords,
-);
+const createDeferred = <T>() => {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	const promise = new Promise<T>((complete) => {
+		resolve = complete;
+	});
+	return { promise, resolve };
+};
 
-const service = () => new MappingService(vi.fn());
-
-function mappedRecord(
-	provider: Provider,
-	anilistId: AniListId,
-	result: Extract<MappingResult, { kind: "mapped" }>,
-): EffectiveMappingRecord {
-	return { provider, anilistId, result };
+async function seedUpstream(records: Record<string, unknown>): Promise<void> {
+	await browser.storage.local.set({
+		"mapping:upstream": {
+			version: 1,
+			records,
+			fetchedAt: Date.now(),
+		},
+	});
 }
 
 describe("MappingService", () => {
-	beforeEach(() => {
-		vi.resetAllMocks();
-		getManualFactsMock.mockResolvedValue(null);
-		getAutoResultMock.mockResolvedValue(null);
-		getSourceUpstreamMappingMock.mockImplementation(
-			async (_provider, source) => ({
-				anilistId: source.source === "anilist" ? source.id : null,
-				targets: [],
-			}),
-		);
-		collectEffectiveMappingRecordsMock.mockResolvedValue([]);
+	beforeEach(async () => {
+		await Promise.all([
+			clearManualFacts(),
+			clearAutoResults(),
+			clearUpstreamMappings(),
+		]);
 	});
 
-	it("chooses the active mapping source by precedence", async () => {
-		const cases: Array<{
-			name: string;
-			provider: Provider;
-			manual?: ManualFacts;
-			upstream?: UpstreamTarget[];
-			auto?: AutoResult;
-			expected: MappingResult;
-		}> = [
-			{
-				name: "ignored beats all",
-				provider: "radarr",
-				manual: { ignored: true },
-				upstream: [{ provider: "radarr", providerId: tmdb(10) }],
-				auto: { kind: "mapped", providerId: tmdb(20) },
-				expected: { kind: "ignored" },
-			},
-			{
-				name: "manual different from upstream wins",
-				provider: "radarr",
-				manual: { mapping: { providerId: tmdb(20) } },
-				upstream: [{ provider: "radarr", providerId: tmdb(10) }],
-				expected: {
-					kind: "mapped",
-					source: "manual",
-					providerId: tmdb(20),
-				},
-			},
-			{
-				name: "manual equal to upstream resolves as upstream",
-				provider: "radarr",
-				manual: { mapping: { providerId: tmdb(10) } },
-				upstream: [{ provider: "radarr", providerId: tmdb(10) }],
-				expected: {
-					kind: "mapped",
-					source: "upstream",
-					providerId: tmdb(10),
-				},
-			},
-			{
-				name: "manual chosen while upstream is ambiguous remains manual",
-				provider: "sonarr",
-				manual: { mapping: { providerId: tvdb(30), season: 2 } },
-				upstream: [
-					{ provider: "sonarr", providerId: tvdb(10), season: 1 },
-					{ provider: "sonarr", providerId: tvdb(20), season: 2 },
-				],
-				expected: {
-					kind: "mapped",
-					source: "manual",
-					providerId: tvdb(30),
-					season: 2,
-				},
-			},
-			{
-				name: "single upstream target maps automatically",
-				provider: "sonarr",
-				upstream: [{ provider: "sonarr", providerId: tvdb(10), season: 1 }],
-				expected: {
-					kind: "mapped",
-					source: "upstream",
-					providerId: tvdb(10),
-					season: 1,
-				},
-			},
-			{
-				name: "ambiguity beats auto",
-				provider: "sonarr",
-				upstream: [
-					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
-					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
-				],
-				auto: { kind: "mapped", providerId: tvdb(310_718) },
-				expected: {
-					kind: "ambiguous",
-					targets: [
-						{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
-						{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
-					],
-				},
-			},
-			{
-				name: "auto result used when no manual or upstream exists",
-				provider: "radarr",
-				auto: { kind: "mapped", providerId: tmdb(30), matchedTitle: "Match" },
-				expected: {
-					kind: "mapped",
-					source: "auto",
-					providerId: tmdb(30),
-					matchedTitle: "Match",
-				},
-			},
-			{
-				name: "rejected auto candidate returns unmapped",
-				provider: "radarr",
-				manual: { rejectedProviderIds: [tmdb(30)] },
-				auto: { kind: "mapped", providerId: tmdb(30) },
-				expected: {
-					kind: "unmapped",
-					hadResolveAttempt: true,
-					rejectedProviderIds: [tmdb(30)],
-				},
-			},
-		];
-
-		for (const [index, testCase] of cases.entries()) {
-			const anilistId = aid(index + 1);
-			getSourceUpstreamMappingMock.mockResolvedValueOnce({
-				anilistId,
-				targets: testCase.upstream ?? [],
-			});
-			getManualFactsMock.mockResolvedValueOnce(testCase.manual ?? null);
-			getAutoResultMock.mockResolvedValueOnce(testCase.auto ?? null);
-
-			await expect(
-				service().getMapping(testCase.provider, anilistSource(anilistId)),
-				testCase.name,
-			).resolves.toEqual(testCase.expected);
-		}
-	});
-
-	it("uses a direct MAL target without running automatic matching", async () => {
-		const source = { source: "mal", id: mal(59_571) } as const;
-		getSourceUpstreamMappingMock.mockResolvedValueOnce({
-			anilistId: null,
-			targets: [{ provider: "radarr", providerId: tmdb(1_333_100) }],
+	it("applies manual, upstream, then automatic precedence", async () => {
+		const source = { source: "anilist", id: aid(1) } as const;
+		await seedUpstream({
+			"anilist:1": { facts: { tmdbMovie: tmdb(10) } },
 		});
-		const resolver = vi.fn();
+		await setAutoResult(captureAutomaticWriteToken(), "radarr", source, {
+			kind: "mapped",
+			providerId: tmdb(30),
+		});
+		await setManualMapping("radarr", source, { providerId: tmdb(20) });
+		const service = new MappingService(vi.fn());
 
-		await expect(
-			new MappingService(resolver).resolveMapping("radarr", source, {
-				forceRetry: true,
-				title: "Kaguya-sama: Love Is War - The First Kiss That Never Ends",
-			}),
-		).resolves.toEqual({
+		await expect(service.getMapping("radarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "manual",
+			providerId: tmdb(20),
+		});
+
+		await service.clearManualMapping("radarr", source);
+		await expect(service.getMapping("radarr", source)).resolves.toEqual({
 			kind: "mapped",
 			source: "upstream",
-			providerId: tmdb(1_333_100),
+			providerId: tmdb(10),
 		});
-		expect(resolver).not.toHaveBeenCalled();
 	});
 
-	it("reads linked MAL manual facts through the canonical AniList identity", async () => {
-		const firstAniListId = aid(21);
-		const secondAniListId = aid(22);
+	it("stores and reuses an automatic result for an unlinked MAL source", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
-		getSourceUpstreamMappingMock
-			.mockResolvedValueOnce({ anilistId: firstAniListId, targets: [] })
-			.mockResolvedValueOnce({ anilistId: secondAniListId, targets: [] });
-		getManualFactsMock
-			.mockResolvedValueOnce({ mapping: { providerId: tvdb(300) } })
-			.mockResolvedValueOnce({ mapping: { providerId: tvdb(500) } });
-
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "manual",
-			providerId: tvdb(300),
-		});
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "manual",
-			providerId: tvdb(500),
-		});
-
-		expect(getManualFactsMock).toHaveBeenNthCalledWith(
-			1,
-			"sonarr",
-			source,
-			firstAniListId,
+		const resolver = vi.fn(async ({ writeToken, provider, identity }) =>
+			setAutoResult(writeToken, provider, identity, {
+				kind: "mapped",
+				providerId: tvdb(78_874),
+				matchedTitle: "Fullmetal Alchemist",
+			}),
 		);
-		expect(getManualFactsMock).toHaveBeenNthCalledWith(
-			2,
-			"sonarr",
-			source,
-			secondAniListId,
-		);
-	});
-
-	it("uses a source-native manual decision for an unlinked MAL entry", async () => {
-		const source = { source: "mal", id: mal(63_816) } as const;
-		getManualFactsMock.mockResolvedValueOnce({
-			mapping: { providerId: tvdb(424_536) },
-		});
-
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "manual",
-			providerId: tvdb(424_536),
-		});
-		expect(getManualFactsMock).toHaveBeenCalledWith(
-			"sonarr",
-			source,
-			undefined,
-		);
-	});
-
-	it("resolves and reuses an automatic mapping for a MAL-only source", async () => {
-		const source = { source: "mal", id: mal(59_999) } as const;
-		getAutoResultMock.mockResolvedValueOnce(null).mockResolvedValueOnce({
-			kind: "mapped",
-			providerId: tvdb(999),
-			matchedTitle: "MAL Page Title",
-		});
-		const resolver = vi.fn(async () => true);
+		const service = new MappingService(resolver);
 
 		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", source, {
-				forceRetry: true,
-				title: "MAL Page Title",
-			}),
+			service.resolveMapping("sonarr", source, { title: "FMA" }),
 		).resolves.toEqual({
 			kind: "mapped",
 			source: "auto",
-			providerId: tvdb(999),
-			matchedTitle: "MAL Page Title",
+			providerId: tvdb(78_874),
+			matchedTitle: "Fullmetal Alchemist",
 		});
-		expect(resolver).toHaveBeenCalledWith({
-			provider: "sonarr",
-			identity: source,
-			anilistId: null,
-			rejectedProviderIds: [],
-			title: "MAL Page Title",
-		});
-		expect(getSourceUpstreamMappingMock).toHaveBeenCalledOnce();
-	});
-
-	it("uses the MAL identity and linked AniList metadata for crosswalked resolution", async () => {
-		const source = { source: "mal", id: mal(59_999) } as const;
-		const anilistId = aid(211_496);
-		const mappedAuto: AutoResult = {
+		await expect(service.getMapping("sonarr", source)).resolves.toMatchObject({
 			kind: "mapped",
-			providerId: tvdb(1000),
-		};
-		getSourceUpstreamMappingMock.mockResolvedValue({ anilistId, targets: [] });
-		getAutoResultMock
-			.mockResolvedValueOnce({ kind: "unmapped" })
-			.mockResolvedValueOnce({ kind: "unmapped" })
-			.mockResolvedValueOnce(mappedAuto)
-			.mockResolvedValueOnce(mappedAuto);
-		const resolver = vi.fn(async () => true);
-		const mappingService = new MappingService(resolver);
-
-		await expect(mappingService.getMapping("sonarr", source)).resolves.toEqual({
-			kind: "unmapped",
-			hadResolveAttempt: true,
-		});
-		await expect(
-			mappingService.resolveMapping("sonarr", source, {
-				forceRetry: true,
-				title: "Crosswalked MAL Page Title",
-			}),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(1000),
-		});
-		expect(resolver).toHaveBeenCalledWith({
-			provider: "sonarr",
-			identity: source,
-			anilistId,
-			rejectedProviderIds: [],
-			title: "Crosswalked MAL Page Title",
-		});
-		await expect(
-			mappingService.getMapping("sonarr", anilistSource(anilistId)),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(1000),
-		});
-	});
-
-	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
-		collectEffectiveMappingRecordsMock.mockResolvedValue([
-			mappedRecord("radarr", aid(30), {
-				kind: "mapped",
-				source: "manual",
-				providerId: tmdb(100),
-			}),
-			mappedRecord("radarr", aid(10), {
-				kind: "mapped",
-				source: "upstream",
-				providerId: tmdb(100),
-			}),
-			mappedRecord("radarr", aid(20), {
-				kind: "mapped",
-				source: "auto",
-				providerId: tmdb(100),
-			}),
-			{
-				provider: "radarr",
-				anilistId: aid(40),
-				result: { kind: "ignored" },
-			},
-			mappedRecord("radarr", aid(50), {
-				kind: "mapped",
-				source: "manual",
-				providerId: tmdb(200),
-			}),
-		]);
-
-		const linked = await service().getLinkedAniListIdsByProviderIds("radarr", [
-			tmdb(100),
-			tmdb(200),
-			tmdb(100),
-		]);
-
-		expect([...linked.entries()]).toEqual([
-			[tmdb(100), [aid(10), aid(20), aid(30)]],
-			[tmdb(200), [aid(50)]],
-		]);
-		expect(collectEffectiveMappingRecordsMock).toHaveBeenCalledOnce();
-		expect(collectEffectiveMappingRecordsMock).toHaveBeenCalledWith("radarr");
-	});
-
-	it("returns each linked AniList ID once when effective records repeat", async () => {
-		const record = mappedRecord("sonarr", aid(10), {
-			kind: "mapped",
-			source: "upstream",
 			providerId: tvdb(78_874),
 		});
-		collectEffectiveMappingRecordsMock.mockResolvedValue([record, record]);
-
-		await expect(
-			service().getLinkedAniListIds("sonarr", tvdb(78_874)),
-		).resolves.toEqual([aid(10)]);
+		expect(resolver).toHaveBeenCalledOnce();
 	});
 
-	it("retries cached unmapped auto results only when forced", async () => {
-		const anilistId = aid(20);
-		const source = anilistSource(anilistId);
-		getAutoResultMock
-			.mockResolvedValueOnce({ kind: "unmapped" })
-			.mockResolvedValueOnce({ kind: "unmapped" })
-			.mockResolvedValueOnce({
+	it("captures the automatic write token before mapping-state reads", async () => {
+		const source = { source: "anilist", id: aid(2) } as const;
+		let releaseStateRead!: () => void;
+		const stateRead = new Promise<void>((resolve) => {
+			releaseStateRead = resolve;
+		});
+		const originalGet = browser.storage.local.get.bind(browser.storage.local);
+		vi.spyOn(browser.storage.local, "get").mockImplementationOnce(
+			async (...args) => {
+				await stateRead;
+				return originalGet(...args);
+			},
+		);
+		const resolver = vi.fn(async ({ writeToken, provider, identity }) =>
+			setAutoResult(writeToken, provider, identity, {
 				kind: "mapped",
-				providerId: tvdb(200),
-				matchedTitle: "Kagurabachi",
-			});
-		const resolver = vi.fn(async () => true);
-		const mappingService = new MappingService(resolver);
-
-		await expect(
-			mappingService.resolveMapping("sonarr", source),
-		).resolves.toEqual({
-			kind: "unmapped",
-			hadResolveAttempt: true,
-		});
-		expect(resolver).not.toHaveBeenCalled();
-
-		await expect(
-			mappingService.resolveMapping("sonarr", source, {
-				forceRetry: true,
-				title: "Kagurabachi",
+				providerId: tvdb(78_874),
 			}),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(200),
-			matchedTitle: "Kagurabachi",
+		);
+		const service = new MappingService(resolver);
+		const pending = service.resolveMapping("sonarr", source);
+
+		await clearAutoResults();
+		releaseStateRead();
+
+		await expect(pending).resolves.toEqual({
+			kind: "unmapped",
+			hadResolveAttempt: false,
 		});
-		expect(resolver).toHaveBeenCalledWith({
-			provider: "sonarr",
-			identity: source,
-			anilistId,
-			rejectedProviderIds: [],
-			title: "Kagurabachi",
+		expect(resolver).toHaveReturnedWith(expect.any(Promise));
+	});
+
+	it("rejects an Arr provider result completed after a full clear", async () => {
+		const source = { source: "anilist", id: aid(3) } as const;
+		const providerResult = createDeferred<void>();
+		const resolver = vi.fn(async ({ writeToken, provider, identity }) => {
+			await providerResult.promise;
+			return setAutoResult(writeToken, provider, identity, {
+				kind: "mapped",
+				providerId: tvdb(78_874),
+			});
+		});
+		const service = new MappingService(resolver);
+		const pending = service.resolveMapping("sonarr", source);
+
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalledOnce());
+		await clearAutoResults();
+		providerResult.resolve();
+
+		await expect(pending).resolves.toEqual({
+			kind: "unmapped",
+			hadResolveAttempt: false,
 		});
 	});
 
-	it("never resolves ambiguous upstream targets, including forced retries", async () => {
-		const anilistId = aid(22);
-		const source = anilistSource(anilistId);
-		const targets: UpstreamTarget[] = [
-			{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
-			{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
-		];
-		getSourceUpstreamMappingMock.mockResolvedValueOnce({ anilistId, targets });
-		getAutoResultMock.mockResolvedValueOnce({ kind: "unmapped" });
+	it("never resolves behind an upstream conflict", async () => {
+		const source = { source: "anilist", id: aid(2) } as const;
+		await seedUpstream({
+			"anilist:2": {
+				facts: {},
+				conflicts: { tmdbMovie: [tmdb(10), tmdb(20)] },
+			},
+		});
 		const resolver = vi.fn();
+		const service = new MappingService(resolver);
 
 		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", source, {
-				forceRetry: true,
-				title: "Magi: Sinbad no Bouken",
-			}),
+			service.resolveMapping("radarr", source, { forceRetry: true }),
 		).resolves.toEqual({
 			kind: "ambiguous",
-			targets,
+			targets: [
+				{ provider: "radarr", providerId: tmdb(10) },
+				{ provider: "radarr", providerId: tmdb(20) },
+			],
 		});
 		expect(resolver).not.toHaveBeenCalled();
+	});
+
+	it("projects Seerr TV from shared facts without promoting pair evidence", async () => {
+		const source = { source: "anilist", id: aid(3) } as const;
+		await setManualSeerrTarget(source, {
+			mediaType: "tv",
+			tmdbId: tmdb(500),
+			tvdbId: tvdb(700),
+			seasons: [2],
+		});
+		const service = new MappingService(vi.fn());
+
+		await expect(service.getSeerrTarget(source, "tv")).resolves.toMatchObject({
+			mediaType: "tv",
+			tmdbId: tmdb(500),
+			tvdbId: tvdb(700),
+			source: "manual",
+		});
+		await expect(service.getMapping("sonarr", source)).resolves.toEqual({
+			kind: "unmapped",
+			hadResolveAttempt: false,
+		});
+	});
+
+	it("clearing Seerr TV retains an independent Sonarr fact", async () => {
+		const source = { source: "anilist", id: aid(4) } as const;
+		await setManualMapping("sonarr", source, { providerId: tvdb(900) });
+		await setManualSeerrTarget(source, {
+			mediaType: "tv",
+			tmdbId: tmdb(800),
+			tvdbId: tvdb(900),
+		});
+		await clearManualSeerrTarget(source, "tv");
+		const service = new MappingService(vi.fn());
+
+		await expect(service.getSeerrTarget(source, "tv")).resolves.toBeNull();
+		await expect(service.getMapping("sonarr", source)).resolves.toMatchObject({
+			kind: "mapped",
+			providerId: tvdb(900),
+		});
+	});
+
+	it("finds linked AniList IDs from the same effective records", async () => {
+		await setManualMapping("radarr", aid(10), { providerId: tmdb(100) });
+		await setManualMapping("radarr", aid(20), { providerId: tmdb(100) });
+		const service = new MappingService(vi.fn());
+
+		await expect(
+			service.getLinkedAniListIds("radarr", tmdb(100)),
+		).resolves.toEqual([aid(10), aid(20)]);
 	});
 });

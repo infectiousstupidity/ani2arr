@@ -1,10 +1,11 @@
 /** Mapping target and resolved mapping result types. */
 // src/mapping/types.ts
 
+import type { AniListId } from "@/anilist/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
-import type { SeerrTarget } from "./seerr-target";
+import type { SeerrTargetWithEvidence } from "./seerr-target";
 
-export type AniBridgeTarget =
+export type UpstreamTarget =
 	| {
 			kind: "tmdb-movie";
 			id: TmdbId;
@@ -20,9 +21,14 @@ export type AniBridgeTarget =
 			season?: number;
 	  };
 
-export type AniBridgeEntries = Record<string, AniBridgeTarget[]>;
+export type UpstreamSourceRecord = {
+	linkedAniListId?: AniListId;
+	targets: UpstreamTarget[];
+};
 
-export type UpstreamTarget =
+export type UpstreamSourceRecords = Record<string, UpstreamSourceRecord>;
+
+export type ArrUpstreamTarget =
 	| {
 			provider: "sonarr";
 			providerId: TvdbId;
@@ -33,12 +39,7 @@ export type UpstreamTarget =
 			providerId: TmdbId;
 	  };
 
-export type SeerrUpstreamTarget =
-	| Extract<SeerrTarget, { mediaType: "movie" }>
-	| (Extract<SeerrTarget, { mediaType: "tv" }> & {
-			tmdbSeasons?: number[];
-			tvdbSeasons?: number[];
-	  });
+export type SeerrUpstreamTarget = SeerrTargetWithEvidence;
 
 export type AutoResult =
 	| {
@@ -52,7 +53,7 @@ export type AutoResult =
 	  }
 	| {
 			kind: "ambiguous";
-			targets: UpstreamTarget[];
+			targets: ArrUpstreamTarget[];
 	  };
 
 export type MappingSource = "manual" | "upstream" | "auto";
@@ -70,7 +71,7 @@ export type MappingResult =
 	  }
 	| {
 			kind: "ambiguous";
-			targets: UpstreamTarget[];
+			targets: ArrUpstreamTarget[];
 	  }
 	| {
 			kind: "unmapped";

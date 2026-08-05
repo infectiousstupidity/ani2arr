@@ -8,6 +8,7 @@ import { apiHandlers } from "@/rpc/handlers";
 import { refreshMappingPipeline } from "@/background/mapping-refresh";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
+import { migrateMappingStorage } from "@/mapping/migrate";
 import {
 	getExtensionOptionsSnapshot,
 	initializeSettingsStorage,
@@ -73,6 +74,9 @@ export const bootstrapBackground = (): void => {
 	});
 
 	registerAni2arrApi(apiHandlers);
+	void migrateMappingStorage().catch((error) => {
+		logError(normalizeError(error), "Background:migrateMappingStorage");
+	});
 
 	browser.runtime.onInstalled.addListener(async (details) => {
 		try {

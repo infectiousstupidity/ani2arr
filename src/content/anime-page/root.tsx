@@ -16,14 +16,11 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "@/mapping/source-identity";
+import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { MappingIdentity, RequestInSeerrInput } from "@/rpc/types";
+import type { MappingIdentity } from "@/rpc/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
-import {
-	SeerrOpenButton,
-	SeerrRequestButton,
-} from "@/features/seerr-request/seerr-request-button";
-import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
+import { SeerrAnimePageAction } from "@/features/seerr-request/seerr-request-button";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
@@ -31,10 +28,10 @@ import type { MediaModalMetadataHint } from "@/features/media-modal/types";
 import type { Provider } from "@/providers/types";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { SeerrMediaType } from "@/providers/seerr/types";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
-import { useSeerrTarget } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
 import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
@@ -92,7 +89,8 @@ interface AnimePageActionStackProps {
 	onOpenSetup(): void;
 	onOpenMapping(): void;
 	showSeerrAction: boolean;
-	seerrRequestInput: RequestInSeerrInput | null;
+	seerrMediaType: SeerrMediaType | null;
+	seerrStatusBlocked: boolean;
 	onOpenSeerrModal(): void;
 }
 
@@ -178,13 +176,6 @@ function shouldShowSeerrAction(input: {
 	optionState: AnimePageOptionsState;
 }): boolean {
 	return input.optionState.seerrEnabled;
-}
-
-function isSeerrTargetQueryEnabled(
-	optionState: AnimePageOptionsState,
-	options: PublicOptions | undefined,
-): boolean {
-	return optionState.seerrEnabled && options?.seerr.isConfigured === true;
 }
 
 function getResolvedAniListId(
@@ -353,7 +344,8 @@ function AnimePageActionStack({
 	onOpenSetup,
 	onOpenMapping,
 	showSeerrAction,
-	seerrRequestInput,
+	seerrMediaType,
+	seerrStatusBlocked,
 	onOpenSeerrModal,
 }: AnimePageActionStackProps): ReactElement {
 	return (
@@ -391,27 +383,18 @@ function AnimePageActionStack({
 				/>
 			) : null}
 			{showSeerrAction ? (
-				<div
-					className={`grid ${
-						options?.seerr.isConfigured === true && seerrRequestInput !== null
-							? `grid-cols-[1fr_auto] ${compact ? "gap-2" : "gap-3.75"}`
-							: "grid-cols-1 gap-0"
-					} w-full items-start`}
-				>
-					<SeerrRequestButton
-						requestInput={seerrRequestInput}
-						isConfigured={options?.seerr.isConfigured === true}
-						compact={compact}
-						portalContainer={portalContainer ?? undefined}
-						onOpenModal={onOpenSeerrModal}
-					/>
-					<SeerrOpenButton
-						requestInput={seerrRequestInput}
-						isConfigured={options?.seerr.isConfigured === true}
-						compact={compact}
-						portalContainer={portalContainer ?? undefined}
-					/>
-				</div>
+				<SeerrAnimePageAction
+					source={source}
+					{...(anilistId === undefined ? {} : { anilistId })}
+					title={providerTitle}
+					metadata={metadata}
+					mediaType={seerrMediaType}
+					isConfigured={options?.seerr.isConfigured === true}
+					statusBlocked={seerrStatusBlocked}
+					compact={compact}
+					portalContainer={portalContainer ?? undefined}
+					onOpenModal={onOpenSeerrModal}
+				/>
 			) : null}
 		</div>
 	);
@@ -441,15 +424,6 @@ export function ContentRoot({
 	const mappingIdentities = useMappingIdentities(anilistIds, {
 		enabled: optionState.actionsEnabled,
 	});
-	const seerrTargetInput = {
-		source,
-		...(anilistId === undefined ? {} : { anilistId }),
-		...(target.title === null ? {} : { title: target.title }),
-		metadata: target.metadata ?? null,
-	};
-	const seerrTarget = useSeerrTarget(seerrTargetInput, {
-		enabled: isSeerrTargetQueryEnabled(optionState, options),
-	});
 	const canonicalMetadata = metadataHintFromAniListMetadata(
 		metadataBatch.data?.metadata?.[0] ?? null,
 	);
@@ -462,7 +436,9 @@ export function ContentRoot({
 		format: target.format,
 		mappedIdentities: mappingIdentities.data ?? [],
 	});
-	const seerrRequestInput = toSeerrRequestInput(seerrTarget.data ?? null);
+	const seerrMediaType = seerrMediaTypeFromAniListFormat(
+		target.format ?? canonicalMetadata?.format ?? null,
+	);
 	const showProviderAction = shouldShowProviderAction(provider, options);
 	const showSeerrAction = shouldShowSeerrAction({
 		optionState,
@@ -483,6 +459,11 @@ export function ContentRoot({
 	const statusBlocked = isStatusBlocked({
 		optionsPending: publicOptionsQuery.isPending,
 		isConfigured,
+		metadataReadyForStatus,
+	});
+	const seerrStatusBlocked = isStatusBlocked({
+		optionsPending: publicOptionsQuery.isPending,
+		isConfigured: options?.seerr.isConfigured === true,
 		metadataReadyForStatus,
 	});
 	const metadataHint = getModalMetadataHint({
@@ -534,7 +515,8 @@ export function ContentRoot({
 					onOpenSetup={openSetup}
 					onOpenMapping={openMapping}
 					showSeerrAction={showSeerrAction}
-					seerrRequestInput={seerrRequestInput}
+					seerrMediaType={seerrMediaType}
+					seerrStatusBlocked={seerrStatusBlocked}
 					onOpenSeerrModal={openSeerrModal}
 				/>
 				{hostElement && mediaModal.state ? (

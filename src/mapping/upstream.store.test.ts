@@ -31,7 +31,7 @@ const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPSTREAM_STORAGE_KEY = "mapping:upstream";
 
 type SnapshotOverrides = Partial<{
-	aniListCrosswalks: Record<string, ReturnType<typeof aid>>;
+	linkedAniListIds: Record<string, ReturnType<typeof aid>>;
 	fetchedAt: number;
 	etag: string;
 }>;
@@ -51,15 +51,47 @@ function mockAniBridgeResponse(response: Response): void {
 }
 
 async function seedSnapshot(
-	entries: Record<string, unknown[]>,
+	targetsBySource: Record<string, unknown[]>,
+	overrides: SnapshotOverrides = {},
+): Promise<void> {
+	const records = Object.fromEntries(
+		Object.entries(targetsBySource).map(([sourceKey, targets]) => [
+			sourceKey,
+			{
+				...(overrides.linkedAniListIds?.[sourceKey] === undefined
+					? {}
+					: { linkedAniListId: overrides.linkedAniListIds[sourceKey] }),
+				targets,
+			},
+		]),
+	);
+	for (const [sourceKey, linkedAniListId] of Object.entries(
+		overrides.linkedAniListIds ?? {},
+	)) {
+		records[sourceKey] ??= { linkedAniListId, targets: [] };
+	}
+	await browser.storage.local.set({
+		[UPSTREAM_STORAGE_KEY]: {
+			records,
+			fetchedAt: Date.now(),
+			...(overrides.fetchedAt === undefined
+				? {}
+				: { fetchedAt: overrides.fetchedAt }),
+			...(overrides.etag === undefined ? {} : { etag: overrides.etag }),
+		},
+	});
+}
+
+async function seedLayerSnapshot(
+	records: Record<string, unknown>,
 	overrides: SnapshotOverrides = {},
 ): Promise<void> {
 	await browser.storage.local.set({
 		[UPSTREAM_STORAGE_KEY]: {
-			entries,
-			aniListCrosswalks: {},
-			fetchedAt: Date.now(),
-			...overrides,
+			version: 1,
+			records,
+			fetchedAt: overrides.fetchedAt ?? Date.now(),
+			...(overrides.etag === undefined ? {} : { etag: overrides.etag }),
 		},
 	});
 }
@@ -96,7 +128,7 @@ describe("refreshUpstreamMappings", () => {
 		await expect(refreshUpstreamMappings()).rejects.toThrow(error);
 	});
 
-	it("persists source-keyed entries and refresh metadata", async () => {
+	it("persists normalized source records and refresh metadata", async () => {
 		mockAniBridgeResponse(
 			createAniBridgeResponse(
 				JSON.stringify({
@@ -109,17 +141,19 @@ describe("refreshUpstreamMappings", () => {
 
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
-			entries: {
-				"anilist:1": [{ kind: "tmdb-movie", id: tmdb(300) }],
+			version: 1,
+			records: {
+				"anilist:1": {
+					facts: { tmdbMovie: tmdb(300) },
+				},
 			},
-			aniListCrosswalks: {},
 			fetchedAt: expect.any(Number),
 		});
 	});
 
 	it("reports unchanged without downloading a fresh canonical snapshot", async () => {
-		await seedSnapshot({
-			"anilist:1": [{ kind: "tmdb-movie", id: tmdb(300) }],
+		await seedLayerSnapshot({
+			"anilist:1": { facts: { tmdbMovie: tmdb(300) } },
 		});
 		const fetchMock = vi.fn<typeof fetch>();
 		vi.stubGlobal("fetch", fetchMock);
@@ -129,11 +163,38 @@ describe("refreshUpstreamMappings", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
+	it("decodes released split snapshots without writing during reads", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					"anilist:21": [{ kind: "tvdb-show", id: tvdb(81_797) }],
+					"mal:5114": [{ kind: "tmdb-movie", id: tmdb(300) }],
+				},
+				aniListCrosswalks: { "mal:5114": aid(21) },
+				fetchedAt: Date.now(),
+			},
+		});
+		const setSpy = vi.spyOn(browser.storage.local, "set");
+
+		await expect(
+			getSourceUpstreamMapping("sonarr", { source: "mal", id: mal(5114) }),
+		).resolves.toEqual({
+			anilistId: aid(21),
+			targets: [{ provider: "sonarr", providerId: tvdb(81_797) }],
+		});
+		expect(setSpy).not.toHaveBeenCalled();
+		setSpy.mockRestore();
+	});
+
 	it("forces a full refresh for fresh legacy snapshots", async () => {
-		await seedSnapshot(
-			{ 1: [{ kind: "tmdb-movie", id: tmdb(300) }] },
-			{ etag: "legacy-etag" },
-		);
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: { 1: [{ kind: "tmdb-movie", id: tmdb(300) }] },
+				aniListCrosswalks: {},
+				fetchedAt: Date.now(),
+				etag: "legacy-etag",
+			},
+		});
 		const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
 			expect(init?.headers).toEqual({});
 			return createAniBridgeResponse(
@@ -149,10 +210,12 @@ describe("refreshUpstreamMappings", () => {
 		expect(fetchMock).toHaveBeenCalledOnce();
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
-			entries: {
-				"anilist:1": [{ kind: "tmdb-movie", id: tmdb(400) }],
+			version: 1,
+			records: {
+				"anilist:1": {
+					facts: { tmdbMovie: tmdb(400) },
+				},
 			},
-			aniListCrosswalks: {},
 			fetchedAt: expect.any(Number),
 		});
 		await expect(
@@ -166,10 +229,10 @@ describe("refreshUpstreamMappings", () => {
 	it("refreshes canonical snapshot metadata after an ETag 304", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
-		const entries = {
-			"anilist:1": [{ kind: "tmdb-movie", id: tmdb(300) }],
+		const records = {
+			"anilist:1": { facts: { tmdbMovie: tmdb(300) } },
 		};
-		await seedSnapshot(entries, {
+		await seedLayerSnapshot(records, {
 			fetchedAt: Date.now() - UPSTREAM_REFRESH_INTERVAL_MS - 1,
 			etag: "canonical-etag",
 		});
@@ -185,8 +248,10 @@ describe("refreshUpstreamMappings", () => {
 
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
-			entries,
-			aniListCrosswalks: {},
+			version: 1,
+			records: {
+				"anilist:1": records["anilist:1"],
+			},
 			fetchedAt: Date.now(),
 			etag: "canonical-etag",
 		});
@@ -195,11 +260,11 @@ describe("refreshUpstreamMappings", () => {
 	it("reports unchanged when a download contains the same mapping facts", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
-		const entries = {
-			"anilist:1": [{ kind: "tmdb-movie" as const, id: tmdb(300) }],
+		const records = {
+			"anilist:1": { facts: { tmdbMovie: tmdb(300) } },
+			"mal:5114": { facts: {}, linkedAniListId: aid(1) },
 		};
-		await seedSnapshot(entries, {
-			aniListCrosswalks: { "mal:5114": aid(1) },
+		await seedLayerSnapshot(records, {
 			fetchedAt: Date.now() - UPSTREAM_REFRESH_INTERVAL_MS - 1,
 			etag: "old-etag",
 		});
@@ -217,8 +282,8 @@ describe("refreshUpstreamMappings", () => {
 
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
-			entries,
-			aniListCrosswalks: { "mal:5114": aid(1) },
+			version: 1,
+			records,
 			fetchedAt: Date.now(),
 			etag: "new-etag",
 		});
@@ -393,7 +458,7 @@ describe("refreshUpstreamMappings", () => {
 				"mal:5114": [{ kind: "tmdb-movie", id: tmdb(300) }],
 			},
 			{
-				aniListCrosswalks: {
+				linkedAniListIds: {
 					[sourceIdentityKey(source)]: aid(21),
 					[sourceIdentityKey(lowerAlias)]: aid(21),
 				},
@@ -428,7 +493,7 @@ describe("refreshUpstreamMappings", () => {
 			{
 				"anilist:21": [{ kind: "tmdb-movie", id: tmdb(400) }],
 			},
-			{ aniListCrosswalks: { [sourceIdentityKey(source)]: aid(21) } },
+			{ linkedAniListIds: { [sourceIdentityKey(source)]: aid(21) } },
 		);
 
 		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
@@ -448,7 +513,7 @@ describe("refreshUpstreamMappings", () => {
 					{ kind: "tmdb-movie", id: tmdb(200) },
 				],
 			},
-			{ aniListCrosswalks: { [sourceIdentityKey(source)]: aid(21) } },
+			{ linkedAniListIds: { [sourceIdentityKey(source)]: aid(21) } },
 		);
 
 		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
@@ -478,7 +543,7 @@ describe("refreshUpstreamMappings", () => {
 	it("resolves a deduplicated alias batch with one pure storage read", async () => {
 		const mapped = { source: "mal", id: mal(5114) } as const;
 		const missing = { source: "mal", id: mal(59_571) } as const;
-		await seedSnapshot({}, { aniListCrosswalks: { "mal:5114": aid(21) } });
+		await seedSnapshot({}, { linkedAniListIds: { "mal:5114": aid(21) } });
 		const getSpy = vi.spyOn(browser.storage.local, "get");
 		const setSpy = vi.spyOn(browser.storage.local, "set");
 

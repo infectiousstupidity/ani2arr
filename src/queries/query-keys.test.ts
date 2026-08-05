@@ -117,9 +117,10 @@ describe("query keys", () => {
 		expect(
 			normalizeSeerrTargetRequest({
 				source,
+				mediaType: "tv",
 				metadata: { relationPrequelIds: [2], coverImage: "cover" },
 			}),
-		).toEqual(normalizeSeerrTargetRequest({ source }));
+		).toEqual(normalizeSeerrTargetRequest({ source, mediaType: "tv" }));
 	});
 
 	it("keeps execution controls out of resource keys", () => {
@@ -130,9 +131,14 @@ describe("query keys", () => {
 			force_verify: true,
 			force_mapping_retry: true,
 		};
-		const normalTarget = normalizeSeerrTargetRequest({ source, title: "Title" });
+		const normalTarget = normalizeSeerrTargetRequest({
+			source,
+			mediaType: "tv",
+			title: "Title",
+		});
 		const forcedTarget = normalizeSeerrTargetRequest({
 			source,
+			mediaType: "tv",
 			title: "Title",
 			forceRetry: true,
 		});
@@ -220,8 +226,14 @@ describe("query keys", () => {
 		expect(
 			normalizeSeerrTargetRequest({
 				source: { source: "anilist", id: aid(1) },
+				mediaType: "movie",
 			}),
-		).toEqual(normalizeSeerrTargetRequest(aid(1)));
+		).toEqual(
+			normalizeSeerrTargetRequest({
+				anilistId: aid(1),
+				mediaType: "movie",
+			}),
+		);
 	});
 
 	it("shares whitespace normalization between search requests and keys", () => {

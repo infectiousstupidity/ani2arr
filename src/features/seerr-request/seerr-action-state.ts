@@ -11,21 +11,18 @@ export type SeerrActionStatus = SeerrMediaStatus | undefined;
 
 export interface SeerrActionStateInput {
 	isConfigured: boolean;
-	isRequesting: boolean;
 	isChecking: boolean;
-	requestSucceeded: boolean;
-	requestFailed: boolean;
+	hasUsableTarget: boolean;
 	status: SeerrActionStatus;
 }
 
 export interface SeerrActionState {
 	state: Extract<
 		MediaActionState,
-		"unconfigured" | "checking" | "adding" | "in-library" | "error" | "can-add"
+		"unconfigured" | "checking" | "in-library" | "error" | "can-add"
 	>;
 	label: string;
 	disabled: boolean;
-	settled: boolean;
 }
 
 export function getSeerrVisualStatus(
@@ -48,7 +45,7 @@ export function getSeerrVisualStatus(
 	return summary.target;
 }
 
-export function isSettledSeerrStatus(status: SeerrActionStatus): boolean {
+function isSettledSeerrStatus(status: SeerrActionStatus): boolean {
 	const settled: string[] = ["available", "pending", "processing", "partial"];
 
 	return status != null && settled.includes(status);
@@ -68,16 +65,6 @@ export function getSeerrActionState(
 			state: "unconfigured",
 			label: "Configure Seerr",
 			disabled: false,
-			settled: false,
-		};
-	}
-
-	if (input.isRequesting) {
-		return {
-			state: "adding",
-			label: "Requesting...",
-			disabled: true,
-			settled: false,
 		};
 	}
 
@@ -86,7 +73,14 @@ export function getSeerrActionState(
 			state: "checking",
 			label: "Checking Seerr...",
 			disabled: true,
-			settled: false,
+		};
+	}
+
+	if (!input.hasUsableTarget) {
+		return {
+			state: "can-add",
+			label: "Choose Seerr target",
+			disabled: false,
 		};
 	}
 
@@ -95,7 +89,6 @@ export function getSeerrActionState(
 			state: "error",
 			label: "Unavailable in Seerr",
 			disabled: true,
-			settled: true,
 		};
 	}
 
@@ -104,25 +97,14 @@ export function getSeerrActionState(
 			state: "can-add",
 			label: "Request again in Seerr",
 			disabled: false,
-			settled: false,
 		};
 	}
 
-	if (input.requestSucceeded || isSettledSeerrStatus(input.status)) {
+	if (isSettledSeerrStatus(input.status)) {
 		return {
 			state: "in-library",
 			label: getSettledLabel(input.status),
 			disabled: false,
-			settled: true,
-		};
-	}
-
-	if (input.requestFailed) {
-		return {
-			state: "error",
-			label: "Retry Seerr request",
-			disabled: false,
-			settled: false,
 		};
 	}
 
@@ -130,6 +112,5 @@ export function getSeerrActionState(
 		state: "can-add",
 		label: "Request in Seerr",
 		disabled: false,
-		settled: false,
 	};
 }

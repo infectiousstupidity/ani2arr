@@ -9,10 +9,8 @@ import {
 
 const baseInput = {
 	isConfigured: true,
-	isRequesting: false,
 	isChecking: false,
-	requestSucceeded: false,
-	requestFailed: false,
+	hasUsableTarget: true,
 	status: undefined,
 };
 
@@ -26,7 +24,6 @@ describe("getSeerrActionState", () => {
 		).toMatchObject({
 			label: "Available in Seerr",
 			disabled: false,
-			settled: true,
 		});
 	});
 
@@ -64,7 +61,6 @@ describe("getSeerrActionState", () => {
 		).toMatchObject({
 			state: "in-library",
 			disabled: false,
-			settled: true,
 		});
 	});
 
@@ -78,11 +74,10 @@ describe("getSeerrActionState", () => {
 			state: "checking",
 			label: "Checking Seerr...",
 			disabled: true,
-			settled: false,
 		});
 	});
 
-	it("keeps requestable state for unknown status and failed status checks", () => {
+	it("keeps requestable state for unknown status", () => {
 		expect(
 			getSeerrActionState({
 				...baseInput,
@@ -90,16 +85,6 @@ describe("getSeerrActionState", () => {
 			}),
 		).toMatchObject({
 			label: "Request in Seerr",
-			disabled: false,
-		});
-
-		expect(
-			getSeerrActionState({
-				...baseInput,
-				requestFailed: true,
-			}),
-		).toMatchObject({
-			label: "Retry Seerr request",
 			disabled: false,
 		});
 	});
@@ -113,7 +98,6 @@ describe("getSeerrActionState", () => {
 		).toMatchObject({
 			label: "Request again in Seerr",
 			disabled: false,
-			settled: false,
 		});
 	});
 
@@ -127,7 +111,6 @@ describe("getSeerrActionState", () => {
 			state: "error",
 			label: "Unavailable in Seerr",
 			disabled: true,
-			settled: true,
 		});
 	});
 });

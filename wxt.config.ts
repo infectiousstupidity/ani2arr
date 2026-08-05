@@ -1,8 +1,9 @@
 // wxt.config.ts
-import { defineConfig, type WxtViteConfig } from "wxt";
+
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import babel from "@rolldown/plugin-babel";
+import { defineConfig, type WxtViteConfig } from "wxt";
 
 export default defineConfig({
 	webExt: {
@@ -30,6 +31,16 @@ export default defineConfig({
 					presets: [reactCompilerPreset()],
 				}),
 				tailwindcss(),
+				{
+					name: "ignore",
+					config: () => ({
+						server: {
+							watch: {
+								ignored: ["**/docs/**", "**/scripts/**"],
+							},
+						},
+					}),
+				},
 			],
 			css: { devSourcemap: true },
 			build: {

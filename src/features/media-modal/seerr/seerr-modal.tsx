@@ -2,6 +2,7 @@
 // src/features/media-modal/seerr/seerr-modal.tsx
 
 import { useState } from "react";
+import type { AniListMediaFormat } from "@/anilist/types";
 import type {
 	SeerrMediaDetails,
 	SeerrSearchResult,
@@ -12,7 +13,8 @@ import {
 	useSeerrTarget,
 } from "@/queries/seerr";
 import { getDirectAniListId, sourceFromInput } from "@/rpc/source-input";
-import type { SeerrRequestTarget } from "@/rpc/types";
+import type { GetSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
+import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -57,6 +59,20 @@ function isSeerrRequestDataLoading(input: {
 	return input.target?.mediaType === "tv" && input.publicSettingsLoading;
 }
 
+function addSeerrMediaType(
+	input: Omit<GetSeerrTargetInput, "mediaType">,
+	mediaType: "movie" | "tv" | null,
+): GetSeerrTargetInput | null {
+	return mediaType === null ? null : { ...input, mediaType };
+}
+
+function getSeerrMediaType(
+	headerFormat: AniListMediaFormat | null | undefined,
+	metadataFormat: AniListMediaFormat | null | undefined,
+): "movie" | "tv" | null {
+	return seerrMediaTypeFromAniListFormat(headerFormat ?? metadataFormat);
+}
+
 export function SeerrModal({
 	state,
 	onClose,
@@ -80,12 +96,19 @@ export function SeerrModal({
 		metadataHint: metadataHint ?? null,
 	});
 	const isConfigured = base.options?.seerr.isConfigured === true;
+	const mediaType = getSeerrMediaType(
+		base.anilistHeaderData.format,
+		base.resolvedMetadata?.format,
+	);
 	const targetQuery = useSeerrTarget(
-		{
-			...targetInput,
-			title: base.providerRequestTitle,
-			metadata: base.resolvedMetadata,
-		},
+		addSeerrMediaType(
+			{
+					...targetInput,
+					title: base.providerRequestTitle,
+					metadata: base.resolvedMetadata,
+			},
+			mediaType,
+		),
 		{ enabled: isConfigured },
 	);
 	const target = targetQuery.data ?? null;

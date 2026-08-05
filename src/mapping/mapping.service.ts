@@ -1,28 +1,51 @@
-/** Decides the active mapping result and exposes mapping write actions. */
-// src/mapping/mapping.service.ts
+/** Composes shared mapping facts and exposes mapping write actions. */
 
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SeerrTargetSource } from "@/providers/seerr/types";
 import type { Provider } from "@/providers/types";
+import {
+	captureAutomaticWriteToken,
+	getAutomaticLayerRecord,
+	listAniListAutomaticLayers,
+} from "./auto.store";
+import {
+	projectRadarrTarget,
+	projectSonarrTarget,
+	type ExternalIdLayer,
+	type ExternalIdLayers,
+} from "./external-id-facts";
+import {
+	chooseMappingResultFromLayers,
+	collectEffectiveMappingRecords,
+	type MappingFactLayers,
+} from "./mapping-facts";
 import {
 	clearIgnored as removeIgnored,
 	clearManualMapping as removeManualMapping,
 	clearRejectedAutoCandidate as removeRejectedCandidate,
-	getManualFacts,
+	getManualLayerRecord,
+	listAniListManualLayers,
 	rejectAutoCandidate,
 	setIgnored as saveIgnored,
 	setManualMapping as saveManualMapping,
-	type ManualFacts,
 } from "./manual.store";
-import { getSourceUpstreamMapping } from "./upstream.store";
-import { getAutoResult } from "./auto.store";
-import type { SourceIdentity } from "./source-identity";
 import type { AutomaticResolver } from "./resolve/resolve";
-import type { MappingResult, UpstreamTarget } from "./types";
 import {
-	chooseMappingResult,
-	collectEffectiveMappingRecords,
-	matchesUpstream,
-} from "./mapping-facts";
+	projectSeerrTarget,
+	type SeerrTargetWithEvidence,
+} from "./seerr-target";
+import type { SourceIdentity } from "./source-identity";
+import {
+	getSourceUpstreamLayers,
+	listAniListUpstreamLayers,
+	type SourceUpstreamLayers,
+} from "./upstream.store";
+import type { MappingResult } from "./types";
+
+export type EffectiveSeerrTarget = {
+	anilistId?: AniListId;
+	source: SeerrTargetSource;
+} & SeerrTargetWithEvidence;
 
 export class MappingService {
 	public constructor(
@@ -34,37 +57,7 @@ export class MappingService {
 		source: SourceIdentity,
 	): Promise<MappingResult> {
 		const state = await this.getMappingState(provider, source);
-		return state.result;
-	}
-
-	private async getMappingState(
-		provider: Provider,
-		source: SourceIdentity,
-	): Promise<{
-		identity: SourceIdentity;
-		anilistId: AniListId | null;
-		manual: ManualFacts | null;
-		upstream: UpstreamTarget[];
-		result: MappingResult;
-	}> {
-		const upstream = await getSourceUpstreamMapping(provider, source);
-		const anilistId = upstream.anilistId ?? undefined;
-		const [manual, auto] = await Promise.all([
-			getManualFacts(provider, source, anilistId),
-			getAutoResult(provider, source, anilistId),
-		]);
-		return {
-			identity: source,
-			anilistId: upstream.anilistId,
-			manual,
-			upstream: upstream.targets,
-			result: chooseMappingResult({
-				provider,
-				manual,
-				upstream: upstream.targets,
-				auto,
-			}),
-		};
+		return chooseMappingResultFromLayers(provider, state.layers);
 	}
 
 	public async resolveMapping(
@@ -76,46 +69,95 @@ export class MappingService {
 			metadata?: AniListMediaHint | null;
 		},
 	): Promise<MappingResult> {
-		const currentState = await this.getMappingState(provider, source);
-		const current = currentState.result;
-
-		if (isStableMapping(current)) {
+		const writeToken = captureAutomaticWriteToken();
+		const state = await this.getMappingState(provider, source);
+		const current = chooseMappingResultFromLayers(provider, state.layers);
+		if (current.kind === "mapped" || current.kind === "ignored") return current;
+		if (current.kind === "ambiguous") return current;
+		if (current.hadResolveAttempt && options?.forceRetry !== true)
 			return current;
-		}
-
-		if (current.kind === "ambiguous") {
-			return current;
-		}
-
-		if (
-			current.kind === "unmapped" &&
-			shouldKeepUnmappedMapping(current, options?.forceRetry === true)
-		) {
-			return current;
-		}
 
 		await this.resolveAutomaticMapping({
+			writeToken,
 			provider,
-			identity: currentState.identity,
-			anilistId: currentState.anilistId,
-			rejectedProviderIds:
-				current.kind === "unmapped" ? (current.rejectedProviderIds ?? []) : [],
+			identity: source,
+			anilistId: state.anilistId,
+			rejectedProviderIds: current.rejectedProviderIds ?? [],
 			...(options?.title === undefined ? {} : { title: options.title }),
 			...(options?.metadata === undefined
 				? {}
 				: { metadata: options.metadata }),
 		});
-
-		const auto = await getAutoResult(
-			provider,
-			currentState.identity,
-			currentState.anilistId ?? undefined,
+		const automatic = await getAutomaticLayerRecord(
+			source,
+			state.anilistId ?? undefined,
 		);
-		return chooseMappingResult({
-			provider,
-			manual: currentState.manual,
-			upstream: currentState.upstream,
-			auto,
+		return chooseMappingResultFromLayers(provider, {
+			...state.layers,
+			automatic,
+		});
+	}
+
+	public async getSeerrTarget(
+		source: SourceIdentity,
+		mediaType: "movie" | "tv",
+	): Promise<EffectiveSeerrTarget | null> {
+		const upstream = await getSourceUpstreamLayers(source);
+		const anilistId = upstream.anilistId ?? undefined;
+		const [manual, automatic] = await Promise.all([
+			getManualLayerRecord(source, anilistId),
+			getAutomaticLayerRecord(source, anilistId),
+		]);
+		return composeSeerrTarget(
+			{
+				manual,
+				upstream: selectSeerrUpstreamLayer(upstream, mediaType),
+				automatic,
+			},
+			mediaType,
+			anilistId,
+		);
+	}
+
+	public async listSeerrTargets(
+		items: readonly { anilistId: AniListId; mediaType: "movie" | "tv" }[],
+	): Promise<EffectiveSeerrTarget[]> {
+		if (items.length === 0) return [];
+		const layers = await loadAniListLayers();
+		return items.flatMap(({ anilistId, mediaType }) => {
+			const target = composeSeerrTarget(
+				{
+					manual: layers.manual.get(anilistId) ?? null,
+					upstream: layers.upstream.get(anilistId) ?? null,
+					automatic: layers.automatic.get(anilistId) ?? null,
+				},
+				mediaType,
+				anilistId,
+			);
+			return target ? [target] : [];
+		});
+	}
+
+	public async listAllSeerrTargets(
+		mediaType: "movie" | "tv",
+	): Promise<Array<EffectiveSeerrTarget & { anilistId: AniListId }>> {
+		const layers = await loadAniListLayers();
+		const ids = new Set([
+			...layers.manual.keys(),
+			...layers.upstream.keys(),
+			...layers.automatic.keys(),
+		]);
+		return [...ids].flatMap((anilistId) => {
+			const target = composeSeerrTarget(
+				{
+					manual: layers.manual.get(anilistId) ?? null,
+					upstream: layers.upstream.get(anilistId) ?? null,
+					automatic: layers.automatic.get(anilistId) ?? null,
+				},
+				mediaType,
+				anilistId,
+			);
+			return target ? [{ ...target, anilistId }] : [];
 		});
 	}
 
@@ -174,26 +216,29 @@ export class MappingService {
 		provider: Provider,
 		anilistId: AniListId,
 	): Promise<boolean> {
-		const [manual, upstream] = await Promise.all([
-			getManualFacts(provider, anilistId),
-			getSourceUpstreamMapping(provider, { source: "anilist", id: anilistId }),
-		]);
-
-		if (!manual || !("mapping" in manual) || upstream.targets.length !== 1) {
-			return false;
-		}
-
-		const upstreamTarget = upstream.targets[0];
-
+		const source = { source: "anilist", id: anilistId } as const;
+		const upstream = await getSourceUpstreamLayers(source);
+		const manual = await getManualLayerRecord(source, anilistId);
+		if (!manual) return false;
+		const full = chooseMappingResultFromLayers(provider, {
+			manual,
+			upstream: selectArrUpstreamLayer(provider, upstream),
+			automatic: null,
+		});
+		const withoutManual = chooseMappingResultFromLayers(provider, {
+			manual: null,
+			upstream: selectArrUpstreamLayer(provider, upstream),
+			automatic: null,
+		});
 		if (
-			!upstreamTarget ||
-			!matchesUpstream(provider, manual.mapping, upstreamTarget)
+			full.kind !== "mapped" ||
+			withoutManual.kind !== "mapped" ||
+			full.providerId !== withoutManual.providerId ||
+			full.season !== withoutManual.season
 		) {
 			return false;
 		}
-
 		await removeManualMapping(provider, anilistId);
-
 		return true;
 	}
 
@@ -201,63 +246,124 @@ export class MappingService {
 		provider: Provider,
 		providerId: number,
 	): Promise<AniListId[]> {
-		const linkedAniListIdsByProviderId =
-			await this.getLinkedAniListIdsByProviderIds(provider, [providerId]);
-
-		return linkedAniListIdsByProviderId.get(providerId) ?? [];
+		const linked = await this.getLinkedAniListIdsByProviderIds(provider, [
+			providerId,
+		]);
+		return linked.get(providerId) ?? [];
 	}
 
 	public async getLinkedAniListIdsByProviderIds(
 		provider: Provider,
 		providerIds: Iterable<number>,
 	): Promise<Map<number, AniListId[]>> {
-		const requestedProviderIds = new Set(providerIds);
-		if (requestedProviderIds.size === 0) {
-			return new Map();
-		}
-
-		const activeRecords = await collectEffectiveMappingRecords(provider);
-		const linkedAniListIdsByProviderId = new Map<number, Set<AniListId>>();
-
-		for (const record of activeRecords) {
+		const requested = new Set(providerIds);
+		if (requested.size === 0) return new Map();
+		const records = await collectEffectiveMappingRecords(provider);
+		const linked = new Map<number, Set<AniListId>>();
+		for (const record of records) {
 			if (
 				record.result.kind !== "mapped" ||
-				!requestedProviderIds.has(record.result.providerId)
+				!requested.has(record.result.providerId)
 			) {
 				continue;
 			}
-
-			const linkedAniListIds =
-				linkedAniListIdsByProviderId.get(record.result.providerId) ?? new Set();
-			linkedAniListIds.add(record.anilistId);
-			linkedAniListIdsByProviderId.set(
-				record.result.providerId,
-				linkedAniListIds,
-			);
+			const ids = linked.get(record.result.providerId) ?? new Set();
+			ids.add(record.anilistId);
+			linked.set(record.result.providerId, ids);
 		}
+		return new Map(
+			[...linked].map(([id, ids]) => [
+				id,
+				[...ids].toSorted((left, right) => left - right),
+			]),
+		);
+	}
 
-		const sortedLinkedAniListIdsByProviderId = new Map<number, AniListId[]>();
-		for (const [
-			linkedProviderId,
-			linkedAniListIds,
-		] of linkedAniListIdsByProviderId) {
-			sortedLinkedAniListIdsByProviderId.set(
-				linkedProviderId,
-				[...linkedAniListIds].toSorted((left, right) => left - right),
-			);
-		}
-
-		return sortedLinkedAniListIdsByProviderId;
+	private async getMappingState(
+		provider: Provider,
+		source: SourceIdentity,
+	): Promise<{ anilistId: AniListId | null; layers: MappingFactLayers }> {
+		const upstream = await getSourceUpstreamLayers(source);
+		const anilistId = upstream.anilistId ?? undefined;
+		const [manual, automatic] = await Promise.all([
+			getManualLayerRecord(source, anilistId),
+			getAutomaticLayerRecord(source, anilistId),
+		]);
+		return {
+			anilistId: upstream.anilistId,
+			layers: {
+				manual,
+				upstream: selectArrUpstreamLayer(provider, upstream),
+				automatic,
+			},
+		};
 	}
 }
 
-function isStableMapping(mapping: MappingResult): boolean {
-	return mapping.kind === "mapped" || mapping.kind === "ignored";
+function selectArrUpstreamLayer(
+	provider: Provider,
+	upstream: SourceUpstreamLayers,
+): ExternalIdLayer | null {
+	if (upstream.direct) {
+		const projection =
+			provider === "sonarr"
+				? projectSonarrTarget({ upstream: upstream.direct })
+				: projectRadarrTarget({ upstream: upstream.direct });
+		if (projection.kind !== "missing") return upstream.direct;
+	}
+	return upstream.canonical;
 }
 
-function shouldKeepUnmappedMapping(
-	current: Extract<MappingResult, { kind: "unmapped" }>,
-	forceRetry: boolean,
-): boolean {
-	return current.hadResolveAttempt && !forceRetry;
+function selectSeerrUpstreamLayer(
+	upstream: SourceUpstreamLayers,
+	mediaType: "movie" | "tv",
+): ExternalIdLayer | null {
+	if (upstream.direct) {
+		const projection = projectSeerrTarget(
+			{ upstream: upstream.direct },
+			mediaType,
+		);
+		if (projection.kind !== "missing") return upstream.direct;
+	}
+	return upstream.canonical;
+}
+
+function composeSeerrTarget(
+	layers: MappingFactLayers,
+	mediaType: "movie" | "tv",
+	anilistId?: AniListId,
+): EffectiveSeerrTarget | null {
+	const externalLayers: ExternalIdLayers = {
+		...(layers.manual ? { manual: layers.manual } : {}),
+		...(layers.upstream ? { upstream: layers.upstream } : {}),
+		...(layers.automatic ? { automatic: layers.automatic } : {}),
+	};
+	const projection = projectSeerrTarget(externalLayers, mediaType);
+	if (projection.kind !== "target") return null;
+	return {
+		...(anilistId === undefined ? {} : { anilistId }),
+		source: projection.source === "upstream" ? "anibridge" : projection.source,
+		...projection.target,
+	};
+}
+
+async function loadAniListLayers(): Promise<{
+	manual: Map<AniListId, MappingFactLayers["manual"]>;
+	upstream: Map<AniListId, MappingFactLayers["upstream"]>;
+	automatic: Map<AniListId, MappingFactLayers["automatic"]>;
+}> {
+	const [manual, upstream, automatic] = await Promise.all([
+		listAniListManualLayers(),
+		listAniListUpstreamLayers(),
+		listAniListAutomaticLayers(),
+	]);
+	return {
+		manual: new Map(manual.map((record) => [record.anilistId, record.record])),
+		upstream: new Map(
+			upstream.map((record) => [record.anilistId, record.record]),
+		),
+		automatic: new Map(
+			automatic.map((record) => [record.anilistId, record.record]),
+		),
+	};
 }

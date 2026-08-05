@@ -3,16 +3,30 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { describe, expect, it, vi } from "vitest";
+import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
+import { useSeerrMediaAction } from "@/features/media-action/use-seerr-media-action";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
-import { parseTmdbId } from "@/providers/schemas";
+import { useAniListMetadataBatch } from "@/queries/anilist";
 import { usePublicOptions } from "@/queries/options";
-import { useSeerrMediaStatus, useSeerrTarget } from "@/queries/seerr";
 import { createDefaultPublicOptions } from "@/settings/schema";
 import { ContentRoot, type AnimePageTarget } from "./root";
 
 const modalOpen = vi.hoisted(() => vi.fn());
+const seerrMediaActionMock = vi.hoisted(() =>
+	vi.fn(() => ({
+		status: {
+			state: "can-add" as const,
+			label: "Choose Seerr target",
+			disabled: false,
+		},
+		visualStatus: undefined,
+		visualTitle: "Choose Seerr target",
+		openProvider: null,
+		runPrimaryAction: vi.fn(),
+	})),
+);
 
 vi.mock("@/features/media-action/use-radarr-media-action", () => ({
 	useRadarrMediaAction: vi.fn(() => ({
@@ -31,6 +45,10 @@ vi.mock("@/features/media-action/use-sonarr-media-action", () => ({
 	useSonarrMediaAction: vi.fn(),
 }));
 
+vi.mock("@/features/media-action/use-seerr-media-action", () => ({
+	useSeerrMediaAction: seerrMediaActionMock,
+}));
+
 vi.mock("@/queries/mapping", () => ({
 	useMappingIdentities: vi.fn(() => ({ data: undefined })),
 	useSourceAniListIdMap: vi.fn(() => ({ data: undefined, isPending: true })),
@@ -46,15 +64,6 @@ vi.mock("@/queries/anilist", () => ({
 
 vi.mock("@/queries/options", () => ({
 	usePublicOptions: vi.fn(() => ({ data: undefined, isPending: false })),
-}));
-
-vi.mock("@/queries/seerr", () => ({
-	useSeerrMediaStatus: vi.fn(() => ({
-		data: undefined,
-		isEnabled: false,
-		isError: false,
-	})),
-	useSeerrTarget: vi.fn(() => ({ data: null })),
 }));
 
 vi.mock("@/queries/use-a2a-broadcasts", () => ({
@@ -110,13 +119,15 @@ describe("ContentRoot", () => {
 		expect(useRadarrMediaAction).not.toHaveBeenCalledWith(
 			expect.objectContaining({ anilistId: expect.anything() }),
 		);
-		expect(useSeerrTarget).toHaveBeenCalledWith(
-			{
+		expect(useSeerrMediaAction).toHaveBeenCalledWith(
+			expect.objectContaining({
 				source: target.source,
+				mediaType: "movie",
 				title: target.title,
 				metadata: target.metadata,
-			},
-			{ enabled: false },
+				enabled: true,
+				statusBlocked: false,
+			}),
 		);
 	});
 
@@ -152,34 +163,59 @@ describe("ContentRoot", () => {
 		});
 	});
 
-	it("shows the mapped-season partial status on anime pages", () => {
+	it("blocks Seerr until the canonical format fallback resolves", () => {
 		const publicOptions = createDefaultPublicOptions();
 		publicOptions.providers.sonarr.isConfigured = false;
 		publicOptions.providers.radarr.isConfigured = false;
 		publicOptions.seerr.isConfigured = true;
 		publicOptions.ui.animePages.sonarr.enabled = false;
 		publicOptions.ui.animePages.radarr.enabled = false;
-		vi.mocked(usePublicOptions).mockReturnValueOnce({
+		vi.mocked(usePublicOptions).mockReturnValue({
 			data: publicOptions,
 			isPending: false,
 		} as ReturnType<typeof usePublicOptions>);
-		vi.mocked(useSeerrTarget).mockReturnValueOnce({
-			data: {
-				source: "automatic",
+		const id = parseAniListId(21_003);
+		vi.mocked(useAniListMetadataBatch)
+			.mockReturnValueOnce({
+				data: undefined,
+				isFetched: false,
+				isError: false,
+			} as ReturnType<typeof useAniListMetadataBatch>)
+			.mockReturnValueOnce({
+				data: {
+					metadata: [
+						{
+							id,
+							titles: { english: "Frieren" },
+							format: "TV",
+						},
+					],
+				},
+				isFetched: true,
+				isError: false,
+			} as ReturnType<typeof useAniListMetadataBatch>);
+		const target: AnimePageTarget = {
+			...createTarget("TV"),
+			anilistId: id,
+			format: null,
+		};
+
+		renderTarget(target);
+
+		expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				mediaType: null,
+				statusBlocked: true,
+			}),
+		);
+
+		renderTarget(target);
+
+		expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
+			expect.objectContaining({
 				mediaType: "tv",
-				tmdbId: parseTmdbId(37_854),
-				seasons: [1],
-			},
-		} as ReturnType<typeof useSeerrTarget>);
-		vi.mocked(useSeerrMediaStatus).mockReturnValueOnce({
-			data: { target: "not-requested", overall: "partial" },
-			isEnabled: true,
-			isError: false,
-		} as ReturnType<typeof useSeerrMediaStatus>);
-
-		const view = renderTarget(createTarget("TV"));
-
-		expect(view).toContain("Partially in Seerr. Request mapped season.");
-		expect(view).not.toContain(">Request in Seerr<");
+				statusBlocked: false,
+			}),
+		);
 	});
 });

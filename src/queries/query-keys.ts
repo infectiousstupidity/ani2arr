@@ -21,6 +21,7 @@ import type {
 	GetMappingInspectionInput,
 	GetSeerrMediaStatusInput,
 	GetSeerrTargetInput,
+	GetSeerrTargetsInput,
 	SearchSeerrMediaInput,
 	SourceRpcInput,
 	StatusInput,
@@ -65,6 +66,7 @@ type NormalizedMediaStatusRequest = NormalizedSourceRequest & {
 };
 
 type NormalizedSeerrTargetRequest = NormalizedSourceRequest & {
+	mediaType: "movie" | "tv";
 	title?: string;
 	metadata?: NormalizedResolverMetadata;
 };
@@ -172,13 +174,13 @@ export const normalizeRadarrStatusRequest = (
 ): NormalizedMediaStatusRequest => normalizeMediaStatusRequest(input, false);
 
 export function normalizeSeerrTargetRequest(
-	input: GetSeerrTargetInput | AniListId,
+	input: GetSeerrTargetInput,
 ): NormalizedSeerrTargetRequest {
-	const sourceInput = typeof input === "number" ? { anilistId: input } : input;
-	const title = normalizeResourceText(sourceInput.title ?? "");
-	const metadata = normalizeResolverMetadata(sourceInput.metadata, false);
+	const title = normalizeResourceText(input.title ?? "");
+	const metadata = normalizeResolverMetadata(input.metadata, false);
 	return {
-		...normalizeSourceRequest(sourceInput),
+		...normalizeSourceRequest(input),
+		mediaType: input.mediaType,
 		...(title === undefined ? {} : { title }),
 		...(metadata === undefined ? {} : { metadata }),
 	};
@@ -326,8 +328,18 @@ export const queryKeys = {
 	seerrTargetsRoot: seerrTargetsRootKey,
 	seerrTarget: (input: NormalizedSeerrTargetRequest) =>
 		[...seerrTargetsRootKey(), "single", input] as const,
-	seerrTargets: (ids: readonly AniListId[]) =>
-		[...seerrTargetsRootKey(), "batch", normalizeMetadataIds(ids)] as const,
+	seerrTargets: (items: GetSeerrTargetsInput) =>
+		[
+			...seerrTargetsRootKey(),
+			"batch",
+			items
+				.map((item) => ({ ...item }))
+				.toSorted(
+					(left, right) =>
+						left.anilistId - right.anilistId ||
+						left.mediaType.localeCompare(right.mediaType),
+				),
+		] as const,
 	seerrMediaStatusItem: seerrMediaStatusItemKey,
 	seerrMediaStatus: (input: NormalizedSeerrMediaStatusRequest | null) =>
 		input === null

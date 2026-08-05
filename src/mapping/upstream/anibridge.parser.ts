@@ -1,28 +1,24 @@
-/** Pure AniBridge v3 row parser for upstream targets and source crosswalks. */
+/** Pure AniBridge v3 row parser for normalized upstream source records. */
 // src/mapping/upstream/anibridge.parser.ts
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import { parseMyAnimeListIdOrNull } from "@/myanimelist/types";
 import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
-import {
-	sourceIdentityKey,
-	type SourceIdentity,
-} from "@/mapping/source-identity";
-import type { AniBridgeEntries, AniBridgeTarget } from "@/mapping/types";
-
-export type AniListCrosswalkMappings = Record<string, AniListId>;
+import { sourceIdentityKey, type SourceIdentity } from "@/mapping/source-identity";
+import type {
+	UpstreamSourceRecords,
+	UpstreamTarget,
+} from "@/mapping/types";
 
 export type ParsedAniBridgeData = {
-	entries: AniBridgeEntries;
-	aniListCrosswalks: AniListCrosswalkMappings;
+	records: UpstreamSourceRecords;
 };
 
 export function parseAniBridgeData(payload: unknown): ParsedAniBridgeData {
-	const entries: AniBridgeEntries = {};
-	const aniListCrosswalks: AniListCrosswalkMappings = {};
+	const records: UpstreamSourceRecords = {};
 
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-		return { entries, aniListCrosswalks };
+		return { records };
 	}
 
 	for (const [rawRowKey, rawTargets] of Object.entries(
@@ -44,16 +40,19 @@ export function parseAniBridgeData(payload: unknown): ParsedAniBridgeData {
 			const target = parseAniBridgeTarget(rawTarget);
 			return target === null ? [] : [target];
 		});
-		if (targets.length > 0) entries[sourceIdentityKey(source)] = targets;
-		if (source.source === "anilist") continue;
+		const linkedAniListId =
+			source.source === "mal"
+				? parseUniqueAniListTarget(rawTargetKeys)
+				: null;
+		if (targets.length === 0 && linkedAniListId === null) continue;
 
-		const aniListId = parseUniqueAniListTarget(rawTargetKeys);
-		if (aniListId !== null) {
-			aniListCrosswalks[sourceIdentityKey(source)] = aniListId;
-		}
+		records[sourceIdentityKey(source)] = {
+			...(linkedAniListId === null ? {} : { linkedAniListId }),
+			targets,
+		};
 	}
 
-	return { entries, aniListCrosswalks };
+	return { records };
 }
 
 function parseSourceDescriptor(
@@ -87,7 +86,7 @@ function parseUniqueAniListTarget(values: readonly string[]): AniListId | null {
 	return uniqueIds.length === 1 ? (uniqueIds[0] ?? null) : null;
 }
 
-function parseAniBridgeTarget(value: string): AniBridgeTarget | null {
+function parseAniBridgeTarget(value: string): UpstreamTarget | null {
 	const target = parseDescriptor(value);
 
 	if (!target) return null;

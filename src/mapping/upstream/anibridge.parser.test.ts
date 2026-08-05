@@ -13,9 +13,9 @@ const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 
-describe("parseAniBridgeData entries", () => {
-	it("keeps provider targets under their source identity", () => {
-		const { entries } = parseAniBridgeData({
+describe("parseAniBridgeData", () => {
+	it("keeps targets, season scope, and one MAL link in each source record", () => {
+		const { records } = parseAniBridgeData({
 			"anilist:113415": {
 				"tmdb_movie:300": {},
 				"tmdb_show:95479:s1": {},
@@ -41,41 +41,50 @@ describe("parseAniBridgeData entries", () => {
 			},
 		});
 
-		expect(entries["anilist:113415"]).toEqual([
-			{ kind: "tmdb-movie", id: tmdb(300) },
-			{ kind: "tmdb-show", id: tmdb(95_479), season: 1 },
-			{ kind: "tvdb-show", id: tvdb(377_543), season: 1 },
-		]);
-		expect(entries["mal:59571"]).toEqual([
-			{ kind: "tmdb-movie", id: tmdb(1_333_100) },
-		]);
-		expect(entries["mal:40748"]).toEqual([
-			{ kind: "tvdb-show", id: tvdb(78_874), season: 1 },
-		]);
-		expect(entries["anilist:145064"]).toBeUndefined();
-		expect(entries["anilist:172463"]).toBeUndefined();
+		expect(records["anilist:113415"]).toEqual({
+			targets: [
+				{ kind: "tmdb-movie", id: tmdb(300) },
+				{ kind: "tmdb-show", id: tmdb(95_479), season: 1 },
+				{ kind: "tvdb-show", id: tvdb(377_543), season: 1 },
+			],
+		});
+		expect(records["mal:59571"]).toEqual({
+			targets: [{ kind: "tmdb-movie", id: tmdb(1_333_100) }],
+		});
+		expect(records["mal:40748"]).toEqual({
+			linkedAniListId: aid(113_415),
+			targets: [{ kind: "tvdb-show", id: tvdb(78_874), season: 1 }],
+		});
+		expect(records["anilist:145064"]).toBeUndefined();
+		expect(records["anilist:172463"]).toBeUndefined();
 	});
-});
 
-describe("parseAniBridgeData AniList crosswalks", () => {
-	it("uses only canonical MAL rows with one AniList target", () => {
-		const { aniListCrosswalks } = parseAniBridgeData({
+	it("omits missing and ambiguous links without dropping valid targets", () => {
+		const { records } = parseAniBridgeData({
 			"mal:40748": {
-				"anilist:113415": {},
 				"tvdb_show:78874:s1": {},
 			},
 			"mal:5114": {
 				"anilist:21": {},
 				"anilist:22": {},
+				"tmdb_show:37854:s1": {},
 			},
-			"anidb:1:R": {
-				"anilist:1": {},
-				"mal:1": {},
+			"mal:1": {
+				"anilist:21": {},
 			},
 		});
 
-		expect(aniListCrosswalks).toEqual({
-			[sourceIdentityKey({ source: "mal", id: mal(40_748) })]: aid(113_415),
+		expect(records).toEqual({
+			[sourceIdentityKey({ source: "mal", id: mal(40_748) })]: {
+				targets: [{ kind: "tvdb-show", id: tvdb(78_874), season: 1 }],
+			},
+			[sourceIdentityKey({ source: "mal", id: mal(5114) })]: {
+				targets: [{ kind: "tmdb-show", id: tmdb(37_854), season: 1 }],
+			},
+			[sourceIdentityKey({ source: "mal", id: mal(1) })]: {
+				linkedAniListId: aid(21),
+				targets: [],
+			},
 		});
 	});
 });

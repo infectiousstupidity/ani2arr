@@ -8,14 +8,16 @@ const apiServicesMock = vi.hoisted(() => ({
 		getMetadata: vi.fn(),
 	},
 	resolveSeerrAutomaticTarget: vi.fn(),
+	mappingService: {
+		getSeerrTarget: vi.fn(),
+		listAllSeerrTargets: vi.fn(),
+		listSeerrTargets: vi.fn(),
+	},
 	seerrClient: {},
 }));
 
-const seerrTargetStoreMock = vi.hoisted(() => ({
+const manualStoreMock = vi.hoisted(() => ({
 	clearManualSeerrTarget: vi.fn(),
-	getEffectiveSeerrTarget: vi.fn(),
-	listAllEffectiveSeerrTargets: vi.fn(),
-	listEffectiveSeerrTargets: vi.fn(),
 	setManualSeerrTarget: vi.fn(),
 }));
 
@@ -27,7 +29,7 @@ vi.mock("@/background/provider-config", () => ({
 	requireSeerrConnection: vi.fn(),
 }));
 
-vi.mock("@/mapping/seerr-target.store", () => seerrTargetStoreMock);
+vi.mock("@/mapping/manual.store", () => manualStoreMock);
 
 vi.mock("@/rpc/revision-signals", () => ({
 	bumpMappingsRevision: bumpMappingsRevisionMock,
@@ -41,7 +43,7 @@ describe("seerrHandlers", () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 
-		seerrTargetStoreMock.setManualSeerrTarget.mockImplementation(
+		manualStoreMock.setManualSeerrTarget.mockImplementation(
 			async () => {},
 		);
 		bumpMappingsRevisionMock.mockImplementation(async () => {});
@@ -55,19 +57,19 @@ describe("seerrHandlers", () => {
 			tmdbId: tmdb(123),
 			source: "manual" as const,
 		};
-		seerrTargetStoreMock.getEffectiveSeerrTarget.mockResolvedValue(target);
+		apiServicesMock.mappingService.getSeerrTarget.mockResolvedValue(target);
 
-		await expect(seerrHandlers.getSeerrTarget({ anilistId })).resolves.toBe(
-			target,
-		);
+		await expect(
+			seerrHandlers.getSeerrTarget({ anilistId, mediaType: "movie" }),
+		).resolves.toBe(target);
 
-		expect(seerrTargetStoreMock.getEffectiveSeerrTarget).toHaveBeenCalledWith({
-			identity: {
+		expect(apiServicesMock.mappingService.getSeerrTarget).toHaveBeenCalledWith(
+			{
 				source: "anilist",
 				id: anilistId,
 			},
-			anilistId,
-		});
+			"movie",
+		);
 		expect(apiServicesMock.resolveSeerrAutomaticTarget).not.toHaveBeenCalled();
 	});
 
@@ -84,6 +86,7 @@ describe("seerrHandlers", () => {
 		await expect(
 			seerrHandlers.getSeerrTarget({
 				anilistId,
+				mediaType: "movie",
 				title: "Perfect Blue",
 				metadata: {
 					format: "MOVIE",
@@ -99,6 +102,7 @@ describe("seerrHandlers", () => {
 				id: anilistId,
 			},
 			anilistId,
+			mediaType: "movie",
 			title: "Perfect Blue",
 			metadata: {
 				format: "MOVIE",
@@ -106,7 +110,7 @@ describe("seerrHandlers", () => {
 			},
 			forceRetry: true,
 		});
-		expect(seerrTargetStoreMock.getEffectiveSeerrTarget).not.toHaveBeenCalled();
+		expect(apiServicesMock.mappingService.getSeerrTarget).not.toHaveBeenCalled();
 	});
 
 	it("stores a complete manual TV target and bumps the mapping revision", async () => {
@@ -122,18 +126,24 @@ describe("seerrHandlers", () => {
 			ok: true,
 		});
 
-		expect(seerrTargetStoreMock.setManualSeerrTarget).toHaveBeenCalledWith({
-			...input,
-			identity: {
+		expect(manualStoreMock.setManualSeerrTarget).toHaveBeenCalledWith(
+			{
 				source: "anilist",
 				id: input.anilistId,
 			},
-		});
+			{
+				mediaType: "tv",
+				tmdbId: input.tmdbId,
+				tvdbId: input.tvdbId,
+				seasons: input.seasons,
+			},
+			input.anilistId,
+		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
 	it("returns AniList entries sharing the same effective Seerr target", async () => {
-		seerrTargetStoreMock.listAllEffectiveSeerrTargets.mockResolvedValue([
+		apiServicesMock.mappingService.listAllSeerrTargets.mockResolvedValue([
 			{
 				anilistId: aid(100),
 				mediaType: "movie",

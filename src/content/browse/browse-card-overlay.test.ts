@@ -119,6 +119,7 @@ describe("BrowseCardOverlay", () => {
 					type: SeerrCardStackActions,
 					props: {
 						source: parsed.source,
+						mediaType: format === "TV" ? "tv" : "movie",
 					},
 				},
 			},

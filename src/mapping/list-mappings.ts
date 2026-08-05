@@ -8,10 +8,10 @@ import {
 	type EffectiveMappingRecord,
 } from "./mapping-facts";
 import type { SourceIdentity } from "./source-identity";
-import type { MappingResult, UpstreamTarget } from "./types";
+import type { ArrUpstreamTarget, MappingResult } from "./types";
 import {
 	listAniListUpstreamMappings,
-	type UpstreamMappingFact,
+	type ArrUpstreamMappingFact,
 } from "./upstream.store";
 
 export interface ActiveMappingIdentity {
@@ -75,7 +75,7 @@ export async function getMappingIdentities(
 
 async function collectListRecords(
 	provider: Provider,
-	upstreamFacts: readonly UpstreamMappingFact[],
+	upstreamFacts: readonly ArrUpstreamMappingFact[],
 	deps: EffectiveMappingListDeps,
 ): Promise<EffectiveMappingRecord[]> {
 	return collectEffectiveMappingRecords(provider, {
@@ -87,15 +87,15 @@ async function collectListRecords(
 
 async function selectListUpstreamTargets(
 	provider: Provider,
-	records: readonly UpstreamMappingFact[],
+	records: readonly ArrUpstreamMappingFact[],
 	deps: EffectiveMappingListDeps,
-): Promise<ReadonlyMap<AniListId, readonly UpstreamTarget[]>> {
+): Promise<ReadonlyMap<AniListId, readonly ArrUpstreamTarget[]>> {
 	const movieIdsWithRadarrTargets = await getMovieIdsWithRadarrTargets(
 		provider,
 		records,
 		deps,
 	);
-	const upstreamByAniListId = new Map<AniListId, UpstreamTarget[]>();
+	const upstreamByAniListId = new Map<AniListId, ArrUpstreamTarget[]>();
 
 	for (const record of records) {
 		const targets =
@@ -113,7 +113,7 @@ async function selectListUpstreamTargets(
 
 async function getMovieIdsWithRadarrTargets(
 	provider: Provider,
-	upstreamFacts: readonly UpstreamMappingFact[],
+	upstreamFacts: readonly ArrUpstreamMappingFact[],
 	deps: EffectiveMappingListDeps,
 ): Promise<ReadonlySet<AniListId>> {
 	if (provider !== "sonarr" || !deps.loadFormatByAniListId) {

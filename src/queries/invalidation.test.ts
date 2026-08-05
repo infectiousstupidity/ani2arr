@@ -71,7 +71,9 @@ describe("query invalidation", () => {
 				"radarr",
 				normalizeProviderLookupRequest({ term: "test" }),
 			),
-			queryKeys.seerrTargets([aid(21)]),
+			queryKeys.seerrTargets([
+				{ anilistId: aid(21), mediaType: "movie" },
+			]),
 			queryKeys.seerrLinkedAniListEntries({
 				mediaType: "movie",
 				tmdbId: tmdb(100),
@@ -108,7 +110,7 @@ describe("query invalidation", () => {
 				normalizeMappingInspectionRequest("sonarr", aid(1)),
 			),
 			queryKeys.mappingIdentities([aid(1)]),
-			queryKeys.seerrTargets([aid(1)]),
+			queryKeys.seerrTargets([{ anilistId: aid(1), mediaType: "tv" }]),
 			queryKeys.seerrLinkedAniListEntries({
 				mediaType: "tv",
 				tmdbId: tmdb(100),

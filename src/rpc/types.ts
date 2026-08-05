@@ -130,8 +130,12 @@ export type ValidateTmdbInput = {
 };
 
 export type GetMappingIdentitiesInput = AniListId[];
-export type GetSeerrTargetsInput = AniListId[];
+export type GetSeerrTargetsInput = Array<{
+	anilistId: AniListId;
+	mediaType: "movie" | "tv";
+}>;
 export type GetSeerrTargetInput = SourceRpcInput & {
+	mediaType: "movie" | "tv";
 	title?: string | null;
 	metadata?: AniListMediaHint | null;
 	forceRetry?: boolean;
@@ -194,7 +198,9 @@ export type SeerrRequestTarget = {
 
 export type SetManualSeerrTargetInput = SourceRpcInput & SeerrTarget;
 
-export type ClearManualSeerrTargetInput = SourceRpcInput;
+export type ClearManualSeerrTargetInput = SourceRpcInput & {
+	mediaType: "movie" | "tv";
+};
 
 export type SearchSeerrMediaInput = {
 	query: string;

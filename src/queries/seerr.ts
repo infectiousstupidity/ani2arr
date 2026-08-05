@@ -2,7 +2,6 @@
 // src/queries/seerr.ts
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist/types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import type { SeerrConnection } from "@/providers/seerr/types";
 import { getAni2arrApi } from "@/rpc";
@@ -15,20 +14,20 @@ import type {
 	GetSeerrMediaStatusInput,
 	GetSeerrMediaStatusOutput,
 	GetSeerrTargetInput,
+	GetSeerrTargetsInput,
 	RequestInSeerrInput,
 	RequestInSeerrOutput,
 	SearchSeerrMediaOutput,
 	SeerrConnectionCheckOutput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
-	SourceRpcInput,
+	ClearManualSeerrTargetInput,
 } from "@/rpc/types";
 import {
 	ErrorCode,
 	type ExtensionError,
 } from "@/shared/errors/error.types";
 import {
-	normalizeMetadataIds,
 	normalizeSeerrMediaStatusRequest,
 	normalizeSeerrSearchRequest,
 	normalizeSeerrTargetRequest,
@@ -99,14 +98,22 @@ export const useSeerrMediaStatus = (options: {
 };
 
 export const useSeerrTargets = (
-	ids: readonly AniListId[],
+	items: GetSeerrTargetsInput,
 	options?: { enabled?: boolean },
 ) => {
-	const normalizedIds = normalizeMetadataIds(ids);
+	const normalizedItems = [
+		...new Map(
+			items.map((item) => [`${item.anilistId}:${item.mediaType}`, item]),
+		).values(),
+	].toSorted(
+		(left, right) =>
+			left.anilistId - right.anilistId ||
+			left.mediaType.localeCompare(right.mediaType),
+	);
 	return useQuery<SeerrRequestTarget[], ExtensionError>({
-		queryKey: queryKeys.seerrTargets(normalizedIds),
-		queryFn: () => getAni2arrApi().getSeerrTargets(normalizedIds),
-		enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
+		queryKey: queryKeys.seerrTargets(normalizedItems),
+		queryFn: () => getAni2arrApi().getSeerrTargets(normalizedItems),
+		enabled: (options?.enabled ?? true) && normalizedItems.length > 0,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
@@ -114,19 +121,24 @@ export const useSeerrTargets = (
 };
 
 export const useSeerrTarget = (
-	input: GetSeerrTargetInput | AniListId,
+	input: GetSeerrTargetInput | null,
 	options?: { enabled?: boolean },
 ) => {
-	const request = normalizeSeerrTargetRequest(input);
-	const forceRetry = typeof input !== "number" && input.forceRetry === true;
+	const request = input === null ? null : normalizeSeerrTargetRequest(input);
+	const forceRetry = input?.forceRetry === true;
 	return useQuery<SeerrRequestTarget | null, ExtensionError>({
-		queryKey: queryKeys.seerrTarget(request),
-		queryFn: () =>
-			getAni2arrApi().getSeerrTarget({
+		queryKey:
+			request === null
+				? [...queryKeys.seerrTargetsRoot(), "single", null]
+				: queryKeys.seerrTarget(request),
+		queryFn: async () => {
+			if (request === null) throw new Error("Seerr target input is required.");
+			return getAni2arrApi().getSeerrTarget({
 				...request,
 				...(forceRetry ? { forceRetry: true } : {}),
-			}),
-		enabled: options?.enabled ?? true,
+			});
+		},
+		enabled: (options?.enabled ?? true) && request !== null,
 		staleTime: forceRetry ? 0 : 10 * 60 * 1000,
 		...(forceRetry ? { refetchOnMount: "always" as const } : {}),
 		gcTime: 60 * 60 * 1000,
@@ -215,7 +227,11 @@ export const useSetManualSeerrTarget = () => {
 export const useClearManualSeerrTarget = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<{ ok: true }, ExtensionError, SourceRpcInput>({
+	return useMutation<
+		{ ok: true },
+		ExtensionError,
+		ClearManualSeerrTargetInput
+	>({
 		mutationFn: (input) => getAni2arrApi().clearManualSeerrTarget(input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });

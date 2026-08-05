@@ -385,7 +385,14 @@ export function SeerrRequestView(props: {
 					requestLabel={requestLabel}
 					onClose={onClose}
 					onChangeTarget={onChangeTarget}
-					onClearManualTarget={() => clearManualTarget.mutate(targetInput)}
+					onClearManualTarget={() => {
+						if (target) {
+							clearManualTarget.mutate({
+								...targetInput,
+								mediaType: target.mediaType,
+							});
+						}
+					}}
 					onRequest={handleRequest}
 				/>
 			}

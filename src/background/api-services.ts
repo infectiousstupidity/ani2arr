@@ -1,19 +1,17 @@
 /** Background-owned singleton services used by the Ani2arr RPC implementation. */
 // src/background/api-services.ts
 
-import { anilistMediaCache, AniListMediaService } from "@/anilist/media.service";
-import { AniListMetadataStore } from "@/anilist/metadata.store";
-import { clearAutoResults } from "@/mapping/auto.store";
-import { clearManualFacts } from "@/mapping/manual.store";
 import {
-	clearSeerrAutoResults,
+	anilistMediaCache,
+	AniListMediaService,
+} from "@/anilist/media.service";
+import { AniListMetadataStore } from "@/anilist/metadata.store";
+import {
+	clearAutoResults,
 	getSeerrAutoResult,
 	setSeerrAutoResult,
-} from "@/mapping/seerr-auto.store";
-import {
-	clearManualSeerrTargets,
-	getEffectiveSeerrTarget,
-} from "@/mapping/seerr-target.store";
+} from "@/mapping/auto.store";
+import { clearManualFacts } from "@/mapping/manual.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
 import { createSeerrAutoResolver } from "@/mapping/resolve/seerr-auto-resolver";
@@ -43,10 +41,7 @@ import {
 } from "@/settings/provider-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
-import {
-	logError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
 import {
 	bumpMappingsRevision,
 	bumpProviderLibraryRevision,
@@ -142,11 +137,13 @@ export const mappingService = new MappingService(async (...args) => {
 });
 
 export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
-	getEffectiveTarget: getEffectiveSeerrTarget,
+	getEffectiveTarget: ({ identity, mediaType }) =>
+		mappingService.getSeerrTarget(identity, mediaType),
 	getAutoResult: getSeerrAutoResult,
 	setAutoResult: async (...args) => {
-		await setSeerrAutoResult(...args);
-		await bumpMappingsRevision();
+		const stored = await setSeerrAutoResult(...args);
+		if (stored) await bumpMappingsRevision();
+		return stored;
 	},
 	loadAniListMedia: (anilistId) =>
 		anilistMediaService.fetchMediaWithRelations(anilistId),
@@ -253,12 +250,7 @@ export const resetExtensionState = async (): Promise<void> => {
 	const previousOptions = await getExtensionOptionsSnapshot();
 
 	await clearManualFacts();
-	await clearManualSeerrTargets();
-	await Promise.all([
-		clearAutoResults("sonarr"),
-		clearAutoResults("radarr"),
-		clearSeerrAutoResults(),
-	]);
+	await clearAutoResults();
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);

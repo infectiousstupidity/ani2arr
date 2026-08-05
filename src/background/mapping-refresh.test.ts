@@ -5,9 +5,14 @@ import { refreshMappingPipeline } from "./mapping-refresh";
 
 const refreshUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
+const consolidateMappingAliasesMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/upstream.store", () => ({
 	refreshUpstreamMappings: refreshUpstreamMappingsMock,
+}));
+
+vi.mock("@/mapping/migrate", () => ({
+	consolidateMappingAliases: consolidateMappingAliasesMock,
 }));
 
 vi.mock("@/rpc/revision-signals", () => ({
@@ -18,6 +23,7 @@ describe("refreshMappingPipeline", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		bumpMappingsRevisionMock.mockResolvedValue("revision");
+		consolidateMappingAliasesMock.mockImplementation(async () => {});
 	});
 
 	it("bumps the mapping revision after mapping facts change", async () => {

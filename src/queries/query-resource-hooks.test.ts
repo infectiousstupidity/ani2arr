@@ -112,6 +112,7 @@ describe("normalized query resource hooks", () => {
 	it("reuses the normal Seerr target key and forces retry execution", async () => {
 		const base = {
 			source: { source: "anilist", id: aid(1) },
+			mediaType: "tv" as const,
 			title: "\tFrieren\t",
 			metadata: { titles: { english: " Frieren " }, coverImage: "cover" },
 		} as const;

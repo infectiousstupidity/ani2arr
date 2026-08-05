@@ -22,13 +22,11 @@ import {
 } from "@/features/media-overlay/seerr-card-overlay";
 import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
 import type { SourceIdentity } from "@/mapping/source-identity";
+import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import type { Provider } from "@/providers/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { MappingIdentity } from "@/rpc/types";
-import type {
-	BrowseCardPrimaryStatus,
-	PublicOptions,
-} from "@/settings/types";
+import type { BrowseCardPrimaryStatus, PublicOptions } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { resolveBrowseCardProvider } from "./browse-card-provider";
@@ -241,6 +239,7 @@ function openSeerrModal(input: {
 	});
 }
 
+// eslint-disable-next-line complexity -- Provider selection stays easier to follow in one component.
 export function BrowseCardOverlay({
 	parsed,
 	adapter,
@@ -270,12 +269,9 @@ export function BrowseCardOverlay({
 
 	if (activeArr === "none" && !seerrEnabled) return null;
 
-	const arrConfigured =
-		activeArr === "sonarr"
-			? sonarrOpts.isConfigured
-			: (activeArr === "radarr"
-				? radarrOpts.isConfigured
-				: false);
+	let arrConfigured = false;
+	if (activeArr === "sonarr") arrConfigured = sonarrOpts.isConfigured;
+	else if (activeArr === "radarr") arrConfigured = radarrOpts.isConfigured;
 
 	const effectivePrimaryStatus = getEffectivePrimaryStatus({
 		preferred: getPrimaryStatus(publicOptions),
@@ -294,6 +290,9 @@ export function BrowseCardOverlay({
 		parsedFormat: parsed.format,
 		metadata,
 	});
+	const seerrMediaType = seerrMediaTypeFromAniListFormat(
+		parsed.format ?? metadata?.format ?? null,
+	);
 
 	const openArrModal = (
 		provider: Provider,
@@ -350,6 +349,7 @@ export function BrowseCardOverlay({
 			{...(anilistId === undefined ? {} : { anilistId })}
 			title={displayTitle}
 			metadata={metadata}
+			mediaType={seerrMediaType}
 			isConfigured={seerrOpts.isConfigured}
 			observeTarget={parsed.mountTarget}
 			tooltipContainer={tooltipContainer}
@@ -386,6 +386,7 @@ export function BrowseCardOverlay({
 				{...(anilistId === undefined ? {} : { anilistId })}
 				title={displayTitle}
 				metadata={metadata}
+				mediaType={seerrMediaType}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}
 				badgeVisibility={seerrOpts.visibility}

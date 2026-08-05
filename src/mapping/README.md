@@ -1,105 +1,82 @@
 # Mapping architecture
 
-Upstream facts keep the page's `SourceIdentity`. Durable manual and automatic
-results use the linked AniList identity when one exists, or the page identity
-when it does not. Released numeric AniList keys remain readable and are
-rewritten as `anilist:<id>` by a later mutation.
+Mapping persists external IDs once per durable source identity and derives
+provider targets on read. It owns mapping facts and effective mapping results;
+provider library state and RPC presentation remain outside this folder.
 
-Mapping owns facts and effective AniList-to-provider mapping results. It does
-not own provider library state or RPC presentation DTOs.
+## Persistent layers
 
-## Stored facts
+Only three stores own external-ID facts:
 
-- `manual.store.ts` stores user mappings, ignores, and rejected automatic
-  candidates by durable storage identity. Rejected IDs are facts attached to
-  the manual record.
-- `upstream.store.ts` stores source-native AniBridge targets plus source
-  crosswalks and refresh metadata. It does not persist Sonarr, Radarr, or Seerr
-  projections.
-- `auto.store.ts` stores expiring automatic results by durable storage identity,
-  using keys such as `anilist:209939` or `mal:63816`. Expired reads return no
-  result and do not mutate storage.
-- `seerr-target.store.ts` stores user-owned manual Seerr overrides separately
-  from downloaded AniBridge data.
+- `manual.store.ts` stores user-confirmed facts and Arr-only ignore/rejected
+  candidate decisions.
+- `upstream.store.ts` stores normalized AniBridge facts, source links, conflict
+  and scope evidence, plus refresh metadata.
+- `auto.store.ts` stores expiring resolver facts, per-slot metadata, and
+  independent negative-attempt lanes.
 
-AniBridge targets preserve source identity, target kind, external ID, and
-optional season scope:
+Each store uses a versioned `{ version: 1, records }` envelope. Records contain
+the shared `tmdbMovie`, `tmdbShow`, and `tvdbShow` slots. The slots are
+independent: learning or clearing one does not change another.
 
-```ts
-type AniBridgeTarget =
-	| { kind: "tmdb-movie"; id: TmdbId }
-	| { kind: "tmdb-show"; id: TmdbId; season?: number }
-	| { kind: "tvdb-show"; id: TvdbId; season?: number };
-```
-
-## Effective Arr mappings
-
-`MappingResult` is the single effective Sonarr/Radarr result. Precedence is:
+Effective facts use this precedence:
 
 ```text
-manual ignore or mapping
-single provider identity from AniBridge
-multiple provider identities from AniBridge -> ambiguous
-automatic result when no upstream target exists
-unmapped
+manual > upstream > automatic
 ```
 
-Manual mappings may match and therefore be reported as upstream, but user intent
-still wins. Automatic results never resolve upstream ambiguity. Sonarr targets
-are grouped by TVDB ID. A single scoped season stays scoped; multiple seasons
-for one TVDB ID widen to one unscoped series target. Different TVDB IDs remain
-ambiguous.
+An upstream conflict occupies its slot and blocks automatic fallback. Manual
+Sonarr and Radarr decisions affect only their Arr projection; they do not own or
+delete unrelated shared slots.
 
-AniBridge projections are derived on read:
+## Provider projections
 
-```text
-tmdb-movie -> Radarr
-tvdb-show -> Sonarr
-tmdb-show -> no direct Arr target
-```
+Sonarr projects `tvdbShow`, Radarr projects `tmdbMovie`, and Seerr selects a
+slot from an explicit media type: movies use `tmdbMovie`, while TV requires
+`tmdbShow`. Callers must not guess between coexisting movie and show facts.
 
-## Automatic resolution
+TVDB/TMDB show pairs are compatibility evidence, not another independent
+mapping. A Seerr TV result may retain a TVDB ID as pair evidence without making
+that ID Sonarr truth. Pair and season-scope evidence is used only when it
+matches the selected show fact.
 
-`MappingService` resolves the AniBridge crosswalk and direct targets once per
-request. It passes the resolver four independent facts:
+Automatic slot facts and conflicts have their own expiry. Negative attempts
+are kept in resolver-specific lanes, so a failed Seerr movie lookup cannot
+suppress Seerr TV or Sonarr resolution. Reads ignore expired state without
+writing or deleting it.
 
-```text
-source identity
-optional AniList ID
-page title metadata
-rejected provider IDs
-```
+## Source identity and aliases
 
-The resolver searches page titles first, then linked AniList metadata when that
-capability exists, then known prequel relations. It never branches on the
-content site's name or reconstructs an AniList ID from the source key. Mapped
-and unmapped results use one write path under the durable storage identity.
+Upstream records remain source-native. Direct MAL facts or conflicts are
+checked before falling back through that record's `linkedAniListId` to the
+canonical AniList record.
 
-## Effective Seerr targets
+Manual and automatic writes use the linked AniList identity when known and the
+page identity otherwise. Explicit migration and post-refresh consolidation
+merge linked MAL aliases into one `anilist:<id>` record:
 
-Seerr targets are derived from AniList-source AniBridge external IDs. TV targets
-require one unambiguous TMDB show ID; a unique TVDB ID and scoped seasons are
-retained when available. TVDB-only facts are treated as missing so automatic
-TMDB resolution can run. A manual Seerr target overrides the derived target for
-the same durable storage identity.
+- canonical manual values win; missing facts, compatible scope/pair evidence,
+  and decisions fill from aliases in stable source-key order;
+- automatic alias facts consolidate only when candidates agree; a conflicting
+  slot is dropped so its resolver can retry;
+- unlinked direct-source facts stay under their source key.
 
-## Library boundary
+Reads are pure and retain alias fallback until consolidation succeeds.
 
-Mapping-list collection reads canonical AniList records and returns one flat
-effective record list per provider. The RPC presentation boundary separately
-attaches MAL crosswalk aliases to those records:
+## Released-data migration
 
-```ts
-type EffectiveMappingRecord = {
-	anilistId: AniListId;
-	provider: Provider;
-	result: MappingResult;
-};
-```
+Store readers decode the bounded released v1/v2 shapes only while the versioned
+envelope is absent. Startup begins an idempotent, non-blocking replacement after
+RPC registration. Mutations perform the same upgrade in their store's write
+queue, then write only the shared shape. Superseded keys are removed only after
+the replacement write succeeds.
 
-Provider library snapshots remain provider-owned. The mapping RPC handler builds
-small TVDB/TMDB lookup maps and directly composes final `MappingListGroup[]`
-responses with route metadata and library presence. There is no intermediate
-mapping-list or provider library-status model.
+Legacy duplicate ownership is deterministic: Sonarr supplies independent
+TVDB facts, Radarr supplies independent movie TMDB facts, and Seerr supplies
+show TMDB facts, request scope, and TVDB/TMDB pair evidence. A legacy Seerr
+movie fills a missing Radarr slot but never overwrites it. V1 mirrors choose the
+newest local/sync record, with ignore taking precedence over an override.
 
-Library state must not enter stored mapping facts or `MappingResult`.
+Reset clears the three shared stores and all supported legacy keys. Task 06
+adds generation protection for reset versus in-flight automatic writes; this
+cut-over deliberately does not add an activation barrier or coordinator.

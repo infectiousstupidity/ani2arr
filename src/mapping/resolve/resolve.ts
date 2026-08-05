@@ -10,7 +10,7 @@ import {
 } from "@/anilist/types";
 import type { MyAnimeListId } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
-import { setAutoResult } from "../auto.store";
+import { setAutoResult, type AutomaticWriteToken } from "../auto.store";
 import { type SourceIdentity, storageIdentity } from "../source-identity";
 import {
 	type ProviderCandidateSearch,
@@ -20,6 +20,7 @@ import { searchPrequelChain } from "./prequel-chain";
 import type { SearchMedia, TitleMatch } from "./title-matching";
 
 export type AutomaticResolver = (request: {
+	writeToken: AutomaticWriteToken;
 	provider: Provider;
 	identity: SourceIdentity;
 	anilistId: AniListId | null;
@@ -98,7 +99,8 @@ export function createAutomaticResolver(dependencies: {
 	searchProviderCandidates: ProviderCandidateSearch;
 }): AutomaticResolver {
 	return async function resolveAutomaticMapping(request): Promise<boolean> {
-		const { provider, identity, anilistId, rejectedProviderIds } = request;
+		const { writeToken, provider, identity, anilistId, rejectedProviderIds } =
+			request;
 		const searchedTitleKeys = new Set<string>();
 
 		const search = (candidateMedia: SearchMedia) =>
@@ -173,7 +175,7 @@ export function createAutomaticResolver(dependencies: {
 			}
 		}
 
-		const result: Parameters<typeof setAutoResult>[2] = match
+		const result: Parameters<typeof setAutoResult>[3] = match
 			? {
 					kind: "mapped",
 					providerId: match.providerId,
@@ -181,12 +183,11 @@ export function createAutomaticResolver(dependencies: {
 				}
 			: { kind: "unmapped" };
 
-		await setAutoResult(
+		return setAutoResult(
+			writeToken,
 			provider,
 			storageIdentity(identity, anilistId ?? undefined),
 			result,
 		);
-
-		return true;
 	};
 }

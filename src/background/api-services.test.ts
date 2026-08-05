@@ -2,19 +2,20 @@
 // src/background/api-services.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parseAniListId } from "@/anilist/types";
+import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import { createDefaultExtensionOptions } from "@/settings/schema";
 import {
 	anilistMetadataStore,
 	clearPersistentCaches,
 	radarrLibrary,
+	mappingService,
 	resetExtensionState,
 	sonarrLibrary,
 } from "./api-services";
 
 const clearAutoResultsMock = vi.hoisted(() => vi.fn());
 const clearManualFactsMock = vi.hoisted(() => vi.fn());
-const clearManualSeerrTargetsMock = vi.hoisted(() => vi.fn());
-const clearSeerrAutoResultsMock = vi.hoisted(() => vi.fn());
 const clearUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 const clearAllTtlCachesMock = vi.hoisted(() => vi.fn());
 const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn());
@@ -22,6 +23,10 @@ const resetAllSettingsSnapshotMock = vi.hoisted(() => vi.fn());
 const resetAllRevisionsMock = vi.hoisted(() => vi.fn());
 const clearLocalCacheMock = vi.hoisted(() => vi.fn());
 const removeSeerrCsrfCookiePermissionMock = vi.hoisted(() => vi.fn());
+const setSeerrAutoResultMock = vi.hoisted(() => vi.fn());
+const automaticResolverMock = vi.hoisted(() => vi.fn());
+const seerrSetterAdapterMock = vi.hoisted(() => vi.fn());
+const arrResolverAdapterMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/anilist/metadata.store", () => ({
 	AniListMetadataStore: vi.fn(function AniListMetadataStore() {
@@ -32,22 +37,43 @@ vi.mock("@/anilist/metadata.store", () => ({
 }));
 
 vi.mock("@/mapping/auto.store", () => ({
+	captureAutomaticWriteToken: vi.fn(() => 0),
 	clearAutoResults: clearAutoResultsMock,
+	getSeerrAutoResult: vi.fn(),
+	setSeerrAutoResult: setSeerrAutoResultMock,
+}));
+
+vi.mock("@/mapping/resolve/resolve", () => ({
+	createAutomaticResolver: vi.fn(() => automaticResolverMock),
+}));
+
+vi.mock("@/mapping/resolve/seerr-auto-resolver", () => ({
+	createSeerrAutoResolver: vi.fn((dependencies) => {
+		seerrSetterAdapterMock.mockImplementation(dependencies.setAutoResult);
+		return vi.fn();
+	}),
 }));
 
 vi.mock("@/mapping/manual.store", () => ({
 	clearManualFacts: clearManualFactsMock,
 }));
 
-vi.mock("@/mapping/seerr-auto.store", () => ({
-	clearSeerrAutoResults: clearSeerrAutoResultsMock,
-	getSeerrAutoResult: vi.fn(),
-	setSeerrAutoResult: vi.fn(),
-}));
-
-vi.mock("@/mapping/seerr-target.store", () => ({
-	clearManualSeerrTargets: clearManualSeerrTargetsMock,
-	getEffectiveSeerrTarget: vi.fn(),
+vi.mock("@/mapping/mapping.service", () => ({
+	MappingService: vi.fn(function MappingService(resolveAutomaticMapping) {
+		arrResolverAdapterMock.mockImplementation(resolveAutomaticMapping);
+		return {
+			getSeerrTarget: vi.fn(),
+			resolveMapping: vi.fn((provider, identity) =>
+				arrResolverAdapterMock({
+					writeToken: 0,
+					provider,
+					identity,
+					anilistId: identity.source === "anilist" ? identity.id : null,
+					rejectedProviderIds: [],
+				}),
+			),
+		};
+	}),
 }));
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -88,8 +114,6 @@ describe("api services", () => {
 
 		clearAutoResultsMock.mockImplementation(async () => {});
 		clearManualFactsMock.mockImplementation(async () => {});
-		clearManualSeerrTargetsMock.mockImplementation(async () => {});
-		clearSeerrAutoResultsMock.mockImplementation(async () => {});
 		clearUpstreamMappingsMock.mockImplementation(async () => {});
 		clearAllTtlCachesMock.mockImplementation(async () => {});
 		getExtensionOptionsSnapshotMock.mockResolvedValue(
@@ -99,11 +123,44 @@ describe("api services", () => {
 		resetAllRevisionsMock.mockImplementation(async () => {});
 		clearLocalCacheMock.mockImplementation(async () => {});
 		removeSeerrCsrfCookiePermissionMock.mockImplementation(async () => {});
+		setSeerrAutoResultMock.mockResolvedValue(true);
+		automaticResolverMock.mockResolvedValue(true);
 		vi.spyOn(sonarrLibrary, "clearSeriesSnapshotCache").mockResolvedValue();
 		vi.spyOn(sonarrLibrary, "refreshSeriesSnapshots").mockResolvedValue([]);
 		vi.spyOn(radarrLibrary, "clearMovieSnapshotCache").mockResolvedValue();
 		vi.spyOn(radarrLibrary, "refreshMovieSnapshots").mockResolvedValue([]);
 	});
+
+	it.each([false, true])(
+		"bumps the Arr mapping revision only when stored is %s",
+		async (stored) => {
+			automaticResolverMock.mockResolvedValue(stored);
+
+			await mappingService.resolveMapping(
+				"radarr",
+				{ source: "anilist", id: parseAniListId(1) },
+				{ title: "Perfect Blue" },
+			);
+
+			expect(bumpMappingsRevision).toHaveBeenCalledTimes(stored ? 1 : 0);
+		},
+	);
+
+	it.each([false, true])(
+		"bumps the Seerr mapping revision only when stored is %s",
+		async (stored) => {
+			setSeerrAutoResultMock.mockResolvedValue(stored);
+
+			await seerrSetterAdapterMock(
+				0,
+				{ source: "anilist", id: parseAniListId(2) },
+				"movie",
+				{ kind: "unmapped" },
+			);
+
+			expect(bumpMappingsRevision).toHaveBeenCalledTimes(stored ? 1 : 0);
+		},
+	);
 
 	it("preserves auto mappings when clearing persistent caches", async () => {
 		await clearPersistentCaches();
@@ -122,11 +179,8 @@ describe("api services", () => {
 		await resetExtensionState();
 
 		expect(clearManualFactsMock).toHaveBeenCalledTimes(1);
-		expect(clearManualSeerrTargetsMock).toHaveBeenCalledTimes(1);
-		expect(clearAutoResultsMock).toHaveBeenCalledTimes(2);
-		expect(clearAutoResultsMock).toHaveBeenCalledWith("sonarr");
-		expect(clearAutoResultsMock).toHaveBeenCalledWith("radarr");
-		expect(clearSeerrAutoResultsMock).toHaveBeenCalledOnce();
+		expect(clearAutoResultsMock).toHaveBeenCalledOnce();
+		expect(clearAutoResultsMock).toHaveBeenCalledWith();
 		expect(sonarrLibrary.clearSeriesSnapshotCache).toHaveBeenCalledTimes(1);
 		expect(radarrLibrary.clearMovieSnapshotCache).toHaveBeenCalledTimes(1);
 		expect(resetAllSettingsSnapshotMock).toHaveBeenCalledTimes(1);

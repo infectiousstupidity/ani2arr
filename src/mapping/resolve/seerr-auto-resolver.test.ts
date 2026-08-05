@@ -3,7 +3,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type AniListMediaFormat, parseAniListId } from "@/anilist/types";
-import type { SeerrAutoResult } from "@/mapping/seerr-auto.store";
+import {
+	clearAutoResults,
+	getSeerrAutoResult,
+	setSeerrAutoResult,
+	type SeerrAutoResult,
+} from "@/mapping/auto.store";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { createSeerrAutoResolver } from "./seerr-auto-resolver";
 
@@ -59,13 +64,23 @@ function request(
 		format: AniListMediaFormat;
 		startYear?: number;
 	},
+	mediaType: "movie" | "tv" = metadata?.format === "MOVIE" ? "movie" : "tv",
 ) {
 	return {
 		source,
+		mediaType,
 		...(title === undefined ? {} : { title }),
 		...(metadata === undefined ? {} : { metadata }),
 	};
 }
+
+const createDeferred = <T>() => {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	const promise = new Promise<T>((complete) => {
+		resolve = complete;
+	});
+	return { promise, resolve };
+};
 
 function requireMappedResult(
 	result: SeerrAutoResult | null,
@@ -102,8 +117,14 @@ describe("Seerr automatic resolver", () => {
 		getEffectiveTarget.mockResolvedValue(null);
 		getAutoResult.mockImplementation(async () => cached);
 		setAutoResult.mockImplementation(
-			async (_source: unknown, result: SeerrAutoResult) => {
+			async (
+				_token: unknown,
+				_source: unknown,
+				_mediaType: unknown,
+				result: SeerrAutoResult,
+			) => {
 				cached = result;
+				return true;
 			},
 		);
 		loadAniListMedia.mockRejectedValue(new Error("not needed"));
@@ -135,6 +156,73 @@ describe("Seerr automatic resolver", () => {
 			matchedTitle: "Perfect Blue",
 		});
 		expect(getTvDetails).not.toHaveBeenCalled();
+	});
+
+	it("returns null when a mapped automatic write is rejected", async () => {
+		searchMedia.mockResolvedValue([movie()]);
+		setAutoResult.mockResolvedValue(false);
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toBeNull();
+	});
+
+	it("captures before effective-target reads and rejects a stale real-store write", async () => {
+		await clearAutoResults();
+		const effectiveRead = createDeferred<null>();
+		const realResolve = createSeerrAutoResolver({
+			getEffectiveTarget: () => effectiveRead.promise,
+			getAutoResult: getSeerrAutoResult,
+			setAutoResult: setSeerrAutoResult,
+			loadAniListMedia,
+			loadMyAnimeListMetadata,
+			searchMedia,
+			getTvDetails,
+		});
+		searchMedia.mockResolvedValue([movie()]);
+		const pending = realResolve(
+			request("Perfect Blue", {
+				format: "MOVIE",
+				startYear: 1998,
+			}),
+		);
+
+		await clearAutoResults();
+		effectiveRead.resolve(null);
+
+		await expect(pending).resolves.toBeNull();
+		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
+	});
+
+	it("rejects a Seerr provider result completed after a full clear", async () => {
+		await clearAutoResults();
+		const providerResult = createDeferred<ReturnType<typeof movie>[]>();
+		const realResolve = createSeerrAutoResolver({
+			getEffectiveTarget: vi.fn().mockResolvedValue(null),
+			getAutoResult: getSeerrAutoResult,
+			setAutoResult: setSeerrAutoResult,
+			loadAniListMedia,
+			loadMyAnimeListMetadata,
+			searchMedia: () => providerResult.promise,
+			getTvDetails,
+		});
+		const pending = realResolve(
+			request("Perfect Blue", {
+				format: "MOVIE",
+				startYear: 1998,
+			}),
+		);
+
+		await clearAutoResults();
+		providerResult.resolve([movie()]);
+
+		await expect(pending).resolves.toBeNull();
+		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
 	});
 
 	it("fetches TV details and stores the TVDB ID", async () => {
@@ -297,13 +385,15 @@ describe("Seerr automatic resolver", () => {
 		});
 		searchMedia.mockResolvedValue([movie()]);
 
-		await expect(resolve(request())).resolves.toBeNull();
+		await expect(
+			resolve(request(undefined, undefined, "movie")),
+		).resolves.toBeNull();
 		expect(loadAniListMedia).not.toHaveBeenCalled();
 		expect(searchMedia).not.toHaveBeenCalled();
 
 		await expect(
 			resolve({
-				...request(),
+				...request(undefined, undefined, "movie"),
 				forceRetry: true,
 			}),
 		).resolves.toMatchObject({
