@@ -1,10 +1,10 @@
+import { parseAnimeFormat } from "@/shared/types/anime-format";
 /** AniList GraphQL client with rate-limit handling and defensive response mapping. */
 // src/anilist/client.ts
 
 import {
 	AniListError,
 	isAniListId,
-	parseAniListMediaFormat,
 	type AniListId,
 	type AniListMedia,
 	type AniListMetadata,
@@ -98,9 +98,9 @@ const normalizeRelationNode = (
 
 	return {
 		id: raw.id,
-		...(parseAniListMediaFormat(raw.format) === null
+		...(parseAnimeFormat(raw.format) === null
 			? {}
-			: { format: parseAniListMediaFormat(raw.format) }),
+			: { format: parseAnimeFormat(raw.format) }),
 		...(Object.keys(title).length > 0 ? { title } : {}),
 		...(startDate ? { startDate } : {}),
 		...(synonyms.length > 0 ? { synonyms } : {}),
@@ -153,7 +153,7 @@ const mapMedia = (value: unknown): AniListMedia => {
 
 	return {
 		id: raw.id,
-		format: parseAniListMediaFormat(raw.format),
+		format: parseAnimeFormat(raw.format),
 		title: normalizeTitles(raw.title),
 		...(startDate ? { startDate } : {}),
 		synonyms: normalizeSynonyms(raw.synonyms),
@@ -263,7 +263,7 @@ function parseMetadataEntry(
 		id: raw.id,
 		titles: normalizeTitles(raw.titles),
 		seasonYear: numberOrNull(raw.seasonYear),
-		format: parseAniListMediaFormat(raw.format),
+		format: parseAnimeFormat(raw.format),
 		coverImage: normalizeMetadataCover(raw.coverImage),
 	};
 }

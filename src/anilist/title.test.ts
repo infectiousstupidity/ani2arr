@@ -1,8 +1,12 @@
+import {
+	parseAnimeFormat,
+	parseAnimeFormatLabel,
+} from "@/shared/types/anime-format";
 /** Focused tests for AniList title and format helpers. */
 // src/anilist/title.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListMediaFormatLabel } from "@/anilist/types";
+
 import { resolveTitlePreference } from "./title";
 
 describe("AniList title helpers", () => {
@@ -18,10 +22,12 @@ describe("AniList title helpers", () => {
 		);
 	});
 
-	it("parses risky browse format labels", () => {
-		expect(parseAniListMediaFormatLabel("TV Show")).toBe("TV");
-		expect(parseAniListMediaFormatLabel("TV Short")).toBe("TV_SHORT");
-		expect(parseAniListMediaFormatLabel("Movies")).toBe("MOVIE");
-		expect(parseAniListMediaFormatLabel("OVA / ONA / SPECIAL")).toBe("SPECIAL");
+	it("normalizes supported anime formats and source labels", () => {
+		expect(parseAnimeFormat(" movie ")).toBe("MOVIE");
+		expect(parseAnimeFormat("MANGA")).toBeNull();
+		expect(parseAnimeFormatLabel("TV Show")).toBe("TV");
+		expect(parseAnimeFormatLabel("TV Short")).toBe("TV_SHORT");
+		expect(parseAnimeFormatLabel("Movies")).toBe("MOVIE");
+		expect(parseAnimeFormatLabel("OVA / ONA / SPECIAL")).toBe("SPECIAL");
 	});
 });

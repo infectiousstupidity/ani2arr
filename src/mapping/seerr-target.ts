@@ -6,7 +6,7 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers/schemas";
-import type { AniListMediaFormat } from "@/anilist/types";
+
 import {
 	type ExternalIdLayers,
 	type ExternalIdSource,
@@ -22,7 +22,7 @@ export type SeerrTarget =
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
 			seasons?: number[];
-		  };
+	  };
 
 export type SeerrTargetWithEvidence =
 	| Extract<SeerrTarget, { mediaType: "movie" }>
@@ -38,23 +38,7 @@ export type SeerrTargetProjection =
 			kind: "target";
 			source: ExternalIdSource;
 			target: SeerrTargetWithEvidence;
-		  };
-
-const SEERR_TV_FORMATS = new Set<AniListMediaFormat>([
-	"TV",
-	"TV_SHORT",
-	"SPECIAL",
-	"OVA",
-	"ONA",
-	"MUSIC",
-]);
-
-export function seerrMediaTypeFromAniListFormat(
-	format: AniListMediaFormat | null | undefined,
-): "movie" | "tv" | null {
-	if (format === "MOVIE") return "movie";
-	return format && SEERR_TV_FORMATS.has(format) ? "tv" : null;
-}
+	  };
 
 export function projectSeerrTarget(
 	layers: ExternalIdLayers,
@@ -80,9 +64,7 @@ export function projectSeerrTarget(
 		: projectSeerrTv(layers, selected);
 }
 
-export function normalizeSeerrTarget(
-	target: SeerrTarget,
-): SeerrTarget | null {
+export function normalizeSeerrTarget(target: SeerrTarget): SeerrTarget | null {
 	const tmdbId = parseTmdbIdOrNull(target.tmdbId);
 	if (tmdbId === null) return null;
 	if (target.mediaType === "movie") return { mediaType: "movie", tmdbId };
@@ -134,9 +116,7 @@ function projectSeerrTv(
 		target: {
 			mediaType: "tv",
 			tmdbId,
-			...(evidence.tvdbShow === undefined
-				? {}
-				: { tvdbId: evidence.tvdbShow }),
+			...(evidence.tvdbShow === undefined ? {} : { tvdbId: evidence.tvdbShow }),
 			...(evidence.tmdbSeasons === undefined
 				? {}
 				: { tmdbSeasons: evidence.tmdbSeasons }),

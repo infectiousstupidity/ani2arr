@@ -1,7 +1,10 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Browse card and adapter contracts owned by content-surface overlays. */
 // src/content/browse/types.ts
 
-import type { AniListId, AniListMediaFormat } from '@/anilist/types';
+import type {
+	AniListId,
+} from '@/anilist/types';
 import type { SourceIdentity } from '@/mapping/source-identity';
 
 export const BROWSE_OVERLAY_CONTAINER_CLASS = 'a2a-overlay-container';
@@ -15,7 +18,7 @@ export interface HostMediaTarget {
   source: SourceIdentity;
   anilistId?: AniListId;
   title: string;
-  format: AniListMediaFormat | null;
+  format: AnimeFormat | null;
   mountTarget: HTMLElement;
   presentation?: 'status-column' | 'action-row';
 }

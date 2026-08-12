@@ -1,7 +1,10 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Lists flat effective mapping records and discovers active AniList identities. */
 // src/mapping/list-mappings.ts
 
-import type { AniListId, AniListMediaFormat } from "@/anilist/types";
+import type {
+	AniListId,
+} from "@/anilist/types";
 import { PROVIDERS, type Provider } from "@/providers/types";
 import {
 	collectEffectiveMappingRecords,
@@ -24,7 +27,7 @@ export interface ActiveMappingIdentity {
 interface EffectiveMappingListDeps {
 	loadFormatByAniListId?: (
 		ids: readonly AniListId[],
-	) => Promise<ReadonlyMap<AniListId, AniListMediaFormat | null | undefined>>;
+	) => Promise<ReadonlyMap<AniListId, AnimeFormat | null | undefined>>;
 }
 
 export async function listEffectiveMappingRecordsByProvider(

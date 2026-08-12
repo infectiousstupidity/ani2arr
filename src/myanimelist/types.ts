@@ -1,9 +1,9 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** MyAnimeList domain identifiers and strict parser helpers. */
 // src/myanimelist/types.ts
 
 import type { Brand } from "@/shared/types/brand";
 import type {
-	AniListMediaFormat,
 	AniListMediaHint,
 	AniListTitles,
 } from "@/anilist/types";
@@ -31,7 +31,7 @@ export interface MyAnimeListMetadata {
 	id: MyAnimeListId;
 	titles: AniListTitles;
 	synonyms: string[];
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	year: number | null;
 	episodes: number | null;
 	status: string | null;

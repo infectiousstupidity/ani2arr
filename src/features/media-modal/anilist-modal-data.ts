@@ -1,3 +1,4 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Pure AniList metadata, title, and header derivation for media modal data hooks. */
 // src/features/media-modal/anilist-modal-data.ts
 
@@ -9,7 +10,6 @@ import {
 import type {
 	AniListId,
 	AniListMedia,
-	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
@@ -49,7 +49,7 @@ export function getMediaFormat(input: {
 	canonicalMetadata: AniListMediaHint | null;
 	anilistMedia: AniListMedia | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
-}): AniListMediaFormat | null {
+}): AnimeFormat | null {
 	return (
 		input.canonicalMetadata?.format ??
 		input.anilistMedia?.format ??
@@ -283,7 +283,7 @@ function buildAniListHeaderData(input: {
 	anilistMedia: AniListMedia | null | undefined;
 	myAnimeListMetadata: MyAnimeListMetadata | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	coverImageHint?: string | null;
 }): AniListHeaderData {
 	return {

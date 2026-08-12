@@ -21,14 +21,13 @@ import {
 } from "@/features/media-overlay/seerr-card-overlay";
 import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
 import type { SourceIdentity } from "@/mapping/source-identity";
-import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import type { Provider } from "@/providers/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { MappingIdentity } from "@/rpc/types";
 import type { BrowseCardPrimaryStatus, PublicOptions } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import { resolveBrowseCardProvider } from "./browse-card-provider";
+import { resolveBrowseCardRoute } from "./browse-card-provider";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
 
 type MetadataHint = ReturnType<typeof metadataHintFromAniListMetadata>;
@@ -105,6 +104,23 @@ function getActiveArrProvider(
 	if (provider === "sonarr" && sonarrEnabled) return "sonarr";
 	if (provider === "radarr" && radarrEnabled) return "radarr";
 	return "none";
+}
+
+function getBrowseRouteState(input: {
+	provider: Provider | null;
+	seerrMediaType: "movie" | "tv" | null;
+	sonarrEnabled: boolean;
+	radarrEnabled: boolean;
+	seerrEnabled: boolean;
+}) {
+	return {
+		activeArr: getActiveArrProvider(
+			input.provider,
+			input.sonarrEnabled,
+			input.radarrEnabled,
+		),
+		seerrEnabled: input.seerrEnabled && input.seerrMediaType !== null,
+	};
 }
 
 function getSonarrOverlayOptions(publicOptions: PublicOptions | undefined) {
@@ -219,11 +235,13 @@ function openProviderModal(input: {
 function openSeerrModal(input: {
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	source: SourceIdentity;
+	mediaType: "movie" | "tv";
 	metadataHint: MediaModalMetadataHint;
 }): void {
 	input.onOpenMediaModal({
 		source: input.source,
 		kind: "seerr",
+		mediaType: input.mediaType,
 		openSource: "content",
 		metadataHint: input.metadataHint,
 	});
@@ -238,22 +256,25 @@ export function BrowseCardOverlay({
 	onOpenMediaModal,
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
-	const rawProvider = resolveBrowseCardProvider({
+	const route = resolveBrowseCardRoute({
 		parsed,
 		metadata,
 		mappedIdentities,
 	});
+	const rawProvider = route?.provider ?? null;
 
 	const sonarrOpts = getSonarrOverlayOptions(publicOptions);
 	const radarrOpts = getRadarrOverlayOptions(publicOptions);
 	const seerrOpts = getSeerrOverlayOptions(publicOptions);
 
-	const activeArr = getActiveArrProvider(
-		rawProvider,
-		sonarrOpts.enabled,
-		radarrOpts.enabled,
-	);
-	const seerrEnabled = seerrOpts.enabled;
+	const seerrMediaType = route?.seerrMediaType ?? null;
+	const { activeArr, seerrEnabled } = getBrowseRouteState({
+		provider: rawProvider,
+		seerrMediaType,
+		sonarrEnabled: sonarrOpts.enabled,
+		radarrEnabled: radarrOpts.enabled,
+		seerrEnabled: seerrOpts.enabled,
+	});
 
 	if (activeArr === "none" && !seerrEnabled) return null;
 
@@ -278,10 +299,6 @@ export function BrowseCardOverlay({
 		parsedFormat: parsed.format,
 		metadata,
 	});
-	const seerrMediaType = seerrMediaTypeFromAniListFormat(
-		parsed.format ?? metadata?.format ?? null,
-	);
-
 	const openArrModal = (
 		provider: Provider,
 		initialView: "setup" | "mapping",
@@ -296,9 +313,11 @@ export function BrowseCardOverlay({
 	};
 
 	const handleOpenSeerrModal = (): void => {
+		if (seerrMediaType === null) return;
 		openSeerrModal({
 			onOpenMediaModal,
 			source: parsed.source,
+			mediaType: seerrMediaType,
 			metadataHint,
 		});
 	};

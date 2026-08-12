@@ -3,22 +3,20 @@
 
 import { Search } from "lucide-react";
 import type { SubmitEvent } from "react";
-import type { SeerrSearchResult } from "@/providers/seerr/types";
+import type {
+	SeerrMediaType,
+	SeerrSearchResult,
+} from "@/providers/seerr/types";
 import type { SeerrRequestTarget } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
 import { MappingCandidateRow } from "../mapping/mapping-search-results";
-import type { AniListHeaderData } from "../types";
-import {
-	filterSeerrSearchResults,
-	getExpectedSeerrMediaType,
-	getTmdbPosterUrl,
-} from "./seerr-selection";
+import { filterSeerrSearchResults, getTmdbPosterUrl } from "./seerr-selection";
 
 export function SeerrChangeTargetMainPane(props: {
 	contentContainer: HTMLDivElement | null;
 	defaultQuery: string;
 	currentTarget: SeerrRequestTarget | null;
-	format: AniListHeaderData["format"];
+	mediaType: SeerrMediaType;
 	isConfigured: boolean;
 	selectedResult: SeerrSearchResult | null;
 	searchQuery: string;
@@ -33,7 +31,7 @@ export function SeerrChangeTargetMainPane(props: {
 		contentContainer,
 		defaultQuery,
 		currentTarget,
-		format,
+		mediaType,
 		isConfigured,
 		selectedResult,
 		searchQuery,
@@ -44,13 +42,9 @@ export function SeerrChangeTargetMainPane(props: {
 		searchError,
 		onSelectResult,
 	} = props;
-	const expectedMediaType = getExpectedSeerrMediaType({
-		currentTargetMediaType: currentTarget?.mediaType,
-		format,
-	});
 	const visibleResults = filterSeerrSearchResults({
 		results: searchResults,
-		expectedMediaType,
+		expectedMediaType: currentTarget?.mediaType ?? mediaType,
 	});
 	const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
 		event.preventDefault();

@@ -11,6 +11,7 @@ import {
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type {
 	SeerrMediaDetails,
+	SeerrMediaType,
 	SeerrSearchResult,
 } from "@/providers/seerr/types";
 import {
@@ -26,7 +27,7 @@ import type {
 } from "@/rpc/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ModalShell } from "../chrome/modal-shell";
-import type { AniListHeaderData, MediaModalContainer } from "../types";
+import type { MediaModalContainer } from "../types";
 import { SeerrChangeTargetInfoPane } from "./seerr-change-target-info-pane";
 import { SeerrChangeTargetMainPane } from "./seerr-change-target-main-pane";
 import { SeerrFooter } from "./seerr-footer";
@@ -96,7 +97,7 @@ export function SeerrChangeTargetView(props: {
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	defaultQuery: string;
-	format: AniListHeaderData["format"];
+	mediaType: SeerrMediaType;
 	header: ReactNode;
 	isConfigured: boolean;
 	onBackToRequest: () => void;
@@ -110,7 +111,7 @@ export function SeerrChangeTargetView(props: {
 		container,
 		contentContainer,
 		defaultQuery,
-		format,
+		mediaType,
 		header,
 		isConfigured,
 		onBackToRequest,
@@ -218,7 +219,7 @@ export function SeerrChangeTargetView(props: {
 				<SeerrChangeTargetMainPane
 					defaultQuery={defaultQuery}
 					currentTarget={target}
-					format={format}
+					mediaType={mediaType}
 					isConfigured={isConfigured}
 					selectedResult={selectedResult}
 					searchQuery={searchQuery}

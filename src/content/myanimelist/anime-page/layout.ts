@@ -1,10 +1,10 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
+import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** DOM readers and layout helpers for MyAnimeList anime detail pages. */
 // src/content/myanimelist/anime-page/layout.ts
 
 import {
-	type AniListMediaFormat,
 	type AniListMediaHint,
-	parseAniListMediaFormatLabel,
 } from "@/anilist/types";
 
 export const TITLE_SELECTOR = "h1.title-name";
@@ -43,7 +43,7 @@ export function readLabeledFacts(
 
 export function readAnimePageData(doc: Document = document): {
 	title: string | null;
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	metadata: AniListMediaHint;
 } {
 	const facts = readLabeledFacts(doc);
@@ -61,7 +61,7 @@ export function readAnimePageData(doc: Document = document): {
 				.filter(Boolean),
 		),
 	];
-	const format = parseAniListMediaFormatLabel(facts.get("type"));
+	const format = parseAnimeFormatLabel(facts.get("type"));
 
 	return {
 		title,

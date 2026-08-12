@@ -7,7 +7,6 @@ import type {
 import {
 	filterSeerrSearchResults,
 	getDefaultSelectedSeasons,
-	getExpectedSeerrMediaType,
 	getRequestableSeasonNumbers,
 	getTmdbPosterUrl,
 	summarizeSeerrSeasonAvailability,
@@ -74,21 +73,6 @@ describe("Seerr search filtering helpers", () => {
 		{ mediaType: "movie", tmdbId: parseTmdbId(1), title: "Movie" },
 		{ mediaType: "tv", tmdbId: parseTmdbId(2), title: "Show" },
 	];
-
-	it("uses expected type from current target before AniList format", () => {
-		expect(
-			getExpectedSeerrMediaType({
-				currentTargetMediaType: "tv",
-				format: "MOVIE",
-			}),
-		).toBe("tv");
-	});
-
-	it("maps AniList formats to Seerr media types", () => {
-		expect(getExpectedSeerrMediaType({ format: "MOVIE" })).toBe("movie");
-		expect(getExpectedSeerrMediaType({ format: "OVA" })).toBe("tv");
-		expect(getExpectedSeerrMediaType({ format: "MANGA" })).toBeNull();
-	});
 
 	it("falls back to all search results when expected type has no results", () => {
 		expect(

@@ -1,7 +1,8 @@
+import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** MyAnimeList browse surface adapter for seasonal, ranking, and search cards. */
 // src/content/myanimelist/browse/adapter.ts
 
-import { parseAniListMediaFormatLabel } from "@/anilist/types";
+
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import type { MyAnimeListId } from "@/myanimelist/types";
 import {
@@ -76,7 +77,7 @@ function parseFormat(card: Element) {
 			card.querySelector<HTMLElement>(".information")?.textContent,
 	);
 	const normalized = raw?.replace(/\s*\(.*/, "");
-	return parseAniListMediaFormatLabel(normalized || raw);
+	return parseAnimeFormatLabel(normalized || raw);
 }
 
 function parseSeasonalFormat(card: Element) {
@@ -84,7 +85,7 @@ function parseSeasonalFormat(card: Element) {
 		card.parentElement?.querySelector<HTMLElement>(".anime-header")
 			?.textContent,
 	);
-	return parseAniListMediaFormatLabel(raw?.replace(/\s*\(.*/, "") ?? raw);
+	return parseAnimeFormatLabel(raw?.replace(/\s*\(.*/, "") ?? raw);
 }
 
 function parseFromLinks(input: {
@@ -192,7 +193,7 @@ function parseAnimeSearchFormat(titleCell: HTMLTableCellElement) {
 	const typeCell = nextCell?.classList.contains(ANIME_SEARCH_ACTION_CELL_CLASS)
 		? nextCell.nextElementSibling
 		: nextCell;
-	return parseAniListMediaFormatLabel(cleanText(typeCell?.textContent));
+	return parseAnimeFormatLabel(cleanText(typeCell?.textContent));
 }
 
 function parseAnimeSearchRow(card: Element): HostMediaTarget | null {

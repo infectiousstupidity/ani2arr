@@ -1,9 +1,12 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Focused behavior tests for source-native Seerr automatic resolution. */
 // src/mapping/resolve/seerr-auto-resolver.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
-import { type AniListMediaFormat, parseAniListId } from "@/anilist/types";
+import {
+	parseAniListId,
+} from "@/anilist/types";
 import {
 	captureAutomaticWriteToken,
 	clearAutoResults,
@@ -64,7 +67,7 @@ function tvDetails(input: {
 function request(
 	title?: string,
 	metadata?: {
-		format: AniListMediaFormat;
+		format: AnimeFormat;
 		startYear?: number;
 	},
 	mediaType: "movie" | "tv" = metadata?.format === "MOVIE" ? "movie" : "tv",

@@ -1,7 +1,6 @@
 /** Pure Seerr modal helpers for season selection and search filtering. */
 // src/features/media-modal/seerr/seerr-selection.ts
 
-import type { AniListMediaFormat } from "@/anilist/types";
 import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import type {
 	SeerrMediaType,
@@ -233,30 +232,6 @@ export function getTmdbPosterUrl(
 	if (!posterPath?.startsWith("/")) return null;
 
 	return `https://image.tmdb.org/t/p/w342${posterPath}`;
-}
-
-export function getExpectedSeerrMediaType(input: {
-	currentTargetMediaType?: SeerrMediaType | undefined;
-	format?: AniListMediaFormat | null | undefined;
-}): SeerrMediaType | null {
-	if (input.currentTargetMediaType) return input.currentTargetMediaType;
-
-	switch (input.format) {
-		case "MOVIE": {
-			return "movie";
-		}
-		case "TV":
-		case "TV_SHORT":
-		case "SPECIAL":
-		case "OVA":
-		case "ONA":
-		case "MUSIC": {
-			return "tv";
-		}
-		default: {
-			return null;
-		}
-	}
 }
 
 export function filterSeerrSearchResults(input: {

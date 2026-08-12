@@ -1,3 +1,4 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** RPC handlers for mapping decisions, mapping listings, and detail reads. */
 // src/rpc/handlers/mapping.handlers.ts
 
@@ -8,7 +9,9 @@ import {
 	sonarrLibrary,
 } from "@/background/api-services";
 import { getProviderConfig } from "@/background/provider-config";
-import type { AniListId, AniListMediaFormat } from "@/anilist/types";
+import type {
+	AniListId,
+} from "@/anilist/types";
 import {
 	getMappingIdentities,
 	listEffectiveMappingRecordsByProvider,
@@ -75,9 +78,9 @@ async function loadRadarrLibrary(): Promise<RadarrMovieSnapshot[]> {
 
 async function loadFormatByAniListId(
 	ids: readonly AniListId[],
-): Promise<ReadonlyMap<AniListId, AniListMediaFormat | null>> {
+): Promise<ReadonlyMap<AniListId, AnimeFormat | null>> {
 	const result = await anilistMetadataStore.getMetadata([...ids]);
-	const formatByAniListId = new Map<AniListId, AniListMediaFormat | null>();
+	const formatByAniListId = new Map<AniListId, AnimeFormat | null>();
 
 	for (const metadata of result.metadata) {
 		formatByAniListId.set(metadata.id, metadata.format ?? null);

@@ -1,9 +1,9 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Plain payload and response types used by RPC and adjacent provider flows. */
 // src/rpc/types.ts
 
 import type {
 	AniListId,
-	AniListMediaFormat,
 	AniListMediaHint,
 	AniListMetadata,
 } from "@/anilist/types";
@@ -322,7 +322,7 @@ export type GetMappingIdentitiesOutput = MappingIdentity[];
 export interface MappingDetailsLinkedAniListEntry {
 	anilistId: AniListId;
 	title?: string;
-	format?: AniListMediaFormat | null;
+	format?: AnimeFormat | null;
 	year?: number | null;
 	coverImage?: string | null;
 	relation?: "current";

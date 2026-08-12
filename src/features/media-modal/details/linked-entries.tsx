@@ -1,10 +1,10 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Renders other AniList entries linked to the selected provider target in the modal. */
 // src/features/media-modal/details/linked-entries.tsx
 
 import { ExternalLink } from "lucide-react";
 import type {
 	AniListId,
-	AniListMediaFormat,
 	AniListMetadata,
 } from "@/anilist/types";
 import { buildAniListAnimeUrl, resolveTitlePreference } from "@/anilist/title";
@@ -27,7 +27,7 @@ interface MappingLinkedEntriesProps {
 type LinkedEntryRow = {
 	anilistId: AniListId;
 	title: string;
-	format?: AniListMediaFormat | null;
+	format?: AnimeFormat | null;
 	year?: number | null;
 	posterUrl?: string | null;
 };

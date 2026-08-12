@@ -13,7 +13,7 @@ import type { MappingIdentity } from "@/rpc/types";
 import { createDefaultPublicOptions } from "@/settings/schema";
 import type { PublicOptions } from "@/settings/types";
 import { BrowseCardOverlay } from "./browse-card-overlay";
-import { resolveBrowseCardProvider } from "./browse-card-provider";
+import { resolveBrowseCardRoute } from "./browse-card-provider";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
 
 const mountTarget = {} as HTMLElement;
@@ -35,22 +35,26 @@ function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
 	};
 }
 
-function createOverlay(parsed: HostMediaTarget, publicOptions?: PublicOptions) {
+function createOverlay(
+	parsed: HostMediaTarget,
+	publicOptions?: PublicOptions,
+	mappedIdentities: readonly MappingIdentity[] = [],
+) {
 	return BrowseCardOverlay({
 		parsed,
 		adapter,
 		publicOptions,
-		mappedIdentities: [],
+		mappedIdentities,
 		metadata: null,
 		onOpenMediaModal: () => {},
 		tooltipContainer: null,
 	});
 }
 
-describe("resolveBrowseCardProvider", () => {
+describe("resolveBrowseCardRoute", () => {
 	it("uses metadata format when host card format is unknown", () => {
 		expect(
-			resolveBrowseCardProvider({
+			resolveBrowseCardRoute({
 				parsed: createTarget(null),
 				metadata: {
 					titles: null,
@@ -62,7 +66,7 @@ describe("resolveBrowseCardProvider", () => {
 				},
 				mappedIdentities: [],
 			}),
-		).toBe("sonarr");
+		).toEqual({ provider: "sonarr", seerrMediaType: "tv" });
 	});
 
 	it("uses mapped identity when both host and metadata formats are unknown", () => {
@@ -83,12 +87,12 @@ describe("resolveBrowseCardProvider", () => {
 		];
 
 		expect(
-			resolveBrowseCardProvider({
+			resolveBrowseCardRoute({
 				parsed: createTarget(null),
 				metadata: null,
 				mappedIdentities,
 			}),
-		).toBe("sonarr");
+		).toEqual({ provider: "sonarr", seerrMediaType: "tv" });
 	});
 });
 
@@ -157,6 +161,64 @@ describe("BrowseCardOverlay", () => {
 			});
 		},
 	);
+
+	it("reuses a mapping override for the Arr and Seerr route", () => {
+		const parsed = createTarget("TV");
+		const mappedIdentities: MappingIdentity[] = [
+			{
+				source: parsed.source,
+				anilistId: parsed.anilistId as ReturnType<typeof parseAniListId>,
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "manual",
+					providerId: 123,
+				},
+			},
+		];
+
+		const overlay = createOverlay(parsed, undefined, mappedIdentities);
+
+		expect(overlay).toMatchObject({
+			type: RadarrCardOverlay,
+			props: {
+				extraAction: {
+					type: SeerrCardStackActions,
+					props: { mediaType: "movie" },
+				},
+			},
+		});
+	});
+
+	it("ignores music even when it has an existing mapping", () => {
+		const parsed = createTarget("MUSIC");
+		const mappedIdentities: MappingIdentity[] = [
+			{
+				source: parsed.source,
+				anilistId: parsed.anilistId as ReturnType<typeof parseAniListId>,
+				provider: "sonarr",
+				result: {
+					kind: "mapped",
+					source: "manual",
+					providerId: 123,
+				},
+			},
+		];
+
+		expect(createOverlay(parsed, undefined, mappedIdentities)).toBeNull();
+	});
+
+	it("keeps Seerr visible when the routed Arr provider is hidden", () => {
+		const publicOptions = createDefaultPublicOptions();
+		publicOptions.ui.browseCards.sonarr.enabled = false;
+
+		const overlay = createOverlay(createTarget("TV"), publicOptions);
+
+		expect(overlay).toMatchObject({
+			type: SeerrStandaloneCardOverlay,
+			props: { mediaType: "tv" },
+		});
+	});
 
 	it.each(["status-column", "action-row"] as const)(
 		"keeps Arr before Seerr for %s targets",

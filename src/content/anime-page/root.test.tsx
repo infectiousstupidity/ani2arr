@@ -202,12 +202,7 @@ describe("ContentRoot", () => {
 
 		renderTarget(target);
 
-		expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
-			expect.objectContaining({
-				mediaType: null,
-				statusBlocked: true,
-			}),
-		);
+		expect(useSeerrMediaAction).not.toHaveBeenCalled();
 
 		renderTarget(target);
 

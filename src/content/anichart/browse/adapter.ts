@@ -1,9 +1,9 @@
+import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** AniChart browse surface adapter for card parsing and portal placement. */
 // src/content/anichart/browse/adapter.ts
 
 import {
-  parseAniListIdOrNull,
-  parseAniListMediaFormatLabel,
+	parseAniListIdOrNull,
 } from '@/anilist/types';
 import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
@@ -29,7 +29,7 @@ const getSectionHeading = (card: Element): string =>
   );
 
 const shouldSkipCard = (card: Element): boolean => {
-  return parseAniListMediaFormatLabel(getSectionHeading(card)) === 'MUSIC';
+  return parseAnimeFormatLabel(getSectionHeading(card)) === 'MUSIC';
 };
 
 const parseAniChartCard = (card: Element): HostMediaTarget | null => {
@@ -57,7 +57,7 @@ const parseAniChartCard = (card: Element): HostMediaTarget | null => {
     source: { source: 'anilist', id: anilistId },
     anilistId,
     title,
-    format: parseAniListMediaFormatLabel(heading),
+    format: parseAnimeFormatLabel(heading),
     mountTarget: cover,
   };
 };

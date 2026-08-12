@@ -1,7 +1,8 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Media modal public and shared prop types. */
 // src/features/media-modal/types.ts
 
-import type { AniListId, AniListMediaFormat } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
@@ -11,7 +12,7 @@ export type MediaModalOpenSource = "content" | "options-page";
 
 export type MediaModalMetadataHint = {
 	title?: string;
-	format?: AniListMediaFormat | null;
+	format?: AnimeFormat | null;
 	coverImage?: string | null;
 };
 
@@ -19,7 +20,7 @@ export type AniListHeaderData = {
 	title: string;
 	bannerImage: string | null;
 	coverImage: string | null;
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	year: number | null;
 };
 
@@ -49,10 +50,10 @@ type MediaModalStateBase = {
 };
 
 type ProviderMediaModalStateBase = MediaModalStateBase & {
-		kind: "provider";
-		provider: Provider;
-		initialView?: MediaModalView;
-	};
+	kind: "provider";
+	provider: Provider;
+	initialView?: MediaModalView;
+};
 
 export type SonarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "sonarr";
@@ -64,6 +65,7 @@ export type RadarrMediaModalState = ProviderMediaModalStateBase & {
 
 export type SeerrMediaModalState = MediaModalStateBase & {
 	kind: "seerr";
+	mediaType: "movie" | "tv";
 };
 
 export type MediaModalState =

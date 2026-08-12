@@ -1,7 +1,9 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
+import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** DOM and layout helpers for the AniList anime-page surface. */
 // src/content/anilist/anime-page/layout.ts
 
-import { parseAniListMediaFormatLabel, type AniListMediaFormat } from '@/anilist/types';
+
 
 export const ACTIONS_SELECTOR = '.header .cover-wrap .actions, .cover-wrap .actions';
 export const LIST_ROW_SELECTOR = '.actions .list';
@@ -172,11 +174,11 @@ export function attachSizeSync(host: HTMLElement): () => void {
   };
 }
 
-export function readFormatFromSidebar(doc: Document = document): AniListMediaFormat | null {
+export function readFormatFromSidebar(doc: Document = document): AnimeFormat | null {
   const rows = [...doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set')];
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
-  return parseAniListMediaFormatLabel(raw);
+  return parseAnimeFormatLabel(raw);
 }
 
 export function readTitleFromHeader(doc: Document = document): string | null {

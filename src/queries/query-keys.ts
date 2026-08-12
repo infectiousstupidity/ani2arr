@@ -1,9 +1,9 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Shared React Query cache keys and pure input normalizers. */
 // src/queries/query-keys.ts
 
 import {
 	type AniListId,
-	type AniListMediaFormat,
 	type AniListTitles,
 	isAniListId,
 } from "@/anilist/types";
@@ -48,7 +48,7 @@ type NormalizedResolverMetadata = {
 	};
 	synonyms?: string[];
 	startYear?: number;
-	format?: AniListMediaFormat;
+	format?: AnimeFormat;
 	relationPrequelIds?: AniListId[];
 };
 

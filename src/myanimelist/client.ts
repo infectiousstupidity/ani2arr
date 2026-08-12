@@ -1,8 +1,8 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
+import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** Jikan anime client and defensive response normalization. */
 
 import {
-	parseAniListMediaFormatLabel,
-	type AniListMediaFormat,
 	type AniListTitles,
 } from "@/anilist/types";
 import {
@@ -51,13 +51,13 @@ const normalizeSynonyms = (value: unknown): string[] =>
 			]
 		: [];
 
-const normalizeFormat = (value: unknown): AniListMediaFormat | null => {
+const normalizeFormat = (value: unknown): AnimeFormat | null => {
 	const label = stringOrNull(value);
 	if (!label) return null;
 
 	const normalized = label.toLowerCase();
 	if (["cm", "pv", "tv special"].includes(normalized)) return "SPECIAL";
-	return parseAniListMediaFormatLabel(label);
+	return parseAnimeFormatLabel(label);
 };
 
 const yearFromAiredStart = (value: unknown): number | null => {

@@ -2,7 +2,7 @@
 // src/features/media-modal/seerr/seerr-modal.tsx
 
 import { useState } from "react";
-import type { AniListMediaFormat } from "@/anilist/types";
+
 import type {
 	SeerrMediaDetails,
 	SeerrSearchResult,
@@ -13,7 +13,6 @@ import {
 	useSeerrTarget,
 } from "@/queries/seerr";
 import type { GetSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
-import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -65,13 +64,6 @@ function addSeerrMediaType(
 	return mediaType === null ? null : { ...input, mediaType };
 }
 
-function getSeerrMediaType(
-	headerFormat: AniListMediaFormat | null | undefined,
-	metadataFormat: AniListMediaFormat | null | undefined,
-): "movie" | "tv" | null {
-	return seerrMediaTypeFromAniListFormat(headerFormat ?? metadataFormat);
-}
-
 export function SeerrModal({
 	state,
 	onClose,
@@ -88,16 +80,13 @@ export function SeerrModal({
 		metadataHint: metadataHint ?? null,
 	});
 	const isConfigured = base.options?.seerr.isConfigured === true;
-	const mediaType = getSeerrMediaType(
-		base.anilistHeaderData.format,
-		base.resolvedMetadata?.format,
-	);
+	const { mediaType } = state;
 	const targetQuery = useSeerrTarget(
 		addSeerrMediaType(
-				{
-					source,
-					title: base.providerRequestTitle,
-					metadata: base.resolvedMetadata,
+			{
+				source,
+				title: base.providerRequestTitle,
+				metadata: base.resolvedMetadata,
 			},
 			mediaType,
 		),
@@ -131,12 +120,12 @@ export function SeerrModal({
 
 	if (view === "change-target") {
 		return (
-				<SeerrChangeTargetView
-					source={source}
+			<SeerrChangeTargetView
+				source={source}
 				container={container}
 				contentContainer={contentContainer}
 				defaultQuery={base.providerRequestTitle}
-				format={base.anilistHeaderData.format}
+				mediaType={target?.mediaType ?? mediaType}
 				header={header}
 				isConfigured={isConfigured}
 				onBackToRequest={() => setView("request")}

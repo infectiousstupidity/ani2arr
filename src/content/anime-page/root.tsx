@@ -3,20 +3,16 @@
 
 import { useState, type ReactElement } from "react";
 import { metadataHintFromAniListMetadata } from "@/anilist/title";
-import type {
-	AniListId,
-	AniListMediaFormat,
-	AniListMediaHint,
-} from "@/anilist/types";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import {
-	resolveAniListTargetProvider,
-	resolveProviderForAniListFormat,
+	resolveAnimeTargetRoute,
+	resolveRouteForAnimeFormat,
+	type AnimeTargetRoute,
 } from "@/content/target-provider";
 import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "@/mapping/source-identity";
-import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { MappingIdentity } from "@/rpc/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
@@ -34,6 +30,7 @@ import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
+import type { AnimeFormat } from "@/shared/types/anime-format";
 import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
 import { useTheme } from "@/shared/hooks/use-theme";
 import MediaActions from "@/content/anime-page/media-actions";
@@ -41,7 +38,7 @@ import MediaActions from "@/content/anime-page/media-actions";
 export interface AnimePageTarget {
 	source: SourceIdentity;
 	anilistId?: AniListId | undefined;
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	title: string | null;
 	metadata?: AniListMediaHint | null | undefined;
 }
@@ -117,7 +114,7 @@ function getMetadataTitle(metadata: AniListMediaHint | null): string | null {
 
 function getModalMetadataHint(input: {
 	title: string;
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	metadata: AniListMediaHint | null;
 }): MediaModalMetadataHint {
 	return {
@@ -172,8 +169,9 @@ function shouldShowProviderAction(
 
 function shouldShowSeerrAction(input: {
 	optionState: AnimePageOptionsState;
+	mediaType: SeerrMediaType | null;
 }): boolean {
-	return input.optionState.seerrEnabled;
+	return input.optionState.seerrEnabled && input.mediaType !== null;
 }
 
 function getResolvedAniListId(
@@ -188,20 +186,39 @@ function toAniListIdBatch(anilistId: AniListId | undefined): AniListId[] {
 	return anilistId === undefined ? [] : [anilistId];
 }
 
-function getTargetProvider(input: {
+function getTargetRoute(input: {
 	anilistId: AniListId | undefined;
-	format: AniListMediaFormat | null;
+	format: AnimeFormat | null;
 	mappedIdentities: readonly MappingIdentity[];
-}): Provider | null {
+}): AnimeTargetRoute | null {
 	if (input.anilistId === undefined) {
-		return resolveProviderForAniListFormat(input.format);
+		return resolveRouteForAnimeFormat(input.format);
 	}
 
-	return resolveAniListTargetProvider({
+	return resolveAnimeTargetRoute({
 		anilistId: input.anilistId,
 		format: input.format,
 		mappedIdentities: input.mappedIdentities,
 	});
+}
+
+function getTargetActionState(input: {
+	route: AnimeTargetRoute | null;
+	options: PublicOptions | undefined;
+	optionState: AnimePageOptionsState;
+}) {
+	const provider = input.route?.provider ?? null;
+	const seerrMediaType = input.route?.seerrMediaType ?? null;
+
+	return {
+		provider,
+		seerrMediaType,
+		showProviderAction: shouldShowProviderAction(provider, input.options),
+		showSeerrAction: shouldShowSeerrAction({
+			optionState: input.optionState,
+			mediaType: seerrMediaType,
+		}),
+	};
 }
 
 function getFallbackTitle(source: SourceIdentity): string {
@@ -344,8 +361,8 @@ function AnimePageActionStack({
 	return (
 		<div className={`flex w-full flex-col ${compact ? "gap-1.5" : "gap-2"}`}>
 			{showProviderAction && provider === "sonarr" ? (
-					<SonarrAnimePageActions
-						compact={compact}
+				<SonarrAnimePageActions
+					compact={compact}
 					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
@@ -359,8 +376,8 @@ function AnimePageActionStack({
 				/>
 			) : null}
 			{showProviderAction && provider === "radarr" ? (
-					<RadarrAnimePageActions
-						compact={compact}
+				<RadarrAnimePageActions
+					compact={compact}
 					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
@@ -374,8 +391,8 @@ function AnimePageActionStack({
 				/>
 			) : null}
 			{showSeerrAction ? (
-					<SeerrAnimePageAction
-						source={source}
+				<SeerrAnimePageAction
+					source={source}
 					title={providerTitle}
 					metadata={metadata}
 					mediaType={seerrMediaType}
@@ -421,18 +438,13 @@ export function ContentRoot({
 	const providerTitle = trimToNull(target.title);
 	const displayTitle =
 		getMetadataTitle(metadata) ?? providerTitle ?? getFallbackTitle(source);
-	const provider = getTargetProvider({
+	const route = getTargetRoute({
 		anilistId,
-		format: target.format,
+		format: target.format ?? canonicalMetadata?.format ?? null,
 		mappedIdentities: mappingIdentities.data ?? [],
 	});
-	const seerrMediaType = seerrMediaTypeFromAniListFormat(
-		target.format ?? canonicalMetadata?.format ?? null,
-	);
-	const showProviderAction = shouldShowProviderAction(provider, options);
-	const showSeerrAction = shouldShowSeerrAction({
-		optionState,
-	});
+	const { provider, seerrMediaType, showProviderAction, showSeerrAction } =
+		getTargetActionState({ route, options, optionState });
 
 	if (!showProviderAction && !showSeerrAction) {
 		return null;
@@ -476,9 +488,11 @@ export function ContentRoot({
 	const openSetup = () => openModal("setup");
 	const openMapping = () => openModal("mapping");
 	const openSeerrModal = () => {
+		if (seerrMediaType === null) return;
 		mediaModal.open({
 			source,
 			kind: "seerr",
+			mediaType: seerrMediaType,
 			openSource: "content",
 			metadataHint,
 		});
@@ -490,8 +504,8 @@ export function ContentRoot({
 				<AnimePageActionStack
 					compact={compactActions}
 					showProviderAction={showProviderAction}
-						provider={provider}
-						source={source}
+					provider={provider}
+					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
 					metadata={metadata}
