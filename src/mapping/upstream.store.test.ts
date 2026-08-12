@@ -12,12 +12,9 @@ import {
 	clearUpstreamMappings,
 	getSourceAliasesByAniListId,
 	getSourceSeerrUpstreamMapping,
-	getSourceUpstreamMapping,
+	getSourceUpstreamLayers,
 	getUniqueAniListIdForSource,
 	getUniqueAniListIdsForSources,
-	listAllSeerrUpstreamTargets,
-	listAniListUpstreamMappings,
-	listSeerrUpstreamTargets,
 	refreshUpstreamMappings,
 } from "./upstream.store";
 
@@ -177,10 +174,10 @@ describe("refreshUpstreamMappings", () => {
 		const setSpy = vi.spyOn(browser.storage.local, "set");
 
 		await expect(
-			getSourceUpstreamMapping("sonarr", { source: "mal", id: mal(5114) }),
-		).resolves.toEqual({
+			getSourceUpstreamLayers({ source: "mal", id: mal(5114) }),
+		).resolves.toMatchObject({
 			anilistId: aid(21),
-			targets: [{ provider: "sonarr", providerId: tvdb(81_797) }],
+			canonical: { facts: { tvdbShow: tvdb(81_797) } },
 		});
 		expect(setSpy).not.toHaveBeenCalled();
 		setSpy.mockRestore();
@@ -219,10 +216,10 @@ describe("refreshUpstreamMappings", () => {
 			fetchedAt: expect.any(Number),
 		});
 		await expect(
-			getSourceUpstreamMapping("radarr", anilistSource(1)),
-		).resolves.toEqual({
+			getSourceUpstreamLayers(anilistSource(1)),
+		).resolves.toMatchObject({
 			anilistId: aid(1),
-			targets: [{ provider: "radarr", providerId: tmdb(400) }],
+			canonical: { facts: { tmdbMovie: tmdb(400) } },
 		});
 	});
 
@@ -309,146 +306,16 @@ describe("refreshUpstreamMappings", () => {
 			"AniBridge mappings payload is not valid JSON.",
 		);
 		await expect(
-			getSourceUpstreamMapping("radarr", anilistSource(1)),
-		).resolves.toEqual({
+			getSourceUpstreamLayers(anilistSource(1)),
+		).resolves.toMatchObject({
 			anilistId: aid(1),
-			targets: [{ provider: "radarr", providerId: tmdb(300) }],
+			canonical: { facts: { tmdbMovie: tmdb(300) } },
 		});
-		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
-			{
-				anilistId: aid(1),
-				kind: "target",
-				target: { mediaType: "movie", tmdbId: tmdb(300) },
-			},
-		]);
-	});
-
-	it("normalizes Arr targets by provider ID", async () => {
-		await seedSnapshot({
-			"anilist:21": [
-				{ kind: "tvdb-show", id: tvdb(81_797), season: 0 },
-				{ kind: "tvdb-show", id: tvdb(81_797), season: 1 },
-				{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
-				{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
-			],
-			"anilist:3": [
-				{ kind: "tvdb-show", id: tvdb(100), season: 1 },
-				{ kind: "tvdb-show", id: tvdb(200), season: 2 },
-			],
-			"anilist:4": [
-				{ kind: "tmdb-movie", id: tmdb(300) },
-				{ kind: "tmdb-movie", id: tmdb(400) },
-			],
-		});
-
-		await expect(
-			Promise.all([
-				getSourceUpstreamMapping("sonarr", anilistSource(21)),
-				getSourceUpstreamMapping("sonarr", anilistSource(3)),
-				getSourceUpstreamMapping("radarr", anilistSource(4)),
-			]),
-		).resolves.toEqual([
-			{
-				anilistId: aid(21),
-				targets: [{ provider: "sonarr", providerId: tvdb(81_797) }],
-			},
-			{
-				anilistId: aid(3),
-				targets: [
-					{ provider: "sonarr", providerId: tvdb(100), season: 1 },
-					{ provider: "sonarr", providerId: tvdb(200), season: 2 },
-				],
-			},
-			{
-				anilistId: aid(4),
-				targets: [
-					{ provider: "radarr", providerId: tmdb(300) },
-					{ provider: "radarr", providerId: tmdb(400) },
-				],
-			},
-		]);
-	});
-
-	it("derives a normalized Seerr TV target from canonical entries", async () => {
-		await seedSnapshot({
-			"anilist:20": [
-				{ kind: "tmdb-show", id: tmdb(500) },
-				{ kind: "tmdb-show", id: tmdb(500), season: 2 },
-				{ kind: "tmdb-show", id: tmdb(500), season: 0 },
-				{ kind: "tmdb-show", id: tmdb(500), season: 2 },
-				{ kind: "tvdb-show", id: tvdb(700), season: 1 },
-				{ kind: "tvdb-show", id: tvdb(700), season: 0 },
-			],
-		});
-
-		await expect(listSeerrUpstreamTargets([aid(20)])).resolves.toEqual([
-			{
-				anilistId: aid(20),
-				kind: "target",
-				target: {
-					mediaType: "tv" as const,
-					tmdbId: tmdb(500),
-					seasons: [0, 1, 2],
-					tmdbSeasons: [0, 2],
-					tvdbSeasons: [0, 1],
-					tvdbId: tvdb(700),
-				},
-			},
-		]);
-		await expect(listAllSeerrUpstreamTargets()).resolves.toHaveLength(1);
-	});
-
-	it("reports movie and media-type conflicts", async () => {
-		await seedSnapshot({
-			"anilist:2": [
-				{ kind: "tmdb-movie", id: tmdb(400) },
-				{ kind: "tmdb-movie", id: tmdb(300) },
-			],
-			"anilist:3": [
-				{ kind: "tmdb-movie", id: tmdb(300) },
-				{ kind: "tmdb-show", id: tmdb(500), season: 1 },
-			],
-		});
-
-		await expect(listSeerrUpstreamTargets([aid(2), aid(3)])).resolves.toEqual([
-			{ anilistId: aid(2), kind: "conflict" },
-			{ anilistId: aid(3), kind: "conflict" },
-		]);
-	});
-
-	it("uses unambiguous TVDB identity and lets TVDB-only facts fall back", async () => {
-		await seedSnapshot({
-			"anilist:1": [
-				{ kind: "tmdb-show", id: tmdb(500) },
-				{ kind: "tvdb-show", id: tvdb(700), season: 0 },
-			],
-			"anilist:3": [{ kind: "tvdb-show", id: tvdb(702), season: 1 }],
-		});
-
-		await expect(listSeerrUpstreamTargets([aid(1), aid(3)])).resolves.toEqual([
-			{
-				anilistId: aid(1),
-				kind: "target",
-				target: {
-					mediaType: "tv",
-					tmdbId: tmdb(500),
-					seasons: [0],
-					tvdbSeasons: [0],
-					tvdbId: tvdb(700),
-				},
-			},
-		]);
-		await expect(
-			getSourceSeerrUpstreamMapping(anilistSource(3)),
-		).resolves.toEqual({ anilistId: aid(3), kind: "missing" });
 	});
 
 	it("uses direct MAL targets before provider-specific AniList fallbacks", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 		const lowerAlias = { source: "mal", id: mal(100) } as const;
-		const targets = [
-			{ provider: "sonarr" as const, providerId: tvdb(78_874), season: 1 },
-		];
 		await seedSnapshot(
 			{
 				"anilist:21": [
@@ -465,20 +332,11 @@ describe("refreshUpstreamMappings", () => {
 			},
 		);
 
-		await expect(getSourceUpstreamMapping("sonarr", source)).resolves.toEqual({
+		await expect(getSourceUpstreamLayers(source)).resolves.toMatchObject({
 			anilistId: aid(21),
-			targets,
+			direct: { facts: { tmdbMovie: tmdb(300) } },
+			canonical: { facts: { tvdbShow: tvdb(78_874) } },
 		});
-		await expect(getSourceUpstreamMapping("radarr", source)).resolves.toEqual({
-			anilistId: aid(21),
-			targets: [{ provider: "radarr", providerId: tmdb(300) }],
-		});
-		await expect(listAniListUpstreamMappings()).resolves.toEqual([
-			{
-				anilistId: aid(21),
-				targets,
-			},
-		]);
 		await expect(
 			getUniqueAniListIdForSource({ source: "mal", id: mal(5114) }),
 		).resolves.toBe(aid(21));
@@ -528,16 +386,15 @@ describe("refreshUpstreamMappings", () => {
 			"mal:59571": [{ kind: "tmdb-movie", id: tmdb(1_333_100) }],
 		});
 
-		await expect(getSourceUpstreamMapping("radarr", source)).resolves.toEqual({
+		await expect(getSourceUpstreamLayers(source)).resolves.toMatchObject({
 			anilistId: null,
-			targets: [{ provider: "radarr", providerId: tmdb(1_333_100) }],
+			direct: { facts: { tmdbMovie: tmdb(1_333_100) } },
 		});
 		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
 			anilistId: null,
 			kind: "target",
 			target: { mediaType: "movie", tmdbId: tmdb(1_333_100) },
 		});
-		await expect(listAniListUpstreamMappings()).resolves.toEqual([]);
 	});
 
 	it("resolves a deduplicated alias batch with one pure storage read", async () => {

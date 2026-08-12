@@ -14,10 +14,10 @@ import {
 	type ExternalIdLayer,
 	type ExternalIdLayers,
 } from "./external-id-facts";
+import { listEffectiveMappingsByProvider } from "./list-mappings";
 import {
-	chooseMappingResultFromLayers,
-	collectEffectiveMappingRecords,
-	type MappingFactLayers,
+	selectMappingResult,
+	type MappingSelectionRecords,
 } from "./mapping-facts";
 import {
 	clearIgnored as removeIgnored,
@@ -58,7 +58,7 @@ export class MappingService {
 		linkedAniListId: AniListId | null,
 	): Promise<MappingResult> {
 		const state = await this.getMappingState(provider, source, linkedAniListId);
-		return chooseMappingResultFromLayers(provider, state.layers);
+		return selectMappingResult(provider, state.layers);
 	}
 
 	public async resolveMapping(
@@ -73,7 +73,7 @@ export class MappingService {
 	): Promise<MappingResult> {
 		const writeToken = captureAutomaticWriteToken();
 		const state = await this.getMappingState(provider, source, linkedAniListId);
-		const current = chooseMappingResultFromLayers(provider, state.layers);
+		const current = selectMappingResult(provider, state.layers);
 		if (current.kind === "mapped" || current.kind === "ignored") return current;
 		if (current.kind === "ambiguous") return current;
 		if (current.hadResolveAttempt && options?.forceRetry !== true)
@@ -94,7 +94,7 @@ export class MappingService {
 			source,
 			state.anilistId ?? undefined,
 		);
-		return chooseMappingResultFromLayers(provider, {
+		return selectMappingResult(provider, {
 			...state.layers,
 			automatic,
 		});
@@ -223,12 +223,12 @@ export class MappingService {
 		const upstream = await getSourceUpstreamLayers(source);
 		const manual = await getManualLayerRecord(source, anilistId);
 		if (!manual) return false;
-		const full = chooseMappingResultFromLayers(provider, {
+		const full = selectMappingResult(provider, {
 			manual,
 			upstream: selectArrUpstreamLayer(provider, upstream),
 			automatic: null,
 		});
-		const withoutManual = chooseMappingResultFromLayers(provider, {
+		const withoutManual = selectMappingResult(provider, {
 			manual: null,
 			upstream: selectArrUpstreamLayer(provider, upstream),
 			automatic: null,
@@ -261,7 +261,8 @@ export class MappingService {
 	): Promise<Map<number, AniListId[]>> {
 		const requested = new Set(providerIds);
 		if (requested.size === 0) return new Map();
-		const records = await collectEffectiveMappingRecords(provider);
+		const recordsByProvider = await listEffectiveMappingsByProvider();
+		const records = recordsByProvider[provider];
 		const linked = new Map<number, Set<AniListId>>();
 		for (const record of records) {
 			if (
@@ -286,7 +287,7 @@ export class MappingService {
 		provider: Provider,
 		source: SourceIdentity,
 		linkedAniListId: AniListId | null,
-	): Promise<{ anilistId: AniListId | null; layers: MappingFactLayers }> {
+	): Promise<{ anilistId: AniListId | null; layers: MappingSelectionRecords }> {
 		const upstream = await getSourceUpstreamLayers(source, linkedAniListId);
 		const anilistId = upstream.anilistId ?? undefined;
 		const [manual, automatic] = await Promise.all([
@@ -333,7 +334,7 @@ function selectSeerrUpstreamLayer(
 }
 
 function composeSeerrTarget(
-	layers: MappingFactLayers,
+	layers: MappingSelectionRecords,
 	mediaType: "movie" | "tv",
 	anilistId?: AniListId,
 ): EffectiveSeerrTarget | null {
@@ -352,9 +353,9 @@ function composeSeerrTarget(
 }
 
 async function loadAniListLayers(): Promise<{
-	manual: Map<AniListId, MappingFactLayers["manual"]>;
-	upstream: Map<AniListId, MappingFactLayers["upstream"]>;
-	automatic: Map<AniListId, MappingFactLayers["automatic"]>;
+	manual: Map<AniListId, MappingSelectionRecords["manual"]>;
+	upstream: Map<AniListId, MappingSelectionRecords["upstream"]>;
+	automatic: Map<AniListId, MappingSelectionRecords["automatic"]>;
 }> {
 	const [manual, upstream, automatic] = await Promise.all([
 		listAniListManualLayers(),

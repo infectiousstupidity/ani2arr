@@ -3,11 +3,7 @@
 import type { AniListId } from "@/anilist/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
-import {
-	hasAutomaticAttempt,
-	listAniListAutomaticLayers,
-	type AutomaticRecord,
-} from "./auto.store";
+import { hasAutomaticAttempt } from "./auto.store";
 import {
 	createExternalIdLayer,
 	projectRadarrTarget,
@@ -17,19 +13,10 @@ import {
 	type ExternalIdLayers,
 	type ManualLayerRecord,
 } from "./external-id-facts";
-import {
-	listAniListManualLayers,
-	type ManualFacts,
-	type ManualMapping,
-	type ManualRecord,
-} from "./manual.store";
-import {
-	listAniListUpstreamLayers,
-	type UpstreamMappingFact,
-} from "./upstream.store";
+import type { ManualFacts, ManualMapping } from "./manual.store";
 import type { ArrUpstreamTarget, AutoResult, MappingResult } from "./types";
 
-export type MappingFactLayers = {
+export type MappingSelectionRecords = {
 	manual: ManualLayerRecord | null;
 	upstream: ExternalIdLayer | null;
 	automatic: AutomaticLayerRecord | null;
@@ -41,26 +28,9 @@ export type EffectiveMappingRecord = {
 	result: MappingResult;
 };
 
-type UpstreamTargetSelector = (
-	records: readonly UpstreamFactInput[],
-) =>
-	| Promise<ReadonlyMap<AniListId, readonly ArrUpstreamTarget[]>>
-	| ReadonlyMap<AniListId, readonly ArrUpstreamTarget[]>;
-
-type CollectEffectiveMappingRecordsOptions = {
-	upstreamFacts?: readonly UpstreamFactInput[];
-	selectUpstreamTargets?: UpstreamTargetSelector;
-};
-
-type UpstreamFactInput = Pick<
-	UpstreamMappingFact,
-	"anilistId" | "targets"
-> &
-	Partial<Pick<UpstreamMappingFact, "record">>;
-
-export function chooseMappingResultFromLayers(
+export function selectMappingResult(
 	provider: Provider,
-	layers: MappingFactLayers,
+	layers: MappingSelectionRecords,
 ): MappingResult {
 	const decision = layers.manual?.decisions?.[provider];
 	if (decision?.ignored) return { kind: "ignored" };
@@ -75,46 +45,9 @@ export function chooseMappingResultFromLayers(
 		: chooseRadarrResult(externalLayers, layers, decision?.rejectedTmdbMovie);
 }
 
-export async function collectEffectiveMappingRecords(
+export function hasMappingState(
 	provider: Provider,
-	options: CollectEffectiveMappingRecordsOptions = {},
-): Promise<EffectiveMappingRecord[]> {
-	const [manualRecords, upstreamRecords, automaticRecords] = await Promise.all([
-		listAniListManualLayers(),
-		options.upstreamFacts ?? listAniListUpstreamLayers(),
-		listAniListAutomaticLayers(),
-	]);
-	const manual = recordsByAniListId(manualRecords);
-	const automatic = recordsByAniListId(automaticRecords);
-	const upstream = await upstreamLayersByAniListId(
-		provider,
-		upstreamRecords,
-		options.selectUpstreamTargets,
-	);
-	const ids = new Set([...manual.keys(), ...upstream.keys(), ...automatic.keys()]);
-	return [...ids]
-		.toSorted((left, right) => left - right)
-		.flatMap((anilistId) => {
-		const layers = {
-			manual: manual.get(anilistId) ?? null,
-			upstream: upstream.get(anilistId) ?? null,
-			automatic: automatic.get(anilistId) ?? null,
-		};
-		return hasProviderState(provider, layers)
-			? [
-					{
-						anilistId,
-						provider,
-						result: chooseMappingResultFromLayers(provider, layers),
-					},
-				]
-			: [];
-		});
-}
-
-function hasProviderState(
-	provider: Provider,
-	layers: MappingFactLayers,
+	layers: MappingSelectionRecords,
 ): boolean {
 	if (layers.manual?.decisions?.[provider]) return true;
 	const slot = provider === "sonarr" ? "tvdbShow" : "tmdbMovie";
@@ -140,40 +73,9 @@ function hasProviderState(
 		: projectRadarrTarget({ upstream: layers.upstream }).kind !== "missing";
 }
 
-function recordsByAniListId<TRecord>(
-	records: ReadonlyArray<
-		(ManualRecord | AutomaticRecord) & { record: TRecord }
-	>,
-): Map<AniListId, TRecord> {
-	return new Map(records.map((record) => [record.anilistId, record.record]));
-}
-
-async function upstreamLayersByAniListId(
-	provider: Provider,
-	records: readonly UpstreamFactInput[],
-	selector: UpstreamTargetSelector | undefined,
-): Promise<Map<AniListId, ExternalIdLayer>> {
-	if (!selector) {
-		return new Map(
-			records.flatMap((record) =>
-				record.record
-					? [[record.anilistId, record.record] as const]
-					: [],
-			),
-		);
-	}
-	const selected = await selector(records);
-	return new Map(
-		[...selected].flatMap(([anilistId, targets]) => {
-			const layer = createArrLayer(provider, targets);
-			return hasLayerData(layer) ? [[anilistId, layer] as const] : [];
-		}),
-	);
-}
-
 function chooseSonarrResult(
 	externalLayers: ExternalIdLayers,
-	layers: MappingFactLayers,
+	layers: MappingSelectionRecords,
 	rejectedProviderIds: number[] | undefined,
 ): MappingResult {
 	const projection = projectSonarrTarget(externalLayers);
@@ -207,7 +109,7 @@ function chooseSonarrResult(
 
 function chooseRadarrResult(
 	externalLayers: ExternalIdLayers,
-	layers: MappingFactLayers,
+	layers: MappingSelectionRecords,
 	rejectedProviderIds: number[] | undefined,
 ): MappingResult {
 	const projection = projectRadarrTarget(externalLayers);
@@ -239,22 +141,19 @@ function mappedResult(input: {
 	provider: Provider;
 	source: "manual" | "upstream" | "automatic";
 	providerId: number;
-	layers: MappingFactLayers;
+	layers: MappingSelectionRecords;
 	rejectedProviderIds?: number[];
 	season?: number;
 }): MappingResult {
-	const {
-		provider,
-		source,
-		providerId,
-		layers,
-		rejectedProviderIds,
-		season,
-	} = input;
+	const { provider, source, providerId, layers, rejectedProviderIds, season } =
+		input;
 	if (source === "automatic" && rejectedProviderIds?.includes(providerId)) {
 		return unmapped(true, rejectedProviderIds);
 	}
-	if (source === "manual" && manualMatchesUpstream(provider, providerId, season, layers)) {
+	if (
+		source === "manual" &&
+		manualMatchesUpstream(provider, providerId, season, layers)
+	) {
 		return {
 			kind: "mapped",
 			source: "upstream",
@@ -268,7 +167,8 @@ function mappedResult(input: {
 		source: source === "automatic" ? "auto" : source,
 		providerId,
 		...(season === undefined ? {} : { season }),
-		...(source === "automatic" && layers.automatic?.slotMeta?.[slot]?.matchedTitle
+		...(source === "automatic" &&
+		layers.automatic?.slotMeta?.[slot]?.matchedTitle
 			? { matchedTitle: layers.automatic.slotMeta[slot].matchedTitle }
 			: {}),
 	};
@@ -278,7 +178,7 @@ function manualMatchesUpstream(
 	provider: Provider,
 	providerId: number,
 	season: number | undefined,
-	layers: MappingFactLayers,
+	layers: MappingSelectionRecords,
 ): boolean {
 	if (!layers.upstream) return false;
 	if (provider === "sonarr") {
@@ -302,8 +202,13 @@ export function chooseMappingResult(input: {
 	upstream: ArrUpstreamTarget[];
 	auto: AutoResult | null;
 }): MappingResult {
-	const layers = legacyLayers(input.provider, input.manual, input.upstream, input.auto);
-	return chooseMappingResultFromLayers(input.provider, layers);
+	const layers = legacyLayers(
+		input.provider,
+		input.manual,
+		input.upstream,
+		input.auto,
+	);
+	return selectMappingResult(input.provider, layers);
 }
 
 function legacyLayers(
@@ -311,42 +216,49 @@ function legacyLayers(
 	manual: ManualFacts | null,
 	upstream: readonly ArrUpstreamTarget[],
 	auto: AutoResult | null,
-): MappingFactLayers {
-	const manualLayer: ManualLayerRecord | null = manual
-		? {
-				...(("mapping" in manual)
-					? createArrLayer(provider, [manual.mapping])
-					: { facts: {} }),
-				...(("ignored" in manual || manual.rejectedProviderIds?.length)
-					? {
-							decisions: {
-								[provider]: {
-									...("ignored" in manual ? { ignored: true as const } : {}),
-									...(manual.rejectedProviderIds?.length
-										? (provider === "sonarr"
-											? { rejectedTvdbShow: manual.rejectedProviderIds as TvdbId[] }
-											: { rejectedTmdbMovie: manual.rejectedProviderIds as TmdbId[] })
-										: {}),
-								},
-							},
-						}
-					: {}),
+): MappingSelectionRecords {
+	let manualLayer: ManualLayerRecord | null = null;
+	if (manual) {
+		const layer =
+			"mapping" in manual
+				? createArrLayer(provider, [manual.mapping])
+				: { facts: {} };
+		if ("ignored" in manual || manual.rejectedProviderIds?.length) {
+			const decision = "ignored" in manual ? { ignored: true as const } : {};
+			if (manual.rejectedProviderIds?.length) {
+				if (provider === "sonarr") {
+					Object.assign(decision, {
+						rejectedTvdbShow: manual.rejectedProviderIds as TvdbId[],
+					});
+				} else {
+					Object.assign(decision, {
+						rejectedTmdbMovie: manual.rejectedProviderIds as TmdbId[],
+					});
+				}
 			}
-		: null;
+			manualLayer = { ...layer, decisions: { [provider]: decision } };
+		} else {
+			manualLayer = layer;
+		}
+	}
 	let automatic: AutomaticLayerRecord | null = null;
 	if (auto) {
+		let layer: ExternalIdLayer = { facts: {} };
+		if (auto.kind === "mapped") {
+			layer = createArrLayer(provider, [auto]);
+		} else if (auto.kind === "ambiguous") {
+			layer = createArrLayer(provider, auto.targets);
+		}
 		automatic = {
-			...(auto.kind === "mapped"
-				? createArrLayer(provider, [auto])
-				: (auto.kind === "ambiguous"
-					? createArrLayer(provider, auto.targets)
-					: { facts: {} })),
+			...layer,
 			...(auto.kind === "mapped"
 				? {
 						slotMeta: {
 							[provider === "sonarr" ? "tvdbShow" : "tmdbMovie"]: {
 								expiresAt: Number.MAX_SAFE_INTEGER,
-								...(auto.matchedTitle ? { matchedTitle: auto.matchedTitle } : {}),
+								...(auto.matchedTitle
+									? { matchedTitle: auto.matchedTitle }
+									: {}),
 							},
 						},
 					}
@@ -354,8 +266,9 @@ function legacyLayers(
 			...(auto.kind === "unmapped"
 				? {
 						attempts: {
-							[provider === "sonarr" ? "sonarrTvdb" : "radarrTmdbMovie"]:
-								{ expiresAt: Number.MAX_SAFE_INTEGER },
+							[provider === "sonarr" ? "sonarrTvdb" : "radarrTmdbMovie"]: {
+								expiresAt: Number.MAX_SAFE_INTEGER,
+							},
 						},
 					}
 				: {}),
@@ -383,21 +296,12 @@ function createArrLayer(
 		? createExternalIdLayer({
 				tvdbShow: matching.map((target) => ({
 					id: target.providerId as TvdbId,
-					...(target.season === undefined
-						? {}
-						: { seasons: [target.season] }),
+					...(target.season === undefined ? {} : { seasons: [target.season] }),
 				})),
 			})
 		: createExternalIdLayer({
 				tmdbMovie: matching.map((target) => target.providerId as TmdbId),
 			});
-}
-
-function hasLayerData(layer: ExternalIdLayer): boolean {
-	return (
-		Object.keys(layer.facts).length > 0 ||
-		Object.keys(layer.conflicts ?? {}).length > 0
-	);
 }
 
 export function matchesUpstream(

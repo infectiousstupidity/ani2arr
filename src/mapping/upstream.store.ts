@@ -10,12 +10,9 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers/schemas";
-import type { Provider } from "@/providers/types";
 import {
 	createExternalIdLayer,
 	normalizeExternalIdLayer,
-	projectRadarrTarget,
-	projectSonarrTarget,
 	type ExternalIdLayer,
 } from "./external-id-facts";
 import { normalizeSeasonNumbers } from "./season-numbers";
@@ -29,11 +26,7 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
-import type {
-	ArrUpstreamTarget,
-	SeerrUpstreamTarget,
-	UpstreamSourceRecord,
-} from "./types";
+import type { SeerrUpstreamTarget, UpstreamSourceRecord } from "./types";
 
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPSTREAM_KEY = "mapping:upstream";
@@ -49,36 +42,16 @@ type UpstreamSnapshot = {
 	etag?: string;
 };
 
-export type UpstreamMappingFact = {
-	anilistId: AniListId;
-	record: UpstreamLayerRecord;
-	targets: ArrUpstreamTarget[];
-};
-
-export type ArrUpstreamMappingFact = {
-	anilistId: AniListId;
-	targets: ArrUpstreamTarget[];
-};
-
 export type SourceUpstreamLayers = {
 	anilistId: AniListId | null;
 	direct: ExternalIdLayer | null;
 	canonical: ExternalIdLayer | null;
 };
 
-export type SourceUpstreamMapping = {
-	anilistId: AniListId | null;
-	targets: ArrUpstreamTarget[];
-};
-
 type SeerrTargetProjection =
 	| { kind: "missing" }
 	| { kind: "target"; target: SeerrUpstreamTarget }
 	| { kind: "conflict" };
-
-export type SeerrUpstreamRecord =
-	| { anilistId: AniListId; kind: "target"; target: SeerrUpstreamTarget }
-	| { anilistId: AniListId; kind: "conflict" };
 
 export type SourceSeerrUpstreamMapping = {
 	anilistId: AniListId | null;
@@ -116,42 +89,14 @@ export async function getSourceUpstreamLayers(
 }
 
 export async function listAniListUpstreamLayers(): Promise<
-	UpstreamMappingFact[]
+	Array<{ anilistId: AniListId; record: UpstreamLayerRecord }>
 > {
 	const snapshot = await readSnapshot();
 	return Object.entries(snapshot?.records ?? {}).flatMap(([rawKey, record]) => {
 		const identity = parseSourceIdentityKey(rawKey);
 		if (identity?.source !== "anilist") return [];
-		return [
-			{
-				anilistId: identity.id,
-				record: structuredClone(record),
-				targets: projectArrTargets(record),
-			},
-		];
+		return [{ anilistId: identity.id, record: structuredClone(record) }];
 	});
-}
-
-export async function getSourceUpstreamMapping(
-	provider: Provider,
-	source: SourceIdentity,
-): Promise<SourceUpstreamMapping> {
-	const layers = await getSourceUpstreamLayers(source);
-	const selected = selectProviderLayer(provider, layers);
-	return {
-		anilistId: layers.anilistId,
-		targets: selected ? projectProviderTargets(provider, selected) : [],
-	};
-}
-
-export async function listAniListUpstreamMappings(): Promise<
-	ArrUpstreamMappingFact[]
-> {
-	const records = await listAniListUpstreamLayers();
-	return records.map(({ anilistId, targets }) => ({
-		anilistId,
-		targets,
-	}));
 }
 
 export async function getUniqueAniListIdForSource(
@@ -187,10 +132,7 @@ export async function getSourceAliasesByAniListId(): Promise<
 	const aliasesByAniListId = new Map<AniListId, SourceIdentity[]>();
 	for (const [rawKey, record] of Object.entries(snapshot?.records ?? {})) {
 		const alias = parseSourceIdentityKey(rawKey);
-		if (
-			alias?.source !== "mal" ||
-			record.linkedAniListId === undefined
-		) {
+		if (alias?.source !== "mal" || record.linkedAniListId === undefined) {
 			continue;
 		}
 		const aliases = aliasesByAniListId.get(record.linkedAniListId) ?? [];
@@ -198,7 +140,9 @@ export async function getSourceAliasesByAniListId(): Promise<
 		aliasesByAniListId.set(record.linkedAniListId, aliases);
 	}
 	for (const aliases of aliasesByAniListId.values()) {
-		aliases.sort((left, right) => sourceIdentityKey(left).localeCompare(sourceIdentityKey(right)));
+		aliases.sort((left, right) =>
+			sourceIdentityKey(left).localeCompare(sourceIdentityKey(right)),
+		);
 	}
 	return aliasesByAniListId;
 }
@@ -226,39 +170,13 @@ export async function getSourceSeerrUpstreamMapping(
 	};
 }
 
-export async function listSeerrUpstreamTargets(
-	ids: readonly AniListId[],
-	mediaType?: "movie" | "tv",
-): Promise<SeerrUpstreamRecord[]> {
-	const requested = new Set(ids);
-	if (requested.size === 0) return [];
-	const records = await listAniListUpstreamLayers();
-	return records
-		.flatMap(({ anilistId, record }) => {
-			if (!requested.has(anilistId)) return [];
-			const projection = projectSeerrLayer(record, mediaType);
-			return projection.kind === "missing"
-				? []
-				: [{ anilistId, ...projection } as SeerrUpstreamRecord];
-		})
-		.toSorted((left, right) => left.anilistId - right.anilistId);
-}
-
-export async function listAllSeerrUpstreamTargets(
-	mediaType?: "movie" | "tv",
-): Promise<SeerrUpstreamRecord[]> {
-	const records = await listAniListUpstreamLayers();
-	return listSeerrUpstreamTargets(
-		records.map((record) => record.anilistId),
-		mediaType,
-	);
-}
-
 export async function migrateUpstreamStore(): Promise<void> {
-	const next = writes.catch(() => {}).then(async () => {
-		const snapshot = await readSnapshot();
-		if (snapshot) await upstreamMappings.setValue(snapshot);
-	});
+	const next = writes
+		.catch(() => {})
+		.then(async () => {
+			const snapshot = await readSnapshot();
+			if (snapshot) await upstreamMappings.setValue(snapshot);
+		});
 	writes = next.then(
 		() => {},
 		() => {},
@@ -267,46 +185,49 @@ export async function migrateUpstreamStore(): Promise<void> {
 }
 
 export async function refreshUpstreamMappings(): Promise<boolean> {
-	const next = writes.catch(() => {}).then(async () => {
-		const stored = await browser.storage.local.get(UPSTREAM_KEY);
-		const rawStored = stored[UPSTREAM_KEY];
-		const previous = decodeSnapshot(rawStored);
-		const hasVersionedSnapshot =
-			isObject(rawStored) && rawStored.version === 1;
-		if (
-			hasVersionedSnapshot &&
-			previous &&
-			Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
-		) {
-			return false;
-		}
-		const result = await downloadAniBridgeMappings({
-			...(hasVersionedSnapshot && previous?.etag
-				? { etag: previous.etag }
-				: {}),
-		});
-		if (result.status === "not-modified") {
-			if (!previous) throw new Error("AniBridge returned 304 without stored entries.");
-			await upstreamMappings.setValue({ ...previous, fetchedAt: Date.now() });
-			return false;
-		}
+	const next = writes
+		.catch(() => {})
+		.then(async () => {
+			const stored = await browser.storage.local.get(UPSTREAM_KEY);
+			const rawStored = stored[UPSTREAM_KEY];
+			const previous = decodeSnapshot(rawStored);
+			const hasVersionedSnapshot =
+				isObject(rawStored) && rawStored.version === 1;
+			if (
+				hasVersionedSnapshot &&
+				previous &&
+				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
+			) {
+				return false;
+			}
+			const result = await downloadAniBridgeMappings({
+				...(hasVersionedSnapshot && previous?.etag
+					? { etag: previous.etag }
+					: {}),
+			});
+			if (result.status === "not-modified") {
+				if (!previous)
+					throw new Error("AniBridge returned 304 without stored entries.");
+				await upstreamMappings.setValue({ ...previous, fetchedAt: Date.now() });
+				return false;
+			}
 
-		const records = Object.fromEntries(
-			Object.entries(result.parsed.records).map(([key, record]) => [
-				key,
-				upstreamLayerFromSourceRecord(record),
-			]),
-		);
-		const changed =
-			JSON.stringify(previous?.records ?? {}) !== JSON.stringify(records);
-		await upstreamMappings.setValue({
-			version: 1,
-			records,
-			fetchedAt: Date.now(),
-			...(result.etag ? { etag: result.etag } : {}),
+			const records = Object.fromEntries(
+				Object.entries(result.parsed.records).map(([key, record]) => [
+					key,
+					upstreamLayerFromSourceRecord(record),
+				]),
+			);
+			const changed =
+				JSON.stringify(previous?.records ?? {}) !== JSON.stringify(records);
+			await upstreamMappings.setValue({
+				version: 1,
+				records,
+				fetchedAt: Date.now(),
+				...(result.etag ? { etag: result.etag } : {}),
+			});
+			return changed;
 		});
-		return changed;
-	});
 	writes = next.then(
 		() => {},
 		() => {},
@@ -315,7 +236,9 @@ export async function refreshUpstreamMappings(): Promise<boolean> {
 }
 
 export async function clearUpstreamMappings(): Promise<void> {
-	const next = writes.catch(() => {}).then(() => upstreamMappings.setValue(null));
+	const next = writes
+		.catch(() => {})
+		.then(() => upstreamMappings.setValue(null));
 	writes = next.then(
 		() => {},
 		() => {},
@@ -333,7 +256,8 @@ function decodeSnapshot(value: unknown): UpstreamSnapshot | null {
 	if (!isObject(value)) return null;
 	const fetchedAt = validTimestamp(value.fetchedAt);
 	if (fetchedAt === null) return null;
-	const etag = typeof value.etag === "string" && value.etag ? value.etag : undefined;
+	const etag =
+		typeof value.etag === "string" && value.etag ? value.etag : undefined;
 	if (value.version === 1 && isObject(value.records)) {
 		return {
 			version: 1,
@@ -398,11 +322,12 @@ function decodeRawSourceRecords(
 	const records: Record<string, UpstreamLayerRecord> = {};
 	for (const [key, rawRecord] of Object.entries(value)) {
 		if (parseSourceIdentityKey(key) === null) continue;
-		const record = Array.isArray(rawRecord)
-			? { targets: rawRecord }
-			: (isObject(rawRecord)
-				? rawRecord
-				: null);
+		let record: Record<string, unknown> | null = null;
+		if (Array.isArray(rawRecord)) {
+			record = { targets: rawRecord };
+		} else if (isObject(rawRecord)) {
+			record = rawRecord;
+		}
 		if (!record || !Array.isArray(record.targets)) continue;
 		const linkedAniListId = parseAniListIdOrNull(record.linkedAniListId);
 		records[key] = {
@@ -420,13 +345,23 @@ function decodeV2Mappings(
 	const records: Record<string, UpstreamLayerRecord> = {};
 	for (const [rawId, rawTargets] of Object.entries(mappings)) {
 		const anilistId = parseAniListIdOrNull(Number(rawId));
-		if (anilistId === null || rawId !== String(anilistId) || !Array.isArray(rawTargets)) continue;
+		if (
+			anilistId === null ||
+			rawId !== String(anilistId) ||
+			!Array.isArray(rawTargets)
+		)
+			continue;
 		records[`anilist:${anilistId}`] = layerFromRawTargets(rawTargets);
 	}
 	if (!isObject(seerrTargets)) return records;
 	for (const [rawId, rawTarget] of Object.entries(seerrTargets)) {
 		const anilistId = parseAniListIdOrNull(Number(rawId));
-		if (anilistId === null || rawId !== String(anilistId) || !isObject(rawTarget)) continue;
+		if (
+			anilistId === null ||
+			rawId !== String(anilistId) ||
+			!isObject(rawTarget)
+		)
+			continue;
 		const target = normalizeSeerrTarget(rawTarget as SeerrTarget);
 		if (!target) continue;
 		const record = (records[`anilist:${anilistId}`] ??= { facts: {} });
@@ -523,61 +458,6 @@ function mergeLegacySeerrTarget(
 			},
 		];
 	}
-}
-
-function selectProviderLayer(
-	provider: Provider,
-	layers: SourceUpstreamLayers,
-): ExternalIdLayer | null {
-	if (layers.direct) {
-		const projection =
-			provider === "sonarr"
-				? projectSonarrTarget({ upstream: layers.direct })
-				: projectRadarrTarget({ upstream: layers.direct });
-		if (projection.kind !== "missing") return layers.direct;
-	}
-	return layers.canonical;
-}
-
-function projectProviderTargets(
-	provider: Provider,
-	layer: ExternalIdLayer,
-): ArrUpstreamTarget[] {
-	if (provider === "radarr") {
-		const projection = projectRadarrTarget({ upstream: layer });
-		if (projection.kind === "target") {
-			return [{ provider, providerId: projection.target.tmdbId }];
-		}
-		return projection.kind === "conflict"
-			? projection.candidates.map((providerId) => ({ provider, providerId }))
-			: [];
-	}
-	const projection = projectSonarrTarget({ upstream: layer });
-	if (projection.kind === "target") {
-		return [
-			{
-				provider,
-				providerId: projection.target.tvdbId,
-				...(projection.target.season === undefined
-					? {}
-					: { season: projection.target.season }),
-			},
-		];
-	}
-	return projection.kind === "conflict"
-		? projection.candidates.map(({ id, seasons }) => ({
-				provider,
-				providerId: id,
-				...(seasons?.length === 1 ? { season: seasons[0] } : {}),
-			}))
-		: [];
-}
-
-function projectArrTargets(layer: ExternalIdLayer): ArrUpstreamTarget[] {
-	return [
-		...projectProviderTargets("sonarr", layer),
-		...projectProviderTargets("radarr", layer),
-	];
 }
 
 function projectSeerrLayer(

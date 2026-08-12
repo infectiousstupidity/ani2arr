@@ -1,12 +1,12 @@
 /** Effective mapping list behavior over shared fact records. */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import {
 	getMappingIdentities,
-	listEffectiveMappingRecordsByProvider,
+	listEffectiveMappingsByProvider,
 } from "./list-mappings";
 
 const aid = parseAniListId;
@@ -53,7 +53,15 @@ describe("list mappings", () => {
 			},
 		});
 
-		const result = await listEffectiveMappingRecordsByProvider();
+		const storageRead = vi.spyOn(browser.storage.local, "get");
+		const result = await listEffectiveMappingsByProvider();
+		expect(storageRead).toHaveBeenCalledTimes(3);
+		expect(storageRead.mock.calls).toEqual([
+			[expect.arrayContaining(["mapping:manual"])],
+			["mapping:upstream"],
+			[expect.arrayContaining(["mapping:auto"])],
+		]);
+		storageRead.mockRestore();
 		expect(
 			[...result.sonarr, ...result.radarr].map((record) => [
 				record.anilistId,
@@ -68,7 +76,7 @@ describe("list mappings", () => {
 		]);
 	});
 
-	it("routes movie upstream mappings only to Radarr", async () => {
+	it("keeps dual upstream mappings in both provider lists regardless of format", async () => {
 		await seed({
 			upstream: {
 				"anilist:1": {
@@ -76,11 +84,14 @@ describe("list mappings", () => {
 				},
 			},
 		});
-		const result = await listEffectiveMappingRecordsByProvider({
-			loadFormatByAniListId: async () => new Map([[aid(1), "MOVIE"]]),
-		});
+		const result = await listEffectiveMappingsByProvider();
 
-		expect(result.sonarr).toEqual([]);
+		expect(result.sonarr).toMatchObject([
+			{
+				anilistId: aid(1),
+				result: { kind: "mapped", providerId: tvdb(10) },
+			},
+		]);
 		expect(result.radarr).toMatchObject([
 			{
 				anilistId: aid(1),
@@ -97,9 +108,11 @@ describe("list mappings", () => {
 			},
 		});
 
-		await expect(getMappingIdentities([aid(2), aid(1)])).resolves.toMatchObject([
-			{ anilistId: aid(2), provider: "sonarr" },
-			{ anilistId: aid(1), provider: "radarr" },
-		]);
+		await expect(getMappingIdentities([aid(2), aid(1)])).resolves.toMatchObject(
+			[
+				{ anilistId: aid(2), provider: "sonarr" },
+				{ anilistId: aid(1), provider: "radarr" },
+			],
+		);
 	});
 });

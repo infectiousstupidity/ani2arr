@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
-import { mappingService } from "@/background/api-services";
+import {
+	anilistMetadataStore,
+	mappingService,
+} from "@/background/api-services";
 import { setAutoResult } from "@/mapping/auto.store";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
@@ -146,6 +149,95 @@ describe("source identity mapping boundary", () => {
 		).resolves.toMatchObject({
 			source: "upstream",
 			providerId: CANONICAL_TMDB_ID,
+		});
+	});
+
+	it("keeps dual-provider mapping truth aligned across lists, identities, reverse links, and inspection", async () => {
+		const firstAniListId = parseAniListId(100);
+		const secondAniListId = parseAniListId(200);
+		const sharedTvdbId = parseTvdbId(555);
+		const sharedTmdbId = parseTmdbId(666);
+		await browser.storage.local.set({
+			"mapping:upstream": upstreamSnapshot({
+				[`anilist:${firstAniListId}`]: {
+					facts: { tvdbShow: sharedTvdbId, tmdbMovie: sharedTmdbId },
+				},
+				[`anilist:${secondAniListId}`]: {
+					facts: { tvdbShow: sharedTvdbId, tmdbMovie: sharedTmdbId },
+				},
+			}),
+		});
+		vi.mocked(anilistMetadataStore.getMetadata).mockImplementation(
+			async (ids) => ({
+				metadata: ids.map((id) => ({
+					id: parseAniListId(id),
+					titles: { english: `Movie ${id}` },
+					format: "MOVIE" as const,
+				})),
+			}),
+		);
+
+		const groups = await mappingHandlers.getMappings();
+		expect(anilistMetadataStore.getMetadata).not.toHaveBeenCalled();
+		expect(groups).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					provider: "sonarr",
+					providerId: sharedTvdbId,
+					rows: [
+						expect.objectContaining({ anilistId: firstAniListId }),
+						expect.objectContaining({ anilistId: secondAniListId }),
+					],
+				}),
+				expect.objectContaining({
+					provider: "radarr",
+					providerId: sharedTmdbId,
+					rows: [
+						expect.objectContaining({ anilistId: firstAniListId }),
+						expect.objectContaining({ anilistId: secondAniListId }),
+					],
+				}),
+			]),
+		);
+		await expect(
+			mappingHandlers.getMappingIdentities([firstAniListId]),
+		).resolves.toMatchObject([
+			{
+				anilistId: firstAniListId,
+				provider: "sonarr",
+				result: { kind: "mapped", providerId: sharedTvdbId },
+			},
+			{
+				anilistId: firstAniListId,
+				provider: "radarr",
+				result: { kind: "mapped", providerId: sharedTmdbId },
+			},
+		]);
+		await expect(
+			sonarrHandlers.getSeriesStatus({
+				source: { source: "anilist", id: firstAniListId },
+			}),
+		).resolves.toMatchObject({
+			mapping: { kind: "mapped", providerId: sharedTvdbId },
+			isInLibrary: false,
+		});
+		await expect(
+			mappingService.getLinkedAniListIds("sonarr", sharedTvdbId),
+		).resolves.toEqual([firstAniListId, secondAniListId]);
+		await expect(
+			mappingService.getLinkedAniListIds("radarr", sharedTmdbId),
+		).resolves.toEqual([firstAniListId, secondAniListId]);
+		await expect(
+			mappingHandlers.getMappingInspection({
+				provider: "sonarr",
+				source: { source: "anilist", id: firstAniListId },
+			}),
+		).resolves.toMatchObject({
+			mapping: { kind: "mapped", providerId: sharedTvdbId },
+			linkedAniListEntries: [
+				{ anilistId: firstAniListId, format: "MOVIE", relation: "current" },
+				{ anilistId: secondAniListId, format: "MOVIE" },
+			],
 		});
 	});
 

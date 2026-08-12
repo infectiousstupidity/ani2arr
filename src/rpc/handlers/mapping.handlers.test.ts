@@ -23,14 +23,14 @@ import type { Provider } from "@/providers/types";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { mappingHandlers } from "./mapping.handlers";
 
-const listEffectiveMappingRecordsByProviderMock = vi.hoisted(() => vi.fn());
+const listEffectiveMappingsByProviderMock = vi.hoisted(() => vi.fn());
 const getProviderConfigMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
 	getMappingIdentities: vi.fn(),
-	listEffectiveMappingRecordsByProvider:
-		listEffectiveMappingRecordsByProviderMock,
+	listEffectiveMappingsByProvider:
+		listEffectiveMappingsByProviderMock,
 }));
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -105,7 +105,7 @@ function radarrMovie(tmdbId: ReturnType<typeof tmdb>): RadarrMovieSnapshot {
 function mockMappingRecords(
 	records: Partial<Record<Provider, EffectiveMappingRecord[]>>,
 ): void {
-	listEffectiveMappingRecordsByProviderMock.mockResolvedValue({
+	listEffectiveMappingsByProviderMock.mockResolvedValue({
 		sonarr: records.sonarr ?? [],
 		radarr: records.radarr ?? [],
 	});

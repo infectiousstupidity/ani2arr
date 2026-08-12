@@ -1,4 +1,3 @@
-import type { AnimeFormat } from "@/shared/types/anime-format";
 /** RPC handlers for mapping decisions, mapping listings, and detail reads. */
 // src/rpc/handlers/mapping.handlers.ts
 
@@ -14,7 +13,7 @@ import type {
 } from "@/anilist/types";
 import {
 	getMappingIdentities,
-	listEffectiveMappingRecordsByProvider,
+	listEffectiveMappingsByProvider,
 } from "@/mapping/list-mappings";
 import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
 import type { MappingResult } from "@/mapping/types";
@@ -74,19 +73,6 @@ async function loadRadarrLibrary(): Promise<RadarrMovieSnapshot[]> {
 	}
 
 	return radarrLibrary.getMovieSnapshots(credentials);
-}
-
-async function loadFormatByAniListId(
-	ids: readonly AniListId[],
-): Promise<ReadonlyMap<AniListId, AnimeFormat | null>> {
-	const result = await anilistMetadataStore.getMetadata([...ids]);
-	const formatByAniListId = new Map<AniListId, AnimeFormat | null>();
-
-	for (const metadata of result.metadata) {
-		formatByAniListId.set(metadata.id, metadata.format ?? null);
-	}
-
-	return formatByAniListId;
 }
 
 function sonarrMeta(
@@ -396,7 +382,7 @@ async function getMappingsOutput(): Promise<MappingListGroup[]> {
 		radarrLibraryItems,
 		aliasesByAniListId,
 	] = await Promise.all([
-		listEffectiveMappingRecordsByProvider({ loadFormatByAniListId }),
+		listEffectiveMappingsByProvider(),
 		loadSonarrLibrary(),
 		loadRadarrLibrary(),
 		getSourceAliasesByAniListId(),
