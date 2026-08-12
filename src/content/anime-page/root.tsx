@@ -54,7 +54,6 @@ interface ContentRootProps {
 interface AnimeProviderActionProps {
 	compact: boolean;
 	source: SourceIdentity;
-	anilistId?: AniListId | undefined;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -78,7 +77,6 @@ interface AnimePageActionStackProps {
 	showProviderAction: boolean;
 	provider: Provider | null;
 	source: SourceIdentity;
-	anilistId?: AniListId | undefined;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -236,7 +234,6 @@ function isStatusBlocked(input: {
 
 function SonarrAnimePageActions({
 	compact,
-	anilistId,
 	source,
 	displayTitle,
 	providerTitle,
@@ -249,7 +246,6 @@ function SonarrAnimePageActions({
 	onOpenMapping,
 }: SonarrAnimeActionProps): ReactElement {
 	const mediaAction = useSonarrMediaAction({
-		...(anilistId === undefined ? {} : { anilistId }),
 		source,
 		displayTitle,
 		providerTitle,
@@ -283,7 +279,6 @@ function SonarrAnimePageActions({
 
 function RadarrAnimePageActions({
 	compact,
-	anilistId,
 	source,
 	displayTitle,
 	providerTitle,
@@ -296,7 +291,6 @@ function RadarrAnimePageActions({
 	onOpenMapping,
 }: RadarrAnimeActionProps): ReactElement {
 	const mediaAction = useRadarrMediaAction({
-		...(anilistId === undefined ? {} : { anilistId }),
 		source,
 		displayTitle,
 		providerTitle,
@@ -333,7 +327,6 @@ function AnimePageActionStack({
 	showProviderAction,
 	provider,
 	source,
-	anilistId,
 	displayTitle,
 	providerTitle,
 	metadata,
@@ -351,9 +344,8 @@ function AnimePageActionStack({
 	return (
 		<div className={`flex w-full flex-col ${compact ? "gap-1.5" : "gap-2"}`}>
 			{showProviderAction && provider === "sonarr" ? (
-				<SonarrAnimePageActions
-					compact={compact}
-					anilistId={anilistId}
+					<SonarrAnimePageActions
+						compact={compact}
 					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
@@ -367,9 +359,8 @@ function AnimePageActionStack({
 				/>
 			) : null}
 			{showProviderAction && provider === "radarr" ? (
-				<RadarrAnimePageActions
-					compact={compact}
-					anilistId={anilistId}
+					<RadarrAnimePageActions
+						compact={compact}
 					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
@@ -383,9 +374,8 @@ function AnimePageActionStack({
 				/>
 			) : null}
 			{showSeerrAction ? (
-				<SeerrAnimePageAction
-					source={source}
-					{...(anilistId === undefined ? {} : { anilistId })}
+					<SeerrAnimePageAction
+						source={source}
 					title={providerTitle}
 					metadata={metadata}
 					mediaType={seerrMediaType}
@@ -475,7 +465,6 @@ export function ContentRoot({
 		if (!provider) return;
 
 		mediaModal.open({
-			...(anilistId === undefined ? {} : { anilistId }),
 			source,
 			kind: "provider",
 			provider,
@@ -488,7 +477,6 @@ export function ContentRoot({
 	const openMapping = () => openModal("mapping");
 	const openSeerrModal = () => {
 		mediaModal.open({
-			...(anilistId === undefined ? {} : { anilistId }),
 			source,
 			kind: "seerr",
 			openSource: "content",
@@ -502,9 +490,8 @@ export function ContentRoot({
 				<AnimePageActionStack
 					compact={compactActions}
 					showProviderAction={showProviderAction}
-					provider={provider}
-					source={source}
-					anilistId={anilistId}
+						provider={provider}
+						source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
 					metadata={metadata}

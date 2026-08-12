@@ -7,7 +7,6 @@ import { parseTmdbIdOrNull, type TmdbId } from "@/providers/schemas";
 import { useAddMovie, useMovieStatus } from "@/queries/radarr";
 import {
 	buildMediaActionStatusQuery,
-	mediaActionSourceInput,
 	type MediaAction,
 	type MediaActionInputBase,
 	useMediaAction,
@@ -30,7 +29,7 @@ function quickAdd(input: {
 	) return;
 
 	input.addMovie.mutate({
-		...mediaActionSourceInput(input.mediaInput),
+		source: input.mediaInput.source,
 		tmdbId: input.tmdbId,
 		title: input.mediaInput.providerTitle,
 		primaryTitleHint: input.mediaInput.providerTitle,

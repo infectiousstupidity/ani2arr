@@ -55,14 +55,16 @@ export class MappingService {
 	public async getMapping(
 		provider: Provider,
 		source: SourceIdentity,
+		linkedAniListId: AniListId | null,
 	): Promise<MappingResult> {
-		const state = await this.getMappingState(provider, source);
+		const state = await this.getMappingState(provider, source, linkedAniListId);
 		return chooseMappingResultFromLayers(provider, state.layers);
 	}
 
 	public async resolveMapping(
 		provider: Provider,
 		source: SourceIdentity,
+		linkedAniListId: AniListId | null,
 		options?: {
 			forceRetry?: boolean;
 			title?: string;
@@ -70,7 +72,7 @@ export class MappingService {
 		},
 	): Promise<MappingResult> {
 		const writeToken = captureAutomaticWriteToken();
-		const state = await this.getMappingState(provider, source);
+		const state = await this.getMappingState(provider, source, linkedAniListId);
 		const current = chooseMappingResultFromLayers(provider, state.layers);
 		if (current.kind === "mapped" || current.kind === "ignored") return current;
 		if (current.kind === "ambiguous") return current;
@@ -101,8 +103,9 @@ export class MappingService {
 	public async getSeerrTarget(
 		source: SourceIdentity,
 		mediaType: "movie" | "tv",
+		linkedAniListId: AniListId | null,
 	): Promise<EffectiveSeerrTarget | null> {
-		const upstream = await getSourceUpstreamLayers(source);
+		const upstream = await getSourceUpstreamLayers(source, linkedAniListId);
 		const anilistId = upstream.anilistId ?? undefined;
 		const [manual, automatic] = await Promise.all([
 			getManualLayerRecord(source, anilistId),
@@ -282,8 +285,9 @@ export class MappingService {
 	private async getMappingState(
 		provider: Provider,
 		source: SourceIdentity,
+		linkedAniListId: AniListId | null,
 	): Promise<{ anilistId: AniListId | null; layers: MappingFactLayers }> {
-		const upstream = await getSourceUpstreamLayers(source);
+		const upstream = await getSourceUpstreamLayers(source, linkedAniListId);
 		const anilistId = upstream.anilistId ?? undefined;
 		const [manual, automatic] = await Promise.all([
 			getManualLayerRecord(source, anilistId),

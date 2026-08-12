@@ -142,16 +142,16 @@ describe("Arr RPC handlers", () => {
 	it.each([
 		{
 			name: "Sonarr",
-			run: () =>
-				sonarrHandlers.getSeriesStatus({
-					anilistId: aid(100),
+				run: () =>
+					sonarrHandlers.getSeriesStatus({
+						source: { source: "anilist", id: aid(100) },
 				}),
 		},
 		{
 			name: "Radarr",
-			run: () =>
-				radarrHandlers.getMovieStatus({
-					anilistId: aid(100),
+				run: () =>
+					radarrHandlers.getMovieStatus({
+						source: { source: "anilist", id: aid(100) },
 				}),
 		},
 	])(
@@ -181,9 +181,9 @@ describe("Arr RPC handlers", () => {
 			setup: () => {
 				addSonarrSeriesMock.mockResolvedValue(createdSeries);
 			},
-			run: () =>
-				sonarrHandlers.addToSonarr({
-					anilistId: aid(100),
+				run: () =>
+					sonarrHandlers.addToSonarr({
+						source: { source: "anilist", id: aid(100) },
 					tvdbId: createdSeries.tvdbId,
 					title: createdSeries.title,
 					form: sonarrAddForm,
@@ -208,9 +208,9 @@ describe("Arr RPC handlers", () => {
 			setup: () => {
 				addRadarrMovieMock.mockResolvedValue(createdMovie);
 			},
-			run: () =>
-				radarrHandlers.addToRadarr({
-					anilistId: aid(100),
+				run: () =>
+					radarrHandlers.addToRadarr({
+						source: { source: "anilist", id: aid(100) },
 					tmdbId: createdMovie.tmdbId,
 					title: createdMovie.title,
 					form: radarrAddForm,
@@ -263,7 +263,7 @@ describe("Arr RPC handlers", () => {
 
 		await expect(
 			sonarrHandlers.updateSonarrSeries({
-				anilistId: aid(100),
+				source: { source: "anilist", id: aid(100) },
 				tvdbId: tvdb(200),
 				title: "Updated Series",
 				form: sonarrForm,

@@ -19,7 +19,6 @@ import {
 } from "@/queries/mapping";
 import { normalizeError } from "@/shared/errors/error-utils";
 import {
-	getMappingEditorIdentity,
 	getRowKey,
 	type ClearMatchAction,
 	type IgnoreAction,
@@ -115,7 +114,7 @@ export function useMappingRowActions(
 		void runRowMutation(row, async () => {
 			const input = {
 				provider: action.provider,
-				anilistId: action.anilistId,
+				source: { source: "anilist" as const, id: action.anilistId },
 			};
 			await (action.kind === "clear-ignore"
 				? clearIgnore.mutateAsync(input)
@@ -131,7 +130,7 @@ export function useMappingRowActions(
 			if (action.kind === "clear-manual") {
 				await clearManualMapping.mutateAsync({
 					provider: action.provider,
-					anilistId: action.anilistId,
+					source: { source: "anilist", id: action.anilistId },
 				});
 				return;
 			}
@@ -144,11 +143,11 @@ export function useMappingRowActions(
 
 			await (action.kind === "clear-rejected"
 				? clearRejectedCandidate.mutateAsync({
-						anilistId: action.anilistId,
+						source: { source: "anilist", id: action.anilistId },
 						...target,
 					})
 				: setRejectedCandidate.mutateAsync({
-						anilistId: action.anilistId,
+						source: { source: "anilist", id: action.anilistId },
 						...target,
 					}));
 		});
@@ -157,7 +156,7 @@ export function useMappingRowActions(
 	const handleEdit = (row: MappingRow): void => {
 		const metadata = metadataById.get(row.anilistId) ?? null;
 		mediaModal.open({
-			...getMappingEditorIdentity(row),
+			source: { source: "anilist", id: row.anilistId },
 			kind: "provider",
 			provider: row.provider,
 			initialView: "mapping",

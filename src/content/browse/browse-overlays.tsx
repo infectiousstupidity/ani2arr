@@ -151,7 +151,7 @@ export function BrowseOverlays({
 			)}
 			{mediaModal.state ? (
 				<MediaModal
-					key={`modal-${mediaModal.state.anilistId ?? "unknown"}`}
+					key={`modal-${sourceIdentityKey(mediaModal.state.source)}`}
 					state={mediaModal.state}
 					onClose={mediaModal.close}
 					container={portalContainer}

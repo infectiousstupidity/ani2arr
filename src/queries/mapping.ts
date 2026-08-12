@@ -1,11 +1,7 @@
 /** React Query hooks for mapping-related RPC reads and mutations. */
 // src/queries/mapping.ts
 
-import {
-	useMutation,
-	useQuery,
-	useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import { invalidateAfterMappingChange } from "@/queries/invalidation";
 import { getAni2arrApi } from "@/rpc";
@@ -19,7 +15,6 @@ import type {
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
-	SourceRpcInput,
 } from "@/rpc/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
@@ -27,7 +22,6 @@ import type { Provider } from "@/providers/types";
 import {
 	normalizeMappingInspectionRequest,
 	normalizeMetadataIds,
-	normalizeSourceKeys,
 	queryKeys,
 } from "./query-keys";
 
@@ -137,34 +131,21 @@ export const useSourceAniListIdMap = (
 	sources: readonly SourceIdentity[],
 	options?: { enabled?: boolean },
 ) => {
-	const sourceKeys = normalizeSourceKeys(sources);
 	return useQuery<Record<string, AniListId | null>, ExtensionError>({
-		queryKey: queryKeys.sourceAniListIds(sourceKeys),
-		queryFn: () =>
-			getAni2arrApi().resolveAniListIdsForSources([...sources]),
-		enabled: (options?.enabled ?? true) && sourceKeys.length > 0,
+		queryKey: queryKeys.sourceAniListIds(sources),
+		queryFn: () => getAni2arrApi().resolveAniListIdsForSources([...sources]),
+		enabled: (options?.enabled ?? true) && sources.length > 0,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
 };
 
-export const mappingInspectionInput = (
-	anilistId: AniListId | undefined,
-	source: SourceIdentity | undefined,
-): SourceRpcInput => {
-	if (source !== undefined) {
-		return anilistId === undefined ? { source } : { source, anilistId };
-	}
-	if (anilistId !== undefined) return { anilistId };
-	throw new Error("Missing mapping inspection source.");
-};
-
 export const useMappingInspection = (
 	provider: Provider,
-	input: AniListId | SourceRpcInput,
+	source: SourceIdentity,
 ) => {
-	const request = normalizeMappingInspectionRequest(provider, input);
+	const request = normalizeMappingInspectionRequest(provider, source);
 	return useQuery<GetMappingInspectionOutput, ExtensionError>({
 		queryKey: queryKeys.mappingInspection(request),
 		queryFn: () => getAni2arrApi().getMappingInspection(request),

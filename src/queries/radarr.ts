@@ -13,7 +13,6 @@ import type {
 	AddRadarrInput,
 	GetMovieStatusOutput,
 	RadarrLookupOutput,
-	SourceRpcInput,
 	StatusInput,
 	UpdateRadarrInput,
 } from "@/rpc/types";
@@ -27,7 +26,6 @@ import {
 } from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
-import { sourceFromInput } from "@/rpc/source-input";
 
 const hasQueryKeyPrefix = (
 	queryKey: QueryKey,
@@ -49,16 +47,6 @@ const keepPreviousMovieStatusForSameMedia =
 			? previousData
 			: undefined;
 	};
-
-function mutationSourceInput(variables: SourceRpcInput): SourceRpcInput {
-	if (variables.source === undefined) {
-		return { anilistId: variables.anilistId };
-	}
-	if ("anilistId" in variables && variables.anilistId !== undefined) {
-		return { source: variables.source, anilistId: variables.anilistId };
-	}
-	return { source: variables.source };
-}
 
 export const useRadarrFormResources = (options?: {
 	enabled?: boolean;
@@ -85,7 +73,7 @@ export const useRadarrFormResources = (options?: {
 };
 
 export const useMovieStatus = (
-	payload: SourceRpcInput & Pick<StatusInput, "title" | "metadata">,
+	payload: Pick<StatusInput, "source" | "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
 		force_verify?: boolean;
@@ -95,7 +83,7 @@ export const useMovieStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
-	const source = sourceFromInput(payload);
+	const source = payload.source;
 	const request = normalizeRadarrStatusRequest(payload);
 
 	return useQuery<GetMovieStatusOutput, ExtensionError>({
@@ -135,9 +123,9 @@ export const useAddMovie = () => {
 	return useMutation<RadarrMovie, ExtensionError, AddRadarrInput>({
 		mutationFn: (input: AddRadarrInput) => getAni2arrApi().addToRadarr(input),
 		onSuccess: (_createdMovie, variables) => {
-			invalidateAfterProviderMediaChange(queryClient, {
-				provider: "radarr",
-				...mutationSourceInput(variables),
+				invalidateAfterProviderMediaChange(queryClient, {
+					provider: "radarr",
+					source: variables.source,
 			});
 		},
 	});
@@ -149,9 +137,9 @@ export const useUpdateMovie = () => {
 		mutationFn: (input: UpdateRadarrInput) =>
 			getAni2arrApi().updateRadarrMovie(input),
 		onSuccess: (_updatedMovie, variables) => {
-			invalidateAfterProviderMediaChange(queryClient, {
-				provider: "radarr",
-				...mutationSourceInput(variables),
+				invalidateAfterProviderMediaChange(queryClient, {
+					provider: "radarr",
+					source: variables.source,
 			});
 		},
 	});

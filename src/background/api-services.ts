@@ -137,8 +137,8 @@ export const mappingService = new MappingService(async (...args) => {
 });
 
 export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
-	getEffectiveTarget: ({ identity, mediaType }) =>
-		mappingService.getSeerrTarget(identity, mediaType),
+	getEffectiveTarget: ({ identity, mediaType, anilistId }) =>
+		mappingService.getSeerrTarget(identity, mediaType, anilistId),
 	getAutoResult: getSeerrAutoResult,
 	setAutoResult: async (...args) => {
 		const stored = await setSeerrAutoResult(...args);

@@ -7,7 +7,6 @@ import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type { StatusInput } from "@/rpc/types";
 import {
-	normalizeMappingInspectionRequest,
 	normalizeMetadataIds,
 	normalizeProviderLookupRequest,
 	normalizeRadarrStatusRequest,
@@ -38,20 +37,31 @@ describe("query keys", () => {
 		const anilistKey = queryKeys.providerMediaStatus(
 			"sonarr",
 			normalizeSonarrStatusRequest({
-				anilistId: aid(5114),
+				source: { source: "anilist", id: aid(5114) },
 				title: "Fullmetal Alchemist",
 			}),
 		);
 
 		expect(malKey.slice(0, itemKey.length)).toEqual(itemKey);
 		expect(malKey).not.toEqual(anilistKey);
+		expect(
+			queryKeys.sourceAniListIds([
+				malSource,
+				{ source: "anilist", id: aid(21) },
+				malSource,
+			]),
+		).toEqual(
+			queryKeys.sourceAniListIds([
+				{ source: "anilist", id: aid(21) },
+				malSource,
+			]),
+		);
 	});
 
 	it("normalizes noisy Sonarr resolver input once for requests and keys", () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 		const noisyRequest = normalizeSonarrStatusRequest({
 			source,
-			anilistId: aid(21),
 			title: "\tFullmetal\n\tAlchemist\t",
 			metadata: {
 				titles: {
@@ -67,7 +77,6 @@ describe("query keys", () => {
 		});
 		const cleanRequest = normalizeSonarrStatusRequest({
 			source,
-			anilistId: aid(21),
 			title: "Fullmetal Alchemist",
 			metadata: {
 				titles: { english: "Fullmetal Alchemist" },
@@ -81,7 +90,6 @@ describe("query keys", () => {
 		expect(noisyRequest).toEqual(cleanRequest);
 		expect(noisyRequest).toEqual({
 			source,
-			anilistId: aid(21),
 			title: "Fullmetal Alchemist",
 			metadata: {
 				titles: { english: "Fullmetal Alchemist" },
@@ -184,7 +192,10 @@ describe("query keys", () => {
 				title: "Title",
 				metadata: { relationPrequelIds: [2] },
 			}),
-			normalizeSonarrStatusRequest({ anilistId: aid(2), title: "Title" }),
+			normalizeSonarrStatusRequest({
+				source: { source: "anilist", id: aid(2) },
+				title: "Title",
+			}),
 		];
 		const baseKey = queryKeys.providerMediaStatus("sonarr", base);
 
@@ -194,46 +205,6 @@ describe("query keys", () => {
 			);
 		}
 		expect(queryKeys.providerMediaStatus("radarr", base)).not.toEqual(baseKey);
-	});
-
-	it("includes MAL canonical AniList identity in status and inspection", () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		const status = (anilistId?: AniListId) =>
-			queryKeys.providerMediaStatus(
-				"sonarr",
-				normalizeSonarrStatusRequest({
-					source,
-					...(anilistId === undefined ? {} : { anilistId }),
-				}),
-			);
-		const inspection = (anilistId?: AniListId) =>
-			queryKeys.mappingInspection(
-				normalizeMappingInspectionRequest("sonarr", {
-					source,
-					...(anilistId === undefined ? {} : { anilistId }),
-				}),
-			);
-
-		expect(status()).not.toEqual(status(aid(1)));
-		expect(status(aid(1))).not.toEqual(status(aid(2)));
-		expect(inspection()).not.toEqual(inspection(aid(1)));
-		expect(inspection(aid(1))).not.toEqual(inspection(aid(2)));
-		expect(
-			normalizeMappingInspectionRequest("sonarr", {
-				source: { source: "anilist", id: aid(1) },
-			}),
-		).toEqual(normalizeMappingInspectionRequest("sonarr", aid(1)));
-		expect(
-			normalizeSeerrTargetRequest({
-				source: { source: "anilist", id: aid(1) },
-				mediaType: "movie",
-			}),
-		).toEqual(
-			normalizeSeerrTargetRequest({
-				anilistId: aid(1),
-				mediaType: "movie",
-			}),
-		);
 	});
 
 	it("shares whitespace normalization between search requests and keys", () => {
@@ -319,7 +290,9 @@ describe("query keys", () => {
 		);
 		expect(
 			scopedKeys.every((key) =>
-				key.slice(0, itemKey.length).every((part, index) => part === itemKey[index]),
+				key
+					.slice(0, itemKey.length)
+					.every((part, index) => part === itemKey[index]),
 			),
 		).toBe(true);
 		expect(new Set(scopedKeys.map((key) => JSON.stringify(key))).size).toBe(3);

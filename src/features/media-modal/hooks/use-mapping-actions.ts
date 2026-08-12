@@ -7,11 +7,11 @@ import {
 	parseTvdbIdOrNull,
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type {
 	TmdbId,
 	TvdbId,
 } from "@/providers/schemas";
-import type { SourceRpcInput } from "@/rpc/types";
 import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
@@ -27,7 +27,7 @@ import { normalizeError } from "@/shared/errors/error-utils";
 import { useConfirm } from "@/shared/hooks/use-confirm";
 
 type UseMappingActionsInput = {
-	sourceInput: SourceRpcInput;
+	source: SourceIdentity;
 	provider: Provider;
 	selectedProviderId: ProviderExternalId | null;
 	rejectProviderId: ProviderExternalId | null;
@@ -58,7 +58,7 @@ function createProviderMappingTarget(
 }
 
 export function useMappingActions({
-	sourceInput,
+	source,
 	provider,
 	selectedProviderId,
 	rejectProviderId,
@@ -98,7 +98,7 @@ export function useMappingActions({
 		}
 
 		try {
-			await setManualMapping.mutateAsync({ ...sourceInput, ...selectedTarget });
+			await setManualMapping.mutateAsync({ source, ...selectedTarget });
 			onMappingApplied();
 		} catch (error) {
 			const normalizedError = normalizeError(error);
@@ -121,7 +121,7 @@ export function useMappingActions({
 
 				try {
 					await setManualMapping.mutateAsync({
-						...sourceInput,
+						source,
 						...selectedTarget,
 						force: true,
 					});
@@ -137,7 +137,7 @@ export function useMappingActions({
 	};
 
 	const resetMapping = async (): Promise<void> => {
-		await clearManualMapping.mutateAsync({ ...sourceInput, provider });
+		await clearManualMapping.mutateAsync({ source, provider });
 		onMappingReset();
 	};
 
@@ -152,21 +152,21 @@ export function useMappingActions({
 
 		if (!didConfirm) return;
 
-		await setIgnore.mutateAsync({ ...sourceInput, provider });
+		await setIgnore.mutateAsync({ source, provider });
 		onIgnored();
 	};
 
 	const rejectCandidate = async (): Promise<void> => {
 		if (rejectTarget === null) return;
 
-		await setRejectedCandidate.mutateAsync({ ...sourceInput, ...rejectTarget });
+		await setRejectedCandidate.mutateAsync({ source, ...rejectTarget });
 	};
 
 	const clearRejectedCandidateAction = async (): Promise<void> => {
 		if (clearRejectedTarget === null) return;
 
 		await clearRejectedCandidate.mutateAsync({
-			...sourceInput,
+			source,
 			...clearRejectedTarget,
 		});
 	};

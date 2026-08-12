@@ -13,7 +13,6 @@ import type {
 	AddSonarrInput,
 	GetSeriesStatusOutput,
 	SonarrLookupOutput,
-	SourceRpcInput,
 	StatusInput,
 	UpdateSonarrInput,
 } from "@/rpc/types";
@@ -27,7 +26,6 @@ import {
 } from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
-import { sourceFromInput } from "@/rpc/source-input";
 
 const hasQueryKeyPrefix = (
 	queryKey: QueryKey,
@@ -49,16 +47,6 @@ const keepPreviousSeriesStatusForSameMedia =
 			? previousData
 			: undefined;
 	};
-
-function mutationSourceInput(variables: SourceRpcInput): SourceRpcInput {
-	if (variables.source === undefined) {
-		return { anilistId: variables.anilistId };
-	}
-	if ("anilistId" in variables && variables.anilistId !== undefined) {
-		return { source: variables.source, anilistId: variables.anilistId };
-	}
-	return { source: variables.source };
-}
 
 export const useSonarrFormResources = (options?: {
 	enabled?: boolean;
@@ -85,7 +73,7 @@ export const useSonarrFormResources = (options?: {
 };
 
 export const useSeriesStatus = (
-	payload: SourceRpcInput & Pick<StatusInput, "title" | "metadata">,
+	payload: Pick<StatusInput, "source" | "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
 		force_verify?: boolean;
@@ -95,7 +83,7 @@ export const useSeriesStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
-	const source = sourceFromInput(payload);
+	const source = payload.source;
 	const request = normalizeSonarrStatusRequest(payload);
 
 	return useQuery<GetSeriesStatusOutput, ExtensionError>({
@@ -135,9 +123,9 @@ export const useAddSeries = () => {
 	return useMutation<SonarrSeries, ExtensionError, AddSonarrInput>({
 		mutationFn: (input: AddSonarrInput) => getAni2arrApi().addToSonarr(input),
 		onSuccess: (_createdSeries, variables) => {
-			invalidateAfterProviderMediaChange(queryClient, {
-				provider: "sonarr",
-				...mutationSourceInput(variables),
+				invalidateAfterProviderMediaChange(queryClient, {
+					provider: "sonarr",
+					source: variables.source,
 			});
 		},
 	});
@@ -149,9 +137,9 @@ export const useUpdateSeries = () => {
 		mutationFn: (input: UpdateSonarrInput) =>
 			getAni2arrApi().updateSonarrSeries(input),
 		onSuccess: (_updatedSeries, variables) => {
-			invalidateAfterProviderMediaChange(queryClient, {
-				provider: "sonarr",
-				...mutationSourceInput(variables),
+				invalidateAfterProviderMediaChange(queryClient, {
+					provider: "sonarr",
+					source: variables.source,
 			});
 		},
 	});

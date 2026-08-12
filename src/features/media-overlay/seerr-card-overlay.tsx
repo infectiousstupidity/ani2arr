@@ -14,7 +14,7 @@ import type {
 	ReactNode,
 	SyntheticEvent,
 } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
 import {
 	type SeerrMediaAction,
 	useSeerrMediaAction,
@@ -31,7 +31,6 @@ import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SeerrCardActionProps {
 	source: SourceIdentity;
-	anilistId?: AniListId | undefined;
 	title: string;
 	metadata: AniListMediaHint | null;
 	mediaType: SeerrMediaType | null;
@@ -173,7 +172,6 @@ function SeerrStackOpenButton(props: {
 
 export function SeerrCardStackActions({
 	source,
-	anilistId,
 	title,
 	metadata,
 	mediaType,
@@ -187,7 +185,6 @@ export function SeerrCardStackActions({
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrMediaAction({
 		source,
-		anilistId,
 		title,
 		metadata,
 		mediaType,
@@ -260,7 +257,6 @@ export function SeerrCardStackActions({
 
 export function SeerrStandaloneCardOverlay({
 	source,
-	anilistId,
 	title,
 	metadata,
 	mediaType,
@@ -276,7 +272,6 @@ export function SeerrStandaloneCardOverlay({
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrMediaAction({
 		source,
-		anilistId,
 		title,
 		metadata,
 		mediaType,

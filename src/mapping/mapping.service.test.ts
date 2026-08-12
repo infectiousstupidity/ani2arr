@@ -63,14 +63,14 @@ describe("MappingService", () => {
 		await setManualMapping("radarr", source, { providerId: tmdb(20) });
 		const service = new MappingService(vi.fn());
 
-		await expect(service.getMapping("radarr", source)).resolves.toEqual({
+		await expect(service.getMapping("radarr", source, source.id)).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
 			providerId: tmdb(20),
 		});
 
 		await service.clearManualMapping("radarr", source);
-		await expect(service.getMapping("radarr", source)).resolves.toEqual({
+		await expect(service.getMapping("radarr", source, source.id)).resolves.toEqual({
 			kind: "mapped",
 			source: "upstream",
 			providerId: tmdb(10),
@@ -89,14 +89,14 @@ describe("MappingService", () => {
 		const service = new MappingService(resolver);
 
 		await expect(
-			service.resolveMapping("sonarr", source, { title: "FMA" }),
+			service.resolveMapping("sonarr", source, null, { title: "FMA" }),
 		).resolves.toEqual({
 			kind: "mapped",
 			source: "auto",
 			providerId: tvdb(78_874),
 			matchedTitle: "Fullmetal Alchemist",
 		});
-		await expect(service.getMapping("sonarr", source)).resolves.toMatchObject({
+		await expect(service.getMapping("sonarr", source, null)).resolves.toMatchObject({
 			kind: "mapped",
 			providerId: tvdb(78_874),
 		});
@@ -123,7 +123,7 @@ describe("MappingService", () => {
 			}),
 		);
 		const service = new MappingService(resolver);
-		const pending = service.resolveMapping("sonarr", source);
+		const pending = service.resolveMapping("sonarr", source, source.id);
 
 		await clearAutoResults();
 		releaseStateRead();
@@ -146,7 +146,7 @@ describe("MappingService", () => {
 			});
 		});
 		const service = new MappingService(resolver);
-		const pending = service.resolveMapping("sonarr", source);
+		const pending = service.resolveMapping("sonarr", source, source.id);
 
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalledOnce());
 		await clearAutoResults();
@@ -170,7 +170,7 @@ describe("MappingService", () => {
 		const service = new MappingService(resolver);
 
 		await expect(
-			service.resolveMapping("radarr", source, { forceRetry: true }),
+			service.resolveMapping("radarr", source, source.id, { forceRetry: true }),
 		).resolves.toEqual({
 			kind: "ambiguous",
 			targets: [
@@ -191,13 +191,13 @@ describe("MappingService", () => {
 		});
 		const service = new MappingService(vi.fn());
 
-		await expect(service.getSeerrTarget(source, "tv")).resolves.toMatchObject({
+		await expect(service.getSeerrTarget(source, "tv", source.id)).resolves.toMatchObject({
 			mediaType: "tv",
 			tmdbId: tmdb(500),
 			tvdbId: tvdb(700),
 			source: "manual",
 		});
-		await expect(service.getMapping("sonarr", source)).resolves.toEqual({
+		await expect(service.getMapping("sonarr", source, source.id)).resolves.toEqual({
 			kind: "unmapped",
 			hadResolveAttempt: false,
 		});
@@ -214,8 +214,8 @@ describe("MappingService", () => {
 		await clearManualSeerrTarget(source, "tv");
 		const service = new MappingService(vi.fn());
 
-		await expect(service.getSeerrTarget(source, "tv")).resolves.toBeNull();
-		await expect(service.getMapping("sonarr", source)).resolves.toMatchObject({
+		await expect(service.getSeerrTarget(source, "tv", source.id)).resolves.toBeNull();
+		await expect(service.getMapping("sonarr", source, source.id)).resolves.toMatchObject({
 			kind: "mapped",
 			providerId: tvdb(900),
 		});

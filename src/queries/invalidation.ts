@@ -2,7 +2,6 @@
 // src/queries/invalidation.ts
 
 import type { QueryClient } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType } from "@/providers/seerr/types";
@@ -11,17 +10,17 @@ import { queryKeys } from "@/queries/query-keys";
 
 export function invalidateAfterMappingChange(
 	queryClient: QueryClient,
-	input: { provider: Provider; source?: SourceIdentity; anilistId?: AniListId },
+	input: { provider: Provider; source: SourceIdentity },
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
+		queryKey: queryKeys.providerMediaStatusItem(input.provider, input.source),
 	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspectionItem(input.provider, input),
+		queryKey: queryKeys.mappingInspectionItem(input.provider, input.source),
 	});
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(input.provider),
@@ -80,13 +79,13 @@ export function invalidateAfterSeerrRequest(
 
 export function invalidateAfterProviderMediaChange(
 	queryClient: QueryClient,
-	input: { provider: Provider; source?: SourceIdentity; anilistId?: AniListId },
+	input: { provider: Provider; source: SourceIdentity },
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
+		queryKey: queryKeys.providerMediaStatusItem(input.provider, input.source),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspectionItem(input.provider, input),
+		queryKey: queryKeys.mappingInspectionItem(input.provider, input.source),
 	});
 }
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { seerrHandlers } from "./seerr.handlers";
 
@@ -22,6 +23,7 @@ const manualStoreMock = vi.hoisted(() => ({
 }));
 
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
+const getUniqueAniListIdForSourceMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/background/api-services", () => apiServicesMock);
 
@@ -31,11 +33,16 @@ vi.mock("@/background/provider-config", () => ({
 
 vi.mock("@/mapping/manual.store", () => manualStoreMock);
 
+vi.mock("@/mapping/upstream.store", () => ({
+	getUniqueAniListIdForSource: getUniqueAniListIdForSourceMock,
+}));
+
 vi.mock("@/rpc/revision-signals", () => ({
 	bumpMappingsRevision: bumpMappingsRevisionMock,
 }));
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 
@@ -43,104 +50,101 @@ describe("seerrHandlers", () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 
-		manualStoreMock.setManualSeerrTarget.mockImplementation(
-			async () => {},
-		);
+		getUniqueAniListIdForSourceMock.mockResolvedValue(null);
+		manualStoreMock.clearManualSeerrTarget.mockImplementation(async () => {});
+		manualStoreMock.setManualSeerrTarget.mockImplementation(async () => {});
 		bumpMappingsRevisionMock.mockImplementation(async () => {});
 	});
 
-	it("reads the stored effective target when no resolution hints are supplied", async () => {
-		const anilistId = aid(100);
-		const target = {
-			anilistId,
-			mediaType: "movie" as const,
-			tmdbId: tmdb(123),
-			source: "manual" as const,
-		};
-		apiServicesMock.mappingService.getSeerrTarget.mockResolvedValue(target);
+	it.each([
+		{ name: "linked", linkedAniListId: aid(100) },
+		{ name: "unlinked", linkedAniListId: null },
+	])(
+		"reads a $name MAL target with one link lookup",
+		async ({ linkedAniListId }) => {
+			const source = { source: "mal", id: mal(5114) } as const;
+			const target = {
+				...(linkedAniListId === null ? {} : { anilistId: linkedAniListId }),
+				mediaType: "movie" as const,
+				tmdbId: tmdb(123),
+				source: "manual" as const,
+			};
+			getUniqueAniListIdForSourceMock.mockResolvedValue(linkedAniListId);
+			apiServicesMock.mappingService.getSeerrTarget.mockResolvedValue(target);
 
-		await expect(
-			seerrHandlers.getSeerrTarget({ anilistId, mediaType: "movie" }),
-		).resolves.toBe(target);
+			await expect(
+				seerrHandlers.getSeerrTarget({ source, mediaType: "movie" }),
+			).resolves.toBe(target);
 
-		expect(apiServicesMock.mappingService.getSeerrTarget).toHaveBeenCalledWith(
-			{
-				source: "anilist",
-				id: anilistId,
-			},
-			"movie",
-		);
-		expect(apiServicesMock.resolveSeerrAutomaticTarget).not.toHaveBeenCalled();
-	});
+			expect(getUniqueAniListIdForSourceMock).toHaveBeenCalledOnce();
+			expect(getUniqueAniListIdForSourceMock).toHaveBeenCalledWith(source);
+			expect(
+				apiServicesMock.mappingService.getSeerrTarget,
+			).toHaveBeenCalledWith(source, "movie", linkedAniListId);
+		},
+	);
 
-	it("runs automatic resolution when mapping hints are supplied", async () => {
-		const anilistId = aid(100);
-		const target = {
-			anilistId,
-			mediaType: "movie" as const,
-			tmdbId: tmdb(123),
-			source: "automatic" as const,
-		};
-		apiServicesMock.resolveSeerrAutomaticTarget.mockResolvedValue(target);
+	it.each([
+		{ name: "linked", linkedAniListId: aid(100) },
+		{ name: "unlinked", linkedAniListId: null },
+	])(
+		"resolves a $name MAL target with the original source",
+		async ({ linkedAniListId }) => {
+			const source = { source: "mal", id: mal(5114) } as const;
+			getUniqueAniListIdForSourceMock.mockResolvedValue(linkedAniListId);
+			apiServicesMock.resolveSeerrAutomaticTarget.mockResolvedValue(null);
 
-		await expect(
-			seerrHandlers.getSeerrTarget({
-				anilistId,
+			await seerrHandlers.getSeerrTarget({
+				source,
 				mediaType: "movie",
 				title: "Perfect Blue",
-				metadata: {
-					format: "MOVIE",
-					startYear: 1998,
-				},
 				forceRetry: true,
-			}),
-		).resolves.toBe(target);
+			});
 
-		expect(apiServicesMock.resolveSeerrAutomaticTarget).toHaveBeenCalledWith({
-			source: {
-				source: "anilist",
-				id: anilistId,
-			},
-			anilistId,
-			mediaType: "movie",
-			title: "Perfect Blue",
-			metadata: {
-				format: "MOVIE",
-				startYear: 1998,
-			},
-			forceRetry: true,
-		});
-		expect(apiServicesMock.mappingService.getSeerrTarget).not.toHaveBeenCalled();
-	});
+			expect(getUniqueAniListIdForSourceMock).toHaveBeenCalledOnce();
+			expect(apiServicesMock.resolveSeerrAutomaticTarget).toHaveBeenCalledWith({
+				source,
+				anilistId: linkedAniListId,
+				mediaType: "movie",
+				title: "Perfect Blue",
+				forceRetry: true,
+			});
+		},
+	);
 
-	it("stores a complete manual TV target and bumps the mapping revision", async () => {
-		const input = {
-			anilistId: aid(100),
-			mediaType: "tv" as const,
-			tmdbId: tmdb(123),
-			tvdbId: tvdb(456),
-			seasons: [2],
-		};
+	it.each([
+		{ name: "linked", linkedAniListId: aid(100) },
+		{ name: "unlinked", linkedAniListId: null },
+	])(
+		"stores a complete manual TV target for a $name MAL source",
+		async ({ linkedAniListId }) => {
+			const input = {
+				source: { source: "mal", id: mal(5114) } as const,
+				mediaType: "tv" as const,
+				tmdbId: tmdb(123),
+				tvdbId: tvdb(456),
+				seasons: [2],
+			};
+			getUniqueAniListIdForSourceMock.mockResolvedValue(linkedAniListId);
 
-		await expect(seerrHandlers.setManualSeerrTarget(input)).resolves.toEqual({
-			ok: true,
-		});
+			await expect(seerrHandlers.setManualSeerrTarget(input)).resolves.toEqual({
+				ok: true,
+			});
 
-		expect(manualStoreMock.setManualSeerrTarget).toHaveBeenCalledWith(
-			{
-				source: "anilist",
-				id: input.anilistId,
-			},
-			{
-				mediaType: "tv",
-				tmdbId: input.tmdbId,
-				tvdbId: input.tvdbId,
-				seasons: input.seasons,
-			},
-			input.anilistId,
-		);
-		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
-	});
+			expect(getUniqueAniListIdForSourceMock).toHaveBeenCalledOnce();
+			expect(manualStoreMock.setManualSeerrTarget).toHaveBeenCalledWith(
+				input.source,
+				{
+					mediaType: "tv",
+					tmdbId: input.tmdbId,
+					tvdbId: input.tvdbId,
+					seasons: input.seasons,
+				},
+				linkedAniListId ?? undefined,
+			);
+			expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
+		},
+	);
 
 	it("returns AniList entries sharing the same effective Seerr target", async () => {
 		apiServicesMock.mappingService.listAllSeerrTargets.mockResolvedValue([

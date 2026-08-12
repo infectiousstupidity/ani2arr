@@ -1,6 +1,6 @@
 /** Seerr media-action workflow shared by browse overlays and anime-page buttons. */
 
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
 import {
 	getSeerrActionState,
 	getSeerrVisualStatus,
@@ -14,9 +14,8 @@ import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { GetSeerrTargetInput } from "@/rpc/types";
 
-interface SeerrMediaActionInput {
+	interface SeerrMediaActionInput {
 	source: SourceIdentity;
-	anilistId?: AniListId | undefined;
 	title: string | null;
 	metadata: AniListMediaHint | null;
 	mediaType: SeerrMediaType | null;
@@ -41,7 +40,6 @@ function getTargetInput(
 
 	return {
 		source: input.source,
-		...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
 		mediaType: input.mediaType,
 		...(input.title === null ? {} : { title: input.title }),
 		metadata: input.metadata,

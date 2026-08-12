@@ -2,13 +2,16 @@
 // src/mapping/resolve/seerr-auto-resolver.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { browser } from "wxt/browser";
 import { type AniListMediaFormat, parseAniListId } from "@/anilist/types";
 import {
+	captureAutomaticWriteToken,
 	clearAutoResults,
 	getSeerrAutoResult,
 	setSeerrAutoResult,
 	type SeerrAutoResult,
 } from "@/mapping/auto.store";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { createSeerrAutoResolver } from "./seerr-auto-resolver";
 
@@ -68,6 +71,7 @@ function request(
 ) {
 	return {
 		source,
+		anilistId: source.id,
 		mediaType,
 		...(title === undefined ? {} : { title }),
 		...(metadata === undefined ? {} : { metadata }),
@@ -142,6 +146,7 @@ describe("Seerr automatic resolver", () => {
 				}),
 			),
 		).resolves.toEqual({
+			anilistId: source.id,
 			source: "automatic",
 			mediaType: "movie",
 			tmdbId: tmdb(10_494),
@@ -171,6 +176,134 @@ describe("Seerr automatic resolver", () => {
 			),
 		).resolves.toBeNull();
 	});
+
+	it("reads linked and unlinked MAL results from distinct real storage keys", async () => {
+		await clearAutoResults();
+		const linkedSource = {
+			source: "mal",
+			id: parseMyAnimeListId(5114),
+		} as const;
+		const unlinkedSource = {
+			source: "mal",
+			id: parseMyAnimeListId(999),
+		} as const;
+		const linkedAniListId = parseAniListId(21);
+		await setSeerrAutoResult(
+			captureAutomaticWriteToken(),
+			{ source: "anilist", id: linkedAniListId },
+			"movie",
+			{ kind: "mapped", target: movie(10_494) },
+		);
+		await setSeerrAutoResult(
+			captureAutomaticWriteToken(),
+			unlinkedSource,
+			"movie",
+			{ kind: "mapped", target: movie(11_111) },
+		);
+		const getAutoResultReal = vi.fn(getSeerrAutoResult);
+		const setAutoResultReal = vi.fn(setSeerrAutoResult);
+		const realResolve = createSeerrAutoResolver({
+			getEffectiveTarget: vi.fn().mockResolvedValue(null),
+			getAutoResult: getAutoResultReal,
+			setAutoResult: setAutoResultReal,
+			loadAniListMedia,
+			loadMyAnimeListMetadata,
+			searchMedia,
+			getTvDetails,
+		});
+
+		await expect(
+			realResolve({
+				source: linkedSource,
+				anilistId: linkedAniListId,
+				mediaType: "movie",
+			}),
+		).resolves.toMatchObject({ tmdbId: tmdb(10_494) });
+		await expect(
+			realResolve({
+				source: unlinkedSource,
+				anilistId: null,
+				mediaType: "movie",
+			}),
+		).resolves.toMatchObject({ tmdbId: tmdb(11_111) });
+
+		expect(getAutoResultReal.mock.calls).toEqual([
+			[linkedSource, "movie", linkedAniListId],
+			[unlinkedSource, "movie", undefined],
+		]);
+		expect(setAutoResultReal).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{
+			name: "linked",
+			malId: parseMyAnimeListId(5114),
+			anilistId: parseAniListId(21),
+			expectedKey: "anilist:21",
+		},
+		{
+			name: "unlinked",
+			malId: parseMyAnimeListId(999),
+			anilistId: null,
+			expectedKey: "mal:999",
+		},
+	])(
+		"uses real automatic storage for a $name MAL source",
+		async ({ malId, anilistId, expectedKey }) => {
+			await clearAutoResults();
+			const malSource = { source: "mal", id: malId } as const;
+			const getEffectiveTargetReal = vi.fn().mockResolvedValue(null);
+			const getAutoResultReal = vi.fn(getSeerrAutoResult);
+			const setAutoResultReal = vi.fn(setSeerrAutoResult);
+			const realResolve = createSeerrAutoResolver({
+				getEffectiveTarget: getEffectiveTargetReal,
+				getAutoResult: getAutoResultReal,
+				setAutoResult: setAutoResultReal,
+				loadAniListMedia,
+				loadMyAnimeListMetadata,
+				searchMedia,
+				getTvDetails,
+			});
+			searchMedia.mockResolvedValue([movie()]);
+
+			await expect(
+				realResolve({
+					source: malSource,
+					anilistId,
+					mediaType: "movie",
+					title: "Perfect Blue",
+					metadata: { format: "MOVIE", startYear: 1998 },
+				}),
+			).resolves.toMatchObject({
+				source: "automatic",
+				mediaType: "movie",
+				tmdbId: tmdb(10_494),
+			});
+
+			expect(getEffectiveTargetReal).toHaveBeenCalledWith({
+				identity: malSource,
+				mediaType: "movie",
+				anilistId,
+			});
+			expect(getAutoResultReal).toHaveBeenCalledWith(
+				malSource,
+				"movie",
+				anilistId ?? undefined,
+			);
+			expect(setAutoResultReal).toHaveBeenCalledWith(
+				expect.any(Number),
+				malSource,
+				"movie",
+				expect.objectContaining({ kind: "mapped" }),
+				anilistId ?? undefined,
+			);
+			const stored = await browser.storage.local.get("mapping:auto");
+			const automatic = stored["mapping:auto"] as {
+				records: Record<string, unknown>;
+			};
+			expect(Object.keys(automatic.records)).toEqual([expectedKey]);
+		},
+	);
 
 	it("captures before effective-target reads and rejects a stale real-store write", async () => {
 		await clearAutoResults();
@@ -297,6 +430,7 @@ describe("Seerr automatic resolver", () => {
 				source: "anilist",
 				id: parseAniListId(21_004),
 			},
+			anilistId: parseAniListId(21_004),
 		});
 
 		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
@@ -345,6 +479,7 @@ describe("Seerr automatic resolver", () => {
 				}),
 			),
 		).resolves.toEqual({
+			anilistId: source.id,
 			source: "automatic",
 			mediaType: "movie",
 			tmdbId: tmdb(10_494),

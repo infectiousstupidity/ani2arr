@@ -43,25 +43,16 @@ import type { PublicOptions } from "@/settings/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
-export type SourceRpcInput =
-	| {
-			source: SourceIdentity;
-			anilistId?: AniListId;
-	  }
-	| {
-			/** LEGACY: AniList callers migrate to source in MAL content phases. */
-			anilistId: AniListId;
-			source?: never;
-	  };
-
-export type StatusInput = SourceRpcInput & {
+export type StatusInput = {
+	source: SourceIdentity;
 	title?: string;
 	force_verify?: boolean;
 	force_mapping_retry?: boolean;
 	metadata?: AniListMediaHint | null;
 };
 
-export type AddSonarrInput = SourceRpcInput & {
+export type AddSonarrInput = {
+	source: SourceIdentity;
 	tvdbId: TvdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -69,14 +60,16 @@ export type AddSonarrInput = SourceRpcInput & {
 	form: SonarrFormState;
 };
 
-export type UpdateSonarrInput = SourceRpcInput & {
+export type UpdateSonarrInput = {
+	source: SourceIdentity;
 	tvdbId: TvdbId;
 	title: string;
 	form: SonarrFormState;
 	monitoringAction?: SonarrEditMonitoringAction;
 };
 
-export type AddRadarrInput = SourceRpcInput & {
+export type AddRadarrInput = {
+	source: SourceIdentity;
 	tmdbId: TmdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -84,28 +77,32 @@ export type AddRadarrInput = SourceRpcInput & {
 	form: RadarrFormState;
 };
 
-export type UpdateRadarrInput = SourceRpcInput & {
+export type UpdateRadarrInput = {
+	source: SourceIdentity;
 	tmdbId: TmdbId;
 	title: string;
 	form: RadarrFormState;
 };
 
-export type SetManualMappingInput = SourceRpcInput & {
+export type SetManualMappingInput = {
+	source: SourceIdentity;
 	force?: boolean;
 } & (
 		| { provider: "sonarr"; providerId: TvdbId }
 		| { provider: "radarr"; providerId: TmdbId }
 	);
 
-export type ClearManualMappingInput = SourceRpcInput & {
+export type ClearManualMappingInput = {
+	source: SourceIdentity;
 	provider: Provider;
 };
 
 export type SetMappingIgnoreInput = ClearManualMappingInput;
 export type ClearMappingIgnoreInput = ClearManualMappingInput;
 
-export type SetMappingRejectedCandidateInput = SourceRpcInput &
-	(
+export type SetMappingRejectedCandidateInput = {
+	source: SourceIdentity;
+} & (
 		| { provider: "sonarr"; providerId: TvdbId }
 		| { provider: "radarr"; providerId: TmdbId }
 	);
@@ -134,7 +131,8 @@ export type GetSeerrTargetsInput = Array<{
 	anilistId: AniListId;
 	mediaType: "movie" | "tv";
 }>;
-export type GetSeerrTargetInput = SourceRpcInput & {
+export type GetSeerrTargetInput = {
+	source: SourceIdentity;
 	mediaType: "movie" | "tv";
 	title?: string | null;
 	metadata?: AniListMediaHint | null;
@@ -142,8 +140,9 @@ export type GetSeerrTargetInput = SourceRpcInput & {
 };
 
 export type GetMappingInspectionInput = {
+	source: SourceIdentity;
 	provider: Provider;
-} & SourceRpcInput;
+};
 
 export type GetAniListMetadataInput = {
 	ids: AniListId[];
@@ -196,9 +195,12 @@ export type SeerrRequestTarget = {
 	source: SeerrTargetSource;
 } & SeerrUpstreamTarget;
 
-export type SetManualSeerrTargetInput = SourceRpcInput & SeerrTarget;
+export type SetManualSeerrTargetInput = {
+	source: SourceIdentity;
+} & SeerrTarget;
 
-export type ClearManualSeerrTargetInput = SourceRpcInput & {
+export type ClearManualSeerrTargetInput = {
+	source: SourceIdentity;
 	mediaType: "movie" | "tv";
 };
 

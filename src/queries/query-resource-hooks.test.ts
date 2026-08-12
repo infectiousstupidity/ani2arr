@@ -78,7 +78,6 @@ describe("normalized query resource hooks", () => {
 	it("uses one normalized Sonarr status resource and adds controls only to RPC", async () => {
 		const input: StatusInput = {
 			source: { source: "mal", id: mal(5114) },
-			anilistId: aid(21),
 			title: "\tFullmetal\n Alchemist\t",
 			metadata: {
 				titles: { english: "\tFullmetal\tAlchemist\t" },

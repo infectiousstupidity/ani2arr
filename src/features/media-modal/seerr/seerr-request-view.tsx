@@ -2,7 +2,7 @@
 // src/features/media-modal/seerr/seerr-request-view.tsx
 
 import { type ReactNode, useMemo, useState } from "react";
-import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
 import { isRequestableSeerrStatus } from "@/providers/seerr/request";
 import type {
@@ -20,7 +20,6 @@ import { openOptionsPage } from "@/rpc/runtime-messages";
 import type {
 	RequestInSeerrInput,
 	SeerrRequestTarget,
-	SourceRpcInput,
 } from "@/rpc/types";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
@@ -195,8 +194,7 @@ function getRequestSeasonSelection(input: {
 }
 
 export function SeerrRequestView(props: {
-	targetInput: SourceRpcInput;
-	anilistId?: AniListId | undefined;
+	source: SourceIdentity;
 	authMode: "session" | "apiKey" | null;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
@@ -212,8 +210,7 @@ export function SeerrRequestView(props: {
 	target: SeerrRequestTarget | null;
 }): React.JSX.Element {
 	const {
-		targetInput,
-		anilistId,
+		source,
 		authMode,
 		container,
 		contentContainer,
@@ -228,6 +225,7 @@ export function SeerrRequestView(props: {
 		onClose,
 		target,
 	} = props;
+	const anilistId = target?.anilistId;
 	const [selectedSeasonDraft, setSelectedSeasonDraft] =
 		useState<SeerrSeasonDraft | null>(null);
 	const request = useRequestInSeerr();
@@ -388,7 +386,7 @@ export function SeerrRequestView(props: {
 					onClearManualTarget={() => {
 						if (target) {
 							clearManualTarget.mutate({
-								...targetInput,
+								source,
 								mediaType: target.mediaType,
 							});
 						}

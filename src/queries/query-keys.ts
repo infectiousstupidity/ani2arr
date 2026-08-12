@@ -16,14 +16,12 @@ import type { MyAnimeListId } from "@/myanimelist/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType } from "@/providers/seerr/types";
 import type { Provider } from "@/providers/types";
-import { type SourceInputLike, sourceFromInput } from "@/rpc/source-input";
 import type {
 	GetMappingInspectionInput,
 	GetSeerrMediaStatusInput,
 	GetSeerrTargetInput,
 	GetSeerrTargetsInput,
 	SearchSeerrMediaInput,
-	SourceRpcInput,
 	StatusInput,
 } from "@/rpc/types";
 
@@ -41,7 +39,6 @@ type SeerrLinkedAniListEntriesKeyInput = {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
 };
-type SourceKeyInput = SourceInputLike | SourceIdentity | AniListId;
 
 type NormalizedResolverMetadata = {
 	titles?: {
@@ -55,24 +52,20 @@ type NormalizedResolverMetadata = {
 	relationPrequelIds?: AniListId[];
 };
 
-type NormalizedSourceRequest = {
+type NormalizedMediaStatusRequest = {
 	source: SourceIdentity;
-	anilistId?: AniListId;
-};
-
-type NormalizedMediaStatusRequest = NormalizedSourceRequest & {
 	title?: string;
 	metadata?: NormalizedResolverMetadata;
 };
 
-type NormalizedSeerrTargetRequest = NormalizedSourceRequest & {
+type NormalizedSeerrTargetRequest = {
+	source: SourceIdentity;
 	mediaType: "movie" | "tv";
 	title?: string;
 	metadata?: NormalizedResolverMetadata;
 };
 
-type NormalizedMappingInspectionRequest = GetMappingInspectionInput &
-	NormalizedSourceRequest;
+type NormalizedMappingInspectionRequest = GetMappingInspectionInput;
 
 type NormalizedProviderLookupRequest = { term: string };
 
@@ -121,8 +114,8 @@ const normalizeResolverMetadata = (
 	const relationPrequelIds =
 		includeRelationPrequelIds && metadata.relationPrequelIds
 			? [...new Set(metadata.relationPrequelIds.filter(isAniListId))].toSorted(
-				(left, right) => left - right,
-			)
+					(left, right) => left - right,
+				)
 			: [];
 	const normalized: NormalizedResolverMetadata = {
 		...(titles === undefined ? {} : { titles }),
@@ -137,20 +130,8 @@ const normalizeResolverMetadata = (
 	return Object.keys(normalized).length === 0 ? undefined : normalized;
 };
 
-const normalizeSourceRequest = (
-	input: SourceInputLike,
-): NormalizedSourceRequest => {
-	const source = sourceFromInput(input);
-	const anilistId =
-		source.source === "anilist" ? source.id : input.anilistId;
-	return {
-		source,
-		...(anilistId === undefined ? {} : { anilistId }),
-	};
-};
-
 const normalizeMediaStatusRequest = (
-	input: SourceRpcInput & Pick<StatusInput, "metadata" | "title">,
+	input: Pick<StatusInput, "source" | "metadata" | "title">,
 	includeRelationPrequelIds: boolean,
 ): NormalizedMediaStatusRequest => {
 	const title = normalizeResourceText(input.title ?? "");
@@ -159,18 +140,18 @@ const normalizeMediaStatusRequest = (
 		includeRelationPrequelIds,
 	);
 	return {
-		...normalizeSourceRequest(input),
+		source: input.source,
 		...(title === undefined ? {} : { title }),
 		...(metadata === undefined ? {} : { metadata }),
 	};
 };
 
 export const normalizeSonarrStatusRequest = (
-	input: SourceRpcInput & Pick<StatusInput, "metadata" | "title">,
+	input: Pick<StatusInput, "source" | "metadata" | "title">,
 ): NormalizedMediaStatusRequest => normalizeMediaStatusRequest(input, true);
 
 export const normalizeRadarrStatusRequest = (
-	input: SourceRpcInput & Pick<StatusInput, "metadata" | "title">,
+	input: Pick<StatusInput, "source" | "metadata" | "title">,
 ): NormalizedMediaStatusRequest => normalizeMediaStatusRequest(input, false);
 
 export function normalizeSeerrTargetRequest(
@@ -179,7 +160,7 @@ export function normalizeSeerrTargetRequest(
 	const title = normalizeResourceText(input.title ?? "");
 	const metadata = normalizeResolverMetadata(input.metadata, false);
 	return {
-		...normalizeSourceRequest(input),
+		source: input.source,
 		mediaType: input.mediaType,
 		...(title === undefined ? {} : { title }),
 		...(metadata === undefined ? {} : { metadata }),
@@ -204,17 +185,15 @@ export const normalizeSeerrMediaStatusRequest = (
 
 export const normalizeMappingInspectionRequest = (
 	provider: Provider,
-	input: AniListId | SourceRpcInput,
+	source: SourceIdentity,
 ): NormalizedMappingInspectionRequest => ({
 	provider,
-	...normalizeSourceRequest(
-		typeof input === "number" ? { anilistId: input } : input,
-	),
+	source,
 });
 
-export const normalizeProviderLookupRequest = (
-	input: { term: string },
-): NormalizedProviderLookupRequest => ({
+export const normalizeProviderLookupRequest = (input: {
+	term: string;
+}): NormalizedProviderLookupRequest => ({
 	term: normalizeResourceText(input.term) ?? "",
 });
 
@@ -230,61 +209,28 @@ export const normalizeMetadataIds = (
 	return [...new Set(ids.filter(isAniListId))].toSorted((a, b) => a - b);
 };
 
-export const normalizeSourceKey = (source: SourceIdentity): string =>
-	sourceIdentityKey(source);
-
-export const normalizeSourceKeys = (
-	sources: readonly SourceIdentity[],
-): string[] => {
-	return [
-		...new Set(sources.map((source) => sourceIdentityKey(source))),
-	].toSorted();
-};
-
-const sourceKeyFromInput = (input: SourceKeyInput): string => {
-	if (typeof input === "number") {
-		return normalizeSourceKey({ source: "anilist", id: input });
-	}
-	if ("id" in input && "source" in input && typeof input.source === "string") {
-		return normalizeSourceKey(input);
-	}
-	return normalizeSourceKey(sourceFromInput(input));
-};
-
-const mappingInspectionItemKey = (
-	provider: Provider,
-	input: SourceKeyInput,
-) =>
+const mappingInspectionItemKey = (provider: Provider, source: SourceIdentity) =>
 	[
 		...mappingRootKey(),
 		"inspection",
 		provider,
-		sourceKeyFromInput(input),
+		sourceIdentityKey(source),
 	] as const;
 
 const providerMediaStatusItemKey = (
 	provider: Provider,
-	input: SourceKeyInput,
+	source: SourceIdentity,
 ) =>
 	[
 		...rootQueryKey,
 		"provider",
 		provider,
 		"mediaStatus",
-		sourceKeyFromInput(input),
+		sourceIdentityKey(source),
 	] as const;
 
-const seerrMediaStatusItemKey = (
-	mediaType: SeerrMediaType,
-	tmdbId: TmdbId,
-) =>
-	[
-		...rootQueryKey,
-		"seerr",
-		"mediaStatus",
-		mediaType,
-		tmdbId,
-	] as const;
+const seerrMediaStatusItemKey = (mediaType: SeerrMediaType, tmdbId: TmdbId) =>
+	[...rootQueryKey, "seerr", "mediaStatus", mediaType, tmdbId] as const;
 
 export const queryKeys = {
 	all: rootQueryKey,
@@ -308,16 +254,18 @@ export const queryKeys = {
 	mappingIdentitiesRoot: () => [...mappingRootKey(), "identities"] as const,
 	mappingIdentities: (ids: readonly AniListId[]) =>
 		[...mappingRootKey(), "identities", normalizeMetadataIds(ids)] as const,
-	sourceAniListIds: (sourceKeys: readonly string[]) =>
+	sourceAniListIds: (sources: readonly SourceIdentity[]) =>
 		[
 			...mappingRootKey(),
 			"sourceAniListIds",
-			[...new Set(sourceKeys)].toSorted(),
+			[
+				...new Set(sources.map((source) => sourceIdentityKey(source))),
+			].toSorted(),
 		] as const,
 	mappingInspectionRoot: () => [...mappingRootKey(), "inspection"] as const,
 	mappingInspectionItem: mappingInspectionItemKey,
 	mappingInspection: (input: NormalizedMappingInspectionRequest) =>
-		[...mappingInspectionItemKey(input.provider, input), input] as const,
+		[...mappingInspectionItemKey(input.provider, input.source), input] as const,
 	providerRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider] as const,
 	providerConnection: (provider: Provider, scope = configuredScope) =>
@@ -384,19 +332,15 @@ export const queryKeys = {
 		[...rootQueryKey, "provider", provider, "formResources", scope] as const,
 	providerLookupRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "lookup"] as const,
-	providerLookup: (provider: Provider, input: NormalizedProviderLookupRequest) =>
-		[
-			...rootQueryKey,
-			"provider",
-			provider,
-			"lookup",
-			input,
-		] as const,
+	providerLookup: (
+		provider: Provider,
+		input: NormalizedProviderLookupRequest,
+	) => [...rootQueryKey, "provider", provider, "lookup", input] as const,
 	providerMediaStatusRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "mediaStatus"] as const,
 	providerMediaStatusItem: providerMediaStatusItemKey,
 	providerMediaStatus: (
 		provider: Provider,
 		input: NormalizedMediaStatusRequest,
-	) => [...providerMediaStatusItemKey(provider, input), input] as const,
+	) => [...providerMediaStatusItemKey(provider, input.source), input] as const,
 };

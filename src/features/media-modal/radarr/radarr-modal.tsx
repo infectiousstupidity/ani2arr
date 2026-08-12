@@ -2,19 +2,15 @@
 // src/features/media-modal/radarr/radarr-modal.tsx
 
 import { useMemo, useState } from "react";
-import type { AniListMediaHint } from "@/anilist/types";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import { sourceIdentityKey } from "@/mapping/source-identity";
 import { parseTmdbIdOrNull } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
-import {
-	mappingInspectionInput,
-	useMappingInspection,
-} from "@/queries/mapping";
+import { useMappingInspection, useSourceAniListIdMap } from "@/queries/mapping";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
-import { sourceFromInput } from "@/rpc/source-input";
-import type { GetMovieStatusOutput, SourceRpcInput } from "@/rpc/types";
+import type { GetMovieStatusOutput } from "@/rpc/types";
 import { createDefaultRadarrFormState as defaultRadarrFormState } from "@/providers/radarr/form-state";
 import { DetailsPanel } from "../details/details-panel";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
@@ -26,10 +22,7 @@ import {
 	pickProviderPoster,
 	targetsEqual,
 } from "../helpers";
-import {
-	MappingFooter,
-	SetupFooter,
-} from "../chrome/modal-footer";
+import { MappingFooter, SetupFooter } from "../chrome/modal-footer";
 import { ModalHeader } from "../chrome/modal-header";
 import { ModalShell } from "../chrome/modal-shell";
 import {
@@ -51,6 +44,14 @@ import type {
 
 const PROVIDER = "radarr" as const;
 const SETUP_FORM_ID = "radarr-setup-form";
+
+function getModalAniListId(
+	source: RadarrModalProps["state"]["source"],
+	idsBySource: Record<string, AniListId | null> | undefined,
+): AniListId | undefined {
+	if (source.source === "anilist") return source.id;
+	return idsBySource?.[sourceIdentityKey(source)] ?? undefined;
+}
 
 type RadarrModalData = {
 	isConfigured: boolean;
@@ -142,16 +143,14 @@ function getCurrentTarget(input: {
 	};
 }
 
-function useRadarrModalData(input: SourceRpcInput & {
+function useRadarrModalData(input: {
+	source: RadarrModalProps["state"]["source"];
 	metadataHint: MediaModalMetadataHint | null;
 }): RadarrModalData {
-	const { anilistId, source, metadataHint } = input;
-	const sourceInput = mappingInspectionInput(anilistId, source);
-	const sourceIdentity = sourceFromInput(sourceInput);
+	const { source, metadataHint } = input;
 	const base = useMediaModalBaseData({
-		source: sourceIdentity,
-		anilistId,
-		fallbackLabel: `${sourceIdentity.source === "mal" ? "MAL" : "AniList"} #${sourceIdentity.id}`,
+		source,
+		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
 		metadataHint,
 	});
 	const options = base.options;
@@ -160,11 +159,11 @@ function useRadarrModalData(input: SourceRpcInput & {
 
 	const statusPayload = useMemo(
 		() => ({
-			...mappingInspectionInput(anilistId, source),
+			source,
 			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
 			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.statusMetadata, base.statusTitle, source],
+		[base.statusMetadata, base.statusTitle, source],
 	);
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
@@ -206,22 +205,21 @@ export function RadarrModal({
 	onClose,
 	container,
 }: RadarrModalProps): React.JSX.Element {
-	const { anilistId, source, metadataHint, openSource, initialView } = state;
-	const sourceInput = mappingInspectionInput(anilistId, source);
-	const sourceIdentity = sourceFromInput(sourceInput);
-	const identityKey = sourceIdentityKey(sourceIdentity);
+	const { source, metadataHint, openSource, initialView } = state;
+	const identityKey = sourceIdentityKey(source);
+	const sourceAniListIds = useSourceAniListIdMap([source], {
+		enabled: source.source === "mal",
+	});
+	const anilistId = getModalAniListId(source, sourceAniListIds.data);
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<RadarrMappingCandidate | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const data = useRadarrModalData({
-		...sourceInput,
+		source,
 		metadataHint: metadataHint ?? null,
 	});
-	const inspection = useMappingInspection(
-		PROVIDER,
-		mappingInspectionInput(anilistId, source),
-	);
+	const inspection = useMappingInspection(PROVIDER, source);
 	const setupTarget = useMemo(
 		() =>
 			getRadarrSetupTarget({
@@ -255,7 +253,7 @@ export function RadarrModal({
 	});
 	const setupForm = useRadarrSetupForm({
 		formId: SETUP_FORM_ID,
-		sourceInput,
+		source,
 		target: setupTarget,
 		providerPayloadTitle: data.providerPayloadTitle,
 		fallbackLookupTitle: data.fallbackLookupTitle,
@@ -268,7 +266,9 @@ export function RadarrModal({
 		verificationSettled: data.verificationSettled,
 		onClose,
 	});
-	const previewTarget = isMappingView ? (selectedCandidate?.summary ?? null) : null;
+	const previewTarget = isMappingView
+		? (selectedCandidate?.summary ?? null)
+		: null;
 	const handleOpenSettings = useOpenMappingSettingsAction({
 		anilistId,
 		openSource,
@@ -295,14 +295,21 @@ export function RadarrModal({
 		setView("setup");
 	};
 	const mappingActions = useMappingActions({
-		sourceInput,
+		source,
 		provider: PROVIDER,
 		selectedProviderId: selectedCandidate?.tmdbId ?? null,
 		rejectProviderId: rejectCandidateTmdbId,
 		clearRejectedProviderId: clearRejectedCandidateTmdbId,
-		requiresApplyConfirmation: setupForm.footerState.isDirty && canSubmitMapping,
-		onMappingApplied: () => { setSelectedCandidate(null); showSetupView(); },
-		onMappingReset: () => { setSelectedCandidate(null); setView("mapping"); },
+		requiresApplyConfirmation:
+			setupForm.footerState.isDirty && canSubmitMapping,
+		onMappingApplied: () => {
+			setSelectedCandidate(null);
+			showSetupView();
+		},
+		onMappingReset: () => {
+			setSelectedCandidate(null);
+			setView("mapping");
+		},
 		onIgnored: onClose,
 	});
 	const showMappingView = (): void => setView("mapping");
@@ -321,7 +328,7 @@ export function RadarrModal({
 					provider={PROVIDER}
 					contentContainer={contentContainer}
 					anilistHeaderData={data.anilistHeaderData}
-					source={sourceIdentity}
+					source={source}
 					isMappingView={isMappingView}
 					isProviderTargetLoading={setupTargetLoading}
 					currentTarget={data.currentTarget}
@@ -362,7 +369,9 @@ export function RadarrModal({
 						canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
 						canIgnoreTitle={canIgnoreTitle}
 						isRejectingCandidate={mappingActions.isRejectingCandidate}
-						isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
+						isClearingRejectedCandidate={
+							mappingActions.isClearingRejectedCandidate
+						}
 						isIgnoring={mappingActions.isIgnoring}
 						canApplyMapping={canSubmitMapping}
 						isApplyingMapping={mappingActions.isSubmittingMapping}

@@ -65,7 +65,7 @@ describe("query invalidation", () => {
 			queryKeys.mappings(),
 			queryKeys.mappingIdentities([aid(21)]),
 			queryKeys.mappingInspection(
-				normalizeMappingInspectionRequest("radarr", { source }),
+				normalizeMappingInspectionRequest("radarr", source),
 			),
 			queryKeys.providerLookup(
 				"radarr",
@@ -86,7 +86,9 @@ describe("query invalidation", () => {
 			),
 			queryKeys.providerMediaStatus(
 				"radarr",
-				normalizeRadarrStatusRequest({ anilistId: aid(22) }),
+				normalizeRadarrStatusRequest({
+					source: { source: "anilist", id: aid(22) },
+				}),
 			),
 		];
 
@@ -95,7 +97,6 @@ describe("query invalidation", () => {
 		invalidateAfterMappingChange(client, {
 			provider: "radarr",
 			source,
-			anilistId: aid(21),
 		});
 
 		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
@@ -107,7 +108,10 @@ describe("query invalidation", () => {
 		const affected = [
 			queryKeys.mappings(),
 			queryKeys.mappingInspection(
-				normalizeMappingInspectionRequest("sonarr", aid(1)),
+				normalizeMappingInspectionRequest("sonarr", {
+					source: "anilist",
+					id: aid(1),
+				}),
 			),
 			queryKeys.mappingIdentities([aid(1)]),
 			queryKeys.seerrTargets([{ anilistId: aid(1), mediaType: "tv" }]),
@@ -117,11 +121,15 @@ describe("query invalidation", () => {
 			}),
 			queryKeys.providerMediaStatus(
 				"sonarr",
-				normalizeSonarrStatusRequest({ anilistId: aid(1) }),
+				normalizeSonarrStatusRequest({
+					source: { source: "anilist", id: aid(1) },
+				}),
 			),
 			queryKeys.providerMediaStatus(
 				"radarr",
-				normalizeRadarrStatusRequest({ anilistId: aid(1) }),
+				normalizeRadarrStatusRequest({
+					source: { source: "anilist", id: aid(1) },
+				}),
 			),
 			queryKeys.providerLookup(
 				"sonarr",
@@ -144,7 +152,9 @@ describe("query invalidation", () => {
 		const affected = [
 			queryKeys.providerMediaStatus(
 				"sonarr",
-				normalizeSonarrStatusRequest({ anilistId: aid(1) }),
+				normalizeSonarrStatusRequest({
+					source: { source: "anilist", id: aid(1) },
+				}),
 			),
 			queryKeys.providerLookup(
 				"sonarr",
@@ -155,7 +165,9 @@ describe("query invalidation", () => {
 		const unaffected = [
 			queryKeys.providerMediaStatus(
 				"radarr",
-				normalizeRadarrStatusRequest({ anilistId: aid(1) }),
+				normalizeRadarrStatusRequest({
+					source: { source: "anilist", id: aid(1) },
+				}),
 			),
 			queryKeys.providerLookup(
 				"radarr",

@@ -223,13 +223,6 @@ export const getMappingRowMutationInput = (
 	provider: row.provider,
 });
 
-export const getMappingEditorIdentity = (
-	row: MappingRow,
-): { source: SourceIdentity; anilistId: AniListId } => ({
-	source: { source: "anilist", id: row.anilistId },
-	anilistId: row.anilistId,
-});
-
 export const formatMappingStatusLabel = (
 	status: MappingListRowStatus,
 ): string => {

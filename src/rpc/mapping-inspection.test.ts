@@ -35,6 +35,7 @@ function inspectionDeps(
 describe("getMappingInspection", () => {
 	it("loads linked metadata for a mapped MAL source", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(10));
 		const linkedMetadata: AniListMetadata[] = [
 			{
 				id: aid(10),
@@ -65,7 +66,7 @@ describe("getMappingInspection", () => {
 
 		await expect(
 			getMappingInspection(
-				{ provider: "sonarr", source, anilistId: aid(10) },
+				{ provider: "sonarr", source },
 				deps,
 			),
 		).resolves.toEqual({
@@ -92,22 +93,30 @@ describe("getMappingInspection", () => {
 		expect(deps.mappingService.getMapping).toHaveBeenCalledWith(
 			"sonarr",
 			source,
+			aid(10),
 		);
 		expect(deps.anilistMetadataStore.getMetadata).toHaveBeenCalledWith([
 			aid(10),
 			aid(11),
 		]);
-		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
+		expect(getUniqueAniListIdForSource).toHaveBeenCalledOnce();
 	});
 
 	it("skips linked metadata for non-mapped results", async () => {
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(404));
 		const deps = inspectionDeps({
 			kind: "unmapped",
 			hadResolveAttempt: false,
 		});
 
 		await expect(
-			getMappingInspection({ provider: "radarr", anilistId: aid(404) }, deps),
+			getMappingInspection(
+				{
+					provider: "radarr",
+					source: { source: "anilist", id: aid(404) },
+				},
+				deps,
+			),
 		).resolves.toEqual({
 			source: { source: "anilist", id: aid(404) },
 			mapping: { kind: "unmapped", hadResolveAttempt: false },
@@ -140,6 +149,7 @@ describe("getMappingInspection", () => {
 		expect(deps.mappingService.getMapping).toHaveBeenCalledWith(
 			"sonarr",
 			source,
+			null,
 		);
 		expect(deps.anilistMetadataStore.getMetadata).not.toHaveBeenCalled();
 	});

@@ -2,7 +2,7 @@
 // src/features/media-overlay/radarr-card-overlay.tsx
 
 import type { ReactElement, ReactNode } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import { RadarrIcon } from "@/features/provider-ui/provider-icons";
 import type { SourceIdentity } from "@/mapping/source-identity";
@@ -15,7 +15,6 @@ import { useCardOverlayInViewport } from "./card-overlay-viewport";
 import { getCardPrimaryLabel, getCardPrimaryTitle } from "./card-primary-title";
 
 interface RadarrCardOverlayProps {
-	anilistId?: AniListId | undefined;
 	source: SourceIdentity;
 	title: string;
 	onOpenSetup(): void;
@@ -32,7 +31,6 @@ interface RadarrCardOverlayProps {
 }
 
 export function RadarrCardOverlay({
-	anilistId,
 	source,
 	title,
 	onOpenSetup,
@@ -49,9 +47,8 @@ export function RadarrCardOverlay({
 }: RadarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
-	const identity = anilistId === undefined ? { source } : { source, anilistId };
 	const mediaAction = useRadarrMediaAction({
-		...identity,
+		source,
 		displayTitle: title,
 		providerTitle,
 		metadata,
@@ -70,10 +67,7 @@ export function RadarrCardOverlay({
 	};
 	const primaryTitle = getCardPrimaryTitle(primaryLabelInput);
 	const primaryLabel = getCardPrimaryLabel(primaryLabelInput);
-	const openSetup =
-		anilistId !== undefined && mediaAction.status.hasMapping
-			? onOpenSetup
-			: undefined;
+	const openSetup = mediaAction.status.hasMapping ? onOpenSetup : undefined;
 	const statusPrimaryAction =
 		mediaAction.status.state === "in-library"
 			? (openSetup ?? mediaAction.openProvider ?? mediaAction.runPrimaryAction)
@@ -96,9 +90,7 @@ export function RadarrCardOverlay({
 			hasMapping={mediaAction.status.hasMapping}
 			onOpenSetup={openSetup}
 			onOpenMapping={
-				anilistId !== undefined && mediaAction.status.state !== "unconfigured"
-					? onOpenMapping
-					: undefined
+				mediaAction.status.state === "unconfigured" ? undefined : onOpenMapping
 			}
 			openProvider={mediaAction.openProvider}
 			openProviderIcon={RadarrIcon}

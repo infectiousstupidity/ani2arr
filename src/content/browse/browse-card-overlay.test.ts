@@ -113,7 +113,6 @@ describe("BrowseCardOverlay", () => {
 		expect(overlay).toMatchObject({
 			type: expectedComponent,
 			props: {
-				anilistId: undefined,
 				source: parsed.source,
 				extraAction: {
 					type: SeerrCardStackActions,

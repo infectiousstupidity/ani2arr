@@ -139,6 +139,7 @@ describe("api services", () => {
 			await mappingService.resolveMapping(
 				"radarr",
 				{ source: "anilist", id: parseAniListId(1) },
+				parseAniListId(1),
 				{ title: "Perfect Blue" },
 			);
 

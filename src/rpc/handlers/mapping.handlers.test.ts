@@ -263,13 +263,13 @@ describe("mappingHandlers", () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 
 		vi.mocked(mappingService.getLinkedAniListIds).mockResolvedValue([aid(11)]);
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(10));
 
 		await expect(
 			mappingHandlers.setManualMapping({
 				provider: "sonarr",
-				providerId: tvdb(20),
-				source,
-				anilistId: aid(10),
+					providerId: tvdb(20),
+					source,
 			}),
 		).rejects.toMatchObject({
 			code: ErrorCode.VALIDATION_ERROR,

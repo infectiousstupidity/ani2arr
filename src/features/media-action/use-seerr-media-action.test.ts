@@ -33,7 +33,6 @@ const tmdbId = parseTmdbId(37_854);
 const onOpenModal = vi.fn();
 const baseInput: Parameters<typeof useSeerrMediaAction>[0] = {
 	source: { source: "anilist", id: anilistId },
-	anilistId,
 	title: "Frieren",
 	metadata: { format: "TV" },
 	mediaType: "tv",

@@ -1,7 +1,7 @@
 /** Anime-page presentation for the shared Seerr media action. */
 
 import type { MouseEvent, ReactElement } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
 import { useSeerrMediaAction } from "@/features/media-action/use-seerr-media-action";
 import { SeerrIcon } from "@/features/provider-ui/provider-icons";
 import type { SourceIdentity } from "@/mapping/source-identity";
@@ -10,7 +10,6 @@ import Button from "@/shared/ui/primitives/button";
 
 interface SeerrAnimePageActionProps {
 	source: SourceIdentity;
-	anilistId?: AniListId | undefined;
 	title: string | null;
 	metadata: AniListMediaHint | null;
 	mediaType: SeerrMediaType | null;
@@ -27,7 +26,6 @@ function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
 
 export function SeerrAnimePageAction({
 	source,
-	anilistId,
 	title,
 	metadata,
 	mediaType,
@@ -39,7 +37,6 @@ export function SeerrAnimePageAction({
 }: SeerrAnimePageActionProps): ReactElement {
 	const action = useSeerrMediaAction({
 		source,
-		...(anilistId === undefined ? {} : { anilistId }),
 		title,
 		metadata,
 		mediaType,

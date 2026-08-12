@@ -8,7 +8,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type {
 	SeerrMediaDetails,
 	SeerrSearchResult,
@@ -23,7 +23,6 @@ import type {
 	GetSeerrMediaDetailsInput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
-	SourceRpcInput,
 } from "@/rpc/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ModalShell } from "../chrome/modal-shell";
@@ -69,7 +68,7 @@ function canSaveTvTarget(
 }
 
 function buildTvManualTargetInput(input: {
-	targetInput: SourceRpcInput;
+	source: SourceIdentity;
 	selectedDetails: SeerrMediaDetails | null;
 	selectedResult: SeerrSearchResult | null;
 	draftSeasons: readonly number[];
@@ -82,7 +81,7 @@ function buildTvManualTargetInput(input: {
 	}
 
 	return {
-		...input.targetInput,
+		source: input.source,
 		mediaType: "tv",
 		tmdbId: input.selectedResult.tmdbId,
 		...(input.selectedDetails?.tvdbId === undefined
@@ -93,8 +92,7 @@ function buildTvManualTargetInput(input: {
 }
 
 export function SeerrChangeTargetView(props: {
-	targetInput: SourceRpcInput;
-	anilistId?: AniListId | undefined;
+	source: SourceIdentity;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	defaultQuery: string;
@@ -108,8 +106,7 @@ export function SeerrChangeTargetView(props: {
 	target: SeerrRequestTarget | null;
 }): React.JSX.Element {
 	const {
-		targetInput,
-		anilistId,
+		source,
 		container,
 		contentContainer,
 		defaultQuery,
@@ -122,6 +119,7 @@ export function SeerrChangeTargetView(props: {
 		setSelectedResult,
 		target,
 	} = props;
+	const anilistId = target?.anilistId;
 	const [searchQueryDraft, setSearchQueryDraft] = useState<string | null>(null);
 	const [submittedQuery, setSubmittedQuery] = useState("");
 	const [manualTargetSeasonDraft, setManualTargetSeasonDraft] =
@@ -181,7 +179,7 @@ export function SeerrChangeTargetView(props: {
 	const saveMovieTarget = (result: SeerrSearchResult): void => {
 		setManualTarget.mutate(
 			{
-				...targetInput,
+				source,
 				mediaType: "movie",
 				tmdbId: result.tmdbId,
 			},
@@ -198,7 +196,7 @@ export function SeerrChangeTargetView(props: {
 	};
 	const saveTvTarget = (): void => {
 		const input = buildTvManualTargetInput({
-			targetInput,
+			source,
 			selectedDetails,
 			selectedResult,
 			draftSeasons,

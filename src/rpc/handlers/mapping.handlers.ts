@@ -18,6 +18,7 @@ import type { MappingResult } from "@/mapping/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import {
 	getSourceAliasesByAniListId,
+	getUniqueAniListIdForSource,
 	getUniqueAniListIdsForSources,
 } from "@/mapping/upstream.store";
 import type { Provider } from "@/providers/types";
@@ -33,10 +34,6 @@ import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
-import {
-	resolveAniListIdFromInput,
-	sourceFromInput,
-} from "@/rpc/source-input";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -51,7 +48,6 @@ import type {
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
-	SourceRpcInput,
 } from "@/rpc/types";
 
 type ProviderMetaSource = {
@@ -442,66 +438,70 @@ async function assertNoConflictingLinkedIds(input: {
 	);
 }
 
-async function resolveMappingIdentity(input: SourceRpcInput) {
-	const anilistId = await resolveAniListIdFromInput(input);
-	return {
-		identity: sourceFromInput(input),
-		anilistId: anilistId ?? undefined,
-	};
-}
-
 export const mappingHandlers = {
 	getMappingIdentities(ids: GetMappingIdentitiesInput) {
 		return getMappingIdentities(ids);
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {
-		const { identity, anilistId } = await resolveMappingIdentity(input);
+		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
 		await assertNoConflictingLinkedIds({
 			provider: input.provider,
-			currentAniListId: anilistId ?? null,
+			currentAniListId: linkedAniListId,
 			providerId: input.providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});
 
 		await mappingService.setManualMapping(
 			input.provider,
-			identity,
+			input.source,
 			input.providerId,
-			anilistId,
+			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
-		const { identity, anilistId } = await resolveMappingIdentity(input);
-		await mappingService.clearManualMapping(input.provider, identity, anilistId);
+		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+		await mappingService.clearManualMapping(
+			input.provider,
+			input.source,
+			linkedAniListId ?? undefined,
+		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
-		const { identity, anilistId } = await resolveMappingIdentity(input);
-		await mappingService.setIgnored(input.provider, identity, anilistId);
+		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+		await mappingService.setIgnored(
+			input.provider,
+			input.source,
+			linkedAniListId ?? undefined,
+		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
-		const { identity, anilistId } = await resolveMappingIdentity(input);
-		await mappingService.clearIgnored(input.provider, identity, anilistId);
+		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+		await mappingService.clearIgnored(
+			input.provider,
+			input.source,
+			linkedAniListId ?? undefined,
+		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput) {
-		const { identity, anilistId } = await resolveMappingIdentity(input);
+		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
 		await mappingService.rejectCandidate(
 			input.provider,
-			identity,
+			input.source,
 			input.providerId,
-			anilistId,
+			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
 		return { ok: true as const };
@@ -510,12 +510,12 @@ export const mappingHandlers = {
 	async clearMappingRejectedCandidate(
 		input: ClearMappingRejectedCandidateInput,
 	) {
-		const { identity, anilistId } = await resolveMappingIdentity(input);
+		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
 		await mappingService.clearRejectedCandidate(
 			input.provider,
-			identity,
+			input.source,
 			input.providerId,
-			anilistId,
+			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
 		return { ok: true as const };

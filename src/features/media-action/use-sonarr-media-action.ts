@@ -7,7 +7,6 @@ import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import { useAddSeries, useSeriesStatus } from "@/queries/sonarr";
 import {
 	buildMediaActionStatusQuery,
-	mediaActionSourceInput,
 	type MediaAction,
 	type MediaActionInputBase,
 	useMediaAction,
@@ -30,7 +29,7 @@ function quickAdd(input: {
 	) return;
 
 	input.addSeries.mutate({
-		...mediaActionSourceInput(input.mediaInput),
+		source: input.mediaInput.source,
 		tvdbId: input.tvdbId,
 		title: input.mediaInput.providerTitle,
 		primaryTitleHint: input.mediaInput.providerTitle,

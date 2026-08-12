@@ -10,7 +10,6 @@ import type {
 	SyntheticEvent,
 } from "react";
 import type { metadataHintFromAniListMetadata } from "@/anilist/title";
-import type { AniListId } from "@/anilist/types";
 import type {
 	MediaModalMetadataHint,
 	MediaModalOpenState,
@@ -185,15 +184,12 @@ function ProviderStackAction(props: {
 
 function getProviderStackAction(input: {
 	isConfigured: boolean;
-	anilistId: AniListId | undefined;
 	configuredLabel: string;
 	configureLabel: string;
 	tooltipContainer: FloatingPortalContainer | undefined;
 	onOpen(): void;
 	onConfigure(): void;
 }): ReactNode {
-	if (input.isConfigured && input.anilistId === undefined) return null;
-
 	return (
 		<ProviderStackAction
 			label={input.isConfigured ? input.configuredLabel : input.configureLabel}
@@ -205,16 +201,12 @@ function getProviderStackAction(input: {
 
 function openProviderModal(input: {
 	onOpenMediaModal(input: MediaModalOpenState): void;
-	anilistId: AniListId | undefined;
 	source: SourceIdentity;
 	provider: Provider;
 	initialView: "setup" | "mapping";
 	metadataHint: MediaModalMetadataHint;
 }): void {
-	if (input.anilistId === undefined) return;
-
 	input.onOpenMediaModal({
-		anilistId: input.anilistId,
 		source: input.source,
 		kind: "provider",
 		provider: input.provider,
@@ -226,12 +218,10 @@ function openProviderModal(input: {
 
 function openSeerrModal(input: {
 	onOpenMediaModal(input: MediaModalOpenState): void;
-	anilistId: AniListId | undefined;
 	source: SourceIdentity;
 	metadataHint: MediaModalMetadataHint;
 }): void {
 	input.onOpenMediaModal({
-		...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
 		source: input.source,
 		kind: "seerr",
 		openSource: "content",
@@ -239,7 +229,6 @@ function openSeerrModal(input: {
 	});
 }
 
-// eslint-disable-next-line complexity -- Provider selection stays easier to follow in one component.
 export function BrowseCardOverlay({
 	parsed,
 	adapter,
@@ -249,7 +238,6 @@ export function BrowseCardOverlay({
 	onOpenMediaModal,
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
-	const anilistId = parsed.anilistId;
 	const rawProvider = resolveBrowseCardProvider({
 		parsed,
 		metadata,
@@ -300,7 +288,6 @@ export function BrowseCardOverlay({
 	): void => {
 		openProviderModal({
 			onOpenMediaModal,
-			anilistId,
 			source: parsed.source,
 			provider,
 			initialView,
@@ -311,7 +298,6 @@ export function BrowseCardOverlay({
 	const handleOpenSeerrModal = (): void => {
 		openSeerrModal({
 			onOpenMediaModal,
-			anilistId,
 			source: parsed.source,
 			metadataHint,
 		});
@@ -322,7 +308,6 @@ export function BrowseCardOverlay({
 	if (activeArr === "sonarr") {
 		arrStackAction = getProviderStackAction({
 			isConfigured: sonarrOpts.isConfigured,
-			anilistId,
 			configuredLabel: "Sonarr options",
 			configureLabel: "Configure Sonarr",
 			tooltipContainer,
@@ -332,7 +317,6 @@ export function BrowseCardOverlay({
 	} else if (activeArr === "radarr") {
 		arrStackAction = getProviderStackAction({
 			isConfigured: radarrOpts.isConfigured,
-			anilistId,
 			configuredLabel: "Radarr options",
 			configureLabel: "Configure Radarr",
 			tooltipContainer,
@@ -346,7 +330,6 @@ export function BrowseCardOverlay({
 	const seerrStackActions: ReactNode = seerrEnabled ? (
 		<SeerrCardStackActions
 			source={parsed.source}
-			{...(anilistId === undefined ? {} : { anilistId })}
 			title={displayTitle}
 			metadata={metadata}
 			mediaType={seerrMediaType}
@@ -369,7 +352,6 @@ export function BrowseCardOverlay({
 			(usesFloatingOverlay && effectivePrimaryStatus === "seerr"));
 
 	const commonProps = {
-		anilistId,
 		source: parsed.source,
 		title: displayTitle,
 		metadata,
@@ -383,7 +365,6 @@ export function BrowseCardOverlay({
 		return (
 			<SeerrStandaloneCardOverlay
 				source={parsed.source}
-				{...(anilistId === undefined ? {} : { anilistId })}
 				title={displayTitle}
 				metadata={metadata}
 				mediaType={seerrMediaType}

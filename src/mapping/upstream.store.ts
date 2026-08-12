@@ -93,13 +93,15 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getSourceUpstreamLayers(
 	source: SourceIdentity,
+	linkedAniListId?: AniListId | null,
 ): Promise<SourceUpstreamLayers> {
 	const snapshot = await readSnapshot();
 	const directRecord = snapshot?.records[sourceIdentityKey(source)];
-	const anilistId =
-		source.source === "anilist"
-			? source.id
-			: (directRecord?.linkedAniListId ?? null);
+	let anilistId: AniListId | null;
+	if (source.source === "anilist") anilistId = source.id;
+	else if (linkedAniListId === undefined) {
+		anilistId = directRecord?.linkedAniListId ?? null;
+	} else anilistId = linkedAniListId;
 	const canonicalRecord =
 		anilistId === null
 			? undefined

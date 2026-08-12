@@ -2,7 +2,6 @@
 // src/features/media-modal/hooks/use-media-modal-base-data.ts
 
 import { useMemo } from "react";
-import type { AniListId } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import { useAniListMedia, useAniListMetadataBatch } from "@/queries/anilist";
 import { useMyAnimeListMetadata } from "@/queries/myanimelist";
@@ -12,7 +11,6 @@ import type { MediaModalMetadataHint } from "../types";
 
 export function useMediaModalBaseData(input: {
 	source: SourceIdentity;
-	anilistId?: AniListId | undefined;
 	fallbackLabel?: string | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 }) {

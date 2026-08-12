@@ -12,7 +12,6 @@ import {
 	useSeerrPublicSettings,
 	useSeerrTarget,
 } from "@/queries/seerr";
-import { getDirectAniListId, sourceFromInput } from "@/rpc/source-input";
 import type { GetSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
 import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
@@ -78,20 +77,13 @@ export function SeerrModal({
 	onClose,
 	container,
 }: SeerrModalProps): React.JSX.Element {
-	const { metadataHint } = state;
-	const source = sourceFromInput(state);
-	const anilistId = getDirectAniListId(state) ?? undefined;
-	const targetInput = {
-		source,
-		...(anilistId === undefined ? {} : { anilistId }),
-	};
+	const { metadataHint, source } = state;
 	const [view, setView] = useState<SeerrView>("request");
 	const [selectedResult, setSelectedResult] =
 		useState<SeerrSearchResult | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
 		source,
-		...(anilistId === undefined ? {} : { anilistId }),
 		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
 		metadataHint: metadataHint ?? null,
 	});
@@ -102,8 +94,8 @@ export function SeerrModal({
 	);
 	const targetQuery = useSeerrTarget(
 		addSeerrMediaType(
-			{
-					...targetInput,
+				{
+					source,
 					title: base.providerRequestTitle,
 					metadata: base.resolvedMetadata,
 			},
@@ -139,9 +131,8 @@ export function SeerrModal({
 
 	if (view === "change-target") {
 		return (
-			<SeerrChangeTargetView
-				targetInput={targetInput}
-				{...(anilistId === undefined ? {} : { anilistId })}
+				<SeerrChangeTargetView
+					source={source}
 				container={container}
 				contentContainer={contentContainer}
 				defaultQuery={base.providerRequestTitle}
@@ -159,8 +150,7 @@ export function SeerrModal({
 
 	return (
 		<SeerrRequestView
-			targetInput={targetInput}
-			{...(anilistId === undefined ? {} : { anilistId })}
+			source={source}
 			authMode={base.options?.seerr.authMode ?? null}
 			container={container}
 			contentContainer={contentContainer}

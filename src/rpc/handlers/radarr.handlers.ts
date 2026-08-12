@@ -13,6 +13,7 @@ import {
 	requireProviderCredentials,
 } from "@/background/provider-config";
 import type { MappingResult } from "@/mapping/types";
+import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { addRadarrMovie } from "@/providers/radarr/add";
 import { updateRadarrMovie as updateRadarrMovieProvider } from "@/providers/radarr/edit";
 import {
@@ -35,7 +36,6 @@ import type {
 	ValidateTmdbInput,
 } from "@/rpc/types";
 import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
-import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 type RadarrMappingResult =
@@ -225,9 +225,11 @@ async function getRadarrStatusFromMappingAndLibrary(
 async function resolveRadarrMapping(
 	input: StatusInput,
 ): Promise<RadarrMappingResult> {
+	const linkedAniListId = await getUniqueAniListIdForSource(input.source);
 	const mapping = await mappingService.resolveMapping(
 		"radarr",
-		sourceFromInput(input),
+		input.source,
+		linkedAniListId,
 		{
 			forceRetry: input.force_mapping_retry === true,
 			...(input.title === undefined ? {} : { title: input.title }),

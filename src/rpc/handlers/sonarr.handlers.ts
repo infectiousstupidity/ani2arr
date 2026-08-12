@@ -13,6 +13,7 @@ import {
 	requireProviderCredentials,
 } from "@/background/provider-config";
 import type { MappingResult } from "@/mapping/types";
+import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { addSonarrSeries } from "@/providers/sonarr/add";
 import { updateSonarrSeries as updateSonarrSeriesProvider } from "@/providers/sonarr/edit";
 import {
@@ -36,7 +37,6 @@ import type {
 	UpdateSonarrInput,
 	ValidateTvdbInput,
 } from "@/rpc/types";
-import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeError } from "@/shared/errors/error-utils";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -244,9 +244,11 @@ async function getSeriesStatusFromMappingAndLibrary(
 async function resolveSeriesMapping(
 	input: StatusInput,
 ): Promise<SonarrMappingResult> {
+	const linkedAniListId = await getUniqueAniListIdForSource(input.source);
 	const mapping = await mappingService.resolveMapping(
 		"sonarr",
-		sourceFromInput(input),
+		input.source,
+		linkedAniListId,
 		{
 			forceRetry: input.force_mapping_retry === true,
 			...(input.title === undefined ? {} : { title: input.title }),

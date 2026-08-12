@@ -30,7 +30,7 @@ import type {
 export type SeerrAutoResolverInput = {
 	source: SourceIdentity;
 	mediaType: SeerrMediaType;
-	anilistId?: AniListId;
+	anilistId: AniListId | null;
 	title?: string;
 	metadata?: AniListMediaHint | null;
 	forceRetry?: boolean;
@@ -40,7 +40,7 @@ type SeerrAutoResolverDependencies = {
 	getEffectiveTarget(input: {
 		identity: SourceIdentity;
 		mediaType: SeerrMediaType;
-		anilistId?: AniListId;
+		anilistId: AniListId | null;
 	}): Promise<EffectiveSeerrTarget | null>;
 	getAutoResult(
 		identity: SourceIdentity,
@@ -74,7 +74,7 @@ function toEffectiveTarget(
 	target: SeerrTarget,
 ): EffectiveSeerrTarget {
 	return {
-		...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
+		...(input.anilistId === null ? {} : { anilistId: input.anilistId }),
 		source: "automatic",
 		...target,
 	};
@@ -218,10 +218,11 @@ export function createSeerrAutoResolver(
 		input: SeerrAutoResolverInput,
 	): Promise<EffectiveSeerrTarget | null> => {
 		const writeToken = captureAutomaticWriteToken();
+		const canonicalAniListId = input.anilistId ?? undefined;
 		const identity = {
 			identity: input.source,
 			mediaType: input.mediaType,
-			...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
+			anilistId: input.anilistId,
 		};
 		const effective = await dependencies.getEffectiveTarget(identity);
 		if (
@@ -234,7 +235,7 @@ export function createSeerrAutoResolver(
 		const cached = await dependencies.getAutoResult(
 			input.source,
 			input.mediaType,
-			input.anilistId,
+			canonicalAniListId,
 		);
 		if (cached?.kind === "mapped" && input.forceRetry !== true) {
 			return toEffectiveTarget(input, cached.target);
@@ -281,7 +282,7 @@ export function createSeerrAutoResolver(
 				input.source,
 				input.mediaType,
 				{ kind: "unmapped" },
-				input.anilistId,
+				canonicalAniListId,
 			);
 			return null;
 		}
@@ -302,7 +303,7 @@ export function createSeerrAutoResolver(
 				target,
 				matchedTitle: match.matchedTitle,
 			},
-			input.anilistId,
+			canonicalAniListId,
 		);
 		return stored ? toEffectiveTarget(input, target) : null;
 	};

@@ -1,20 +1,17 @@
 /** Shared media-action hook for provider-neutral action state, URLs, and commands. */
 // src/features/media-action/use-media-action.ts
 
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MappingResult } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";
-import type { SourceRpcInput, StatusInput } from "@/rpc/types";
+import type { StatusInput } from "@/rpc/types";
 import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
-type MediaActionIdentity =
-	| { source: SourceIdentity; anilistId?: AniListId }
-	| { source?: undefined; anilistId: AniListId };
-
-export type MediaActionInputBase<TForm> = MediaActionIdentity & {
+export type MediaActionInputBase<TForm> = {
+	source: SourceIdentity;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -82,26 +79,14 @@ function shouldEnableStatus(input: MediaActionInputBase<unknown>): boolean {
 	return input.enabled && input.isConfigured && input.statusBlocked !== true;
 }
 
-export function mediaActionSourceInput(
-	input: MediaActionIdentity,
-): SourceRpcInput {
-	if (input.source !== undefined) {
-		return "anilistId" in input && input.anilistId !== undefined
-			? { source: input.source, anilistId: input.anilistId }
-			: { source: input.source };
-	}
-
-	return { anilistId: input.anilistId };
-}
-
 export function buildMediaActionStatusQuery(
 	input: MediaActionInputBase<unknown>,
 ): {
-	payload: SourceRpcInput & Pick<StatusInput, "metadata" | "title">;
+	payload: Pick<StatusInput, "source" | "metadata" | "title">;
 	options: MediaActionStatusOptions;
 } {
-	const payload: SourceRpcInput & Pick<StatusInput, "metadata" | "title"> = {
-		...mediaActionSourceInput(input),
+	const payload: Pick<StatusInput, "source" | "metadata" | "title"> = {
+		source: input.source,
 		metadata: input.metadata,
 	};
 	if (input.providerTitle !== null) {
