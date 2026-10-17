@@ -32,7 +32,7 @@ jobs:
           version: 11.7.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        uses: actions/setup-node@v7 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           node-version: 24
           cache: pnpm
