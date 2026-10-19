@@ -69,7 +69,6 @@ const NON_ANIMATION_SCORE_FACTOR = 0.85;
 const SHORT_QUERY_VERBOSE_RESULT_FACTOR = 0.85;
 const RARE_TOKEN_MIN_LENGTH = 4;
 const MINIMUM_SCORE = 0.82;
-const MINIMUM_WINNER_MARGIN = 0.02;
 
 type NormalizeTitleTokensOptions = {
 	stripDiacritics?: boolean;
@@ -900,10 +899,7 @@ function findTitleMatchForTermInternal(
 		.toSorted((left, right) => right.score - left.score);
 
 	const winner = scored[0];
-	const second = scored[1];
 	if (!winner || winner.score < MINIMUM_SCORE) return null;
-	if (second && winner.score - second.score < MINIMUM_WINNER_MARGIN)
-		return null;
 
 	return {
 		providerId: winner.candidate.providerId,

@@ -67,6 +67,50 @@ describe("auto mapping store", () => {
 		});
 	});
 
+	it("expires an independent TMDB show with its season scope", async () => {
+		const identity = { source: "anilist", id: aid(1) } as const;
+		await setSeerrAutoResult(captureAutomaticWriteToken(), identity, "tv", {
+			kind: "mapped",
+			target: {
+				mediaType: "tv",
+				tmdbId: tmdb(10),
+				seasons: [2],
+			},
+		});
+		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
+			facts: { tmdbShow: tmdb(10) },
+			scopes: { tmdbShow: { id: tmdb(10), seasons: [2] } },
+		});
+
+		vi.setSystemTime(new Date("2026-02-02T00:00:00Z"));
+		await expect(getAutomaticLayerRecord(identity)).resolves.toBeNull();
+	});
+
+	it("decodes malformed current-v1 nested automatic fields safely", async () => {
+		await browser.storage.local.set({
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: { tmdbMovie: "bad", tvdbShow: tvdb(20) },
+						scopes: { tvdbShow: { id: tvdb(20), seasons: [-1, 2] } },
+						slotMeta: {
+							tvdbShow: { expiresAt: Date.now() + 1000 },
+							tmdbMovie: { expiresAt: "later" },
+						},
+						attempts: { seerrTmdbShow: { expiresAt: "later" } },
+					},
+				},
+			},
+		});
+
+		await expect(getAutomaticLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tvdbShow: tvdb(20) },
+			scopes: { tvdbShow: { id: tvdb(20), seasons: [2] } },
+			slotMeta: { tvdbShow: { expiresAt: Date.now() + 1000 } },
+		});
+	});
+
 	it("lists only AniList results from mixed-source storage", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: {
@@ -178,6 +222,48 @@ describe("auto mapping store", () => {
 		expect(envelope.records).not.toHaveProperty("mal:5114");
 	});
 
+	it("preserves an active alias when the canonical result has expired", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		const expiredAt = Date.now() - 1;
+		const activeUntil = Date.now() + 10_000;
+		await browser.storage.local.set({
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: { tmdbMovie: tmdb(10) },
+						slotMeta: { tmdbMovie: { expiresAt: expiredAt } },
+					},
+					"mal:5114": {
+						facts: { tmdbMovie: tmdb(20) },
+						slotMeta: { tmdbMovie: { expiresAt: activeUntil } },
+					},
+				},
+			},
+		});
+
+		await expect(getAutomaticLayerRecord(source, aid(1))).resolves.toEqual({
+			facts: { tmdbMovie: tmdb(20) },
+			slotMeta: { tmdbMovie: { expiresAt: activeUntil } },
+		});
+
+		await consolidateAutomaticAliases(new Map([[aid(1), [source]]]));
+
+		await expect(getAutomaticLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tmdbMovie: tmdb(20) },
+			slotMeta: { tmdbMovie: { expiresAt: activeUntil } },
+		});
+		const storedResult = await browser.storage.local.get(AUTO_STORAGE_KEY);
+		const stored = storedResult[AUTO_STORAGE_KEY] as {
+			records: Record<string, unknown>;
+		};
+		expect(stored.records).not.toHaveProperty("mal:5114");
+		expect(stored.records["anilist:1"]).toEqual({
+			facts: { tmdbMovie: tmdb(20) },
+			slotMeta: { tmdbMovie: { expiresAt: activeUntil } },
+		});
+	});
+
 	it("reads legacy raw AniList keys", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: {
@@ -195,6 +281,89 @@ describe("auto mapping store", () => {
 		await expect(
 			getAutomaticLayerRecord({ source: "anilist", id: aid(1) }),
 		).resolves.toMatchObject({ facts: { tmdbMovie: tmdb(300) } });
+	});
+
+	it("drops legacy provider-bucket ambiguity without recording an attempt", async () => {
+		await browser.storage.local.set({
+			[AUTO_STORAGE_KEY]: {
+				sonarr: {
+					1: {
+						kind: "ambiguous",
+						targets: [
+							{ provider: "sonarr", providerId: tvdb(10) },
+							{ provider: "sonarr", providerId: tvdb(20) },
+						],
+						expiresAt: Date.now() + 10_000,
+					},
+				},
+				radarr: {},
+			},
+		});
+
+		await migrateAutomaticStore();
+
+		await expect(getAutomaticLayerRecord(aid(1))).resolves.toBeNull();
+		await expect(browser.storage.local.get(AUTO_STORAGE_KEY)).resolves.toEqual({
+			[AUTO_STORAGE_KEY]: { version: 1, records: {} },
+		});
+	});
+
+	it("drops current automatic Arr conflicts and their slot state", async () => {
+		const expiresAt = Date.now() + 10_000;
+		await browser.storage.local.set({
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: {
+							tmdbMovie: tmdb(10),
+							tmdbShow: tmdb(30),
+							tvdbShow: tvdb(40),
+						},
+						conflicts: {
+							tmdbMovie: [tmdb(10), tmdb(20)],
+							tvdbShow: [
+								{ id: tvdb(40), seasons: [1] },
+								{ id: tvdb(50), seasons: [2] },
+							],
+						},
+						scopes: { tvdbShow: { id: tvdb(40), seasons: [1] } },
+						slotMeta: {
+							tmdbMovie: { expiresAt },
+							tmdbShow: { expiresAt },
+							tvdbShow: { expiresAt },
+						},
+						attempts: { seerrTmdbMovie: { expiresAt } },
+					},
+					"anilist:2": {
+						facts: {},
+						conflicts: { tmdbMovie: [tmdb(60), tmdb(70)] },
+						slotMeta: { tmdbMovie: { expiresAt } },
+					},
+				},
+			},
+		});
+
+		await migrateAutomaticStore();
+
+		await expect(getAutomaticLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tmdbShow: tmdb(30) },
+			slotMeta: { tmdbShow: { expiresAt } },
+			attempts: { seerrTmdbMovie: { expiresAt } },
+		});
+		await expect(getAutomaticLayerRecord(aid(2))).resolves.toBeNull();
+		await expect(browser.storage.local.get(AUTO_STORAGE_KEY)).resolves.toEqual({
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: { tmdbShow: tmdb(30) },
+						slotMeta: { tmdbShow: { expiresAt } },
+						attempts: { seerrTmdbMovie: { expiresAt } },
+					},
+				},
+			},
+		});
 	});
 
 	it("migrates Arr and Seerr TTLs with independent facts and attempt lanes", async () => {
@@ -231,6 +400,8 @@ describe("auto mapping store", () => {
 						mediaType: "tv",
 						tmdbId: tmdb(300),
 						tvdbId: tvdb(400),
+						seasons: [2],
+						tmdbSeasons: [3],
 					},
 					expiresAt: seerrExpiry,
 				},
@@ -251,7 +422,7 @@ describe("auto mapping store", () => {
 				tmdbShow: tmdb(300),
 				tvdbShow: tvdb(100),
 			},
-			tvShowPairs: [{ tmdbShow: tmdb(300), tvdbShow: tvdb(400) }],
+			scopes: { tmdbShow: { id: tmdb(300), seasons: [3] } },
 			slotMeta: {
 				tmdbMovie: { expiresAt: radarrExpiry },
 				tmdbShow: { expiresAt: seerrExpiry },

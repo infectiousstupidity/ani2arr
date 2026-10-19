@@ -1,45 +1,63 @@
 /** Mapping target and resolved mapping result types. */
-// src/mapping/types.ts
 
-import type { AniListId } from "@/anilist/types";
-import type { TmdbId, TvdbId } from "@/providers/schemas";
-import type { SeerrTargetWithEvidence } from "./seerr-target";
+import {
+	parseTmdbIdOrNull,
+	type TmdbId,
+	type TvdbId,
+} from "@/providers/schemas";
+import { normalizeSeasonNumbers } from "./season-numbers";
 
-export type UpstreamTarget =
+export type SeerrTarget =
+	| { mediaType: "movie"; tmdbId: TmdbId }
 	| {
-			kind: "tmdb-movie";
-			id: TmdbId;
-	  }
-	| {
-			kind: "tmdb-show";
-			id: TmdbId;
-			season?: number;
-	  }
-	| {
-			kind: "tvdb-show";
-			id: TvdbId;
-			season?: number;
+			mediaType: "tv";
+			tmdbId: TmdbId;
+			seasons?: number[];
 	  };
 
-export type UpstreamSourceRecord = {
-	linkedAniListId?: AniListId;
-	targets: UpstreamTarget[];
-};
+export function normalizeSeerrTarget(target: unknown): SeerrTarget | null {
+	return normalizeSeerrTargetWithSeasonField(target, "seasons");
+}
 
-export type UpstreamSourceRecords = Record<string, UpstreamSourceRecord>;
+export function normalizeLegacySeerrTarget(
+	target: unknown,
+): SeerrTarget | null {
+	return normalizeSeerrTargetWithSeasonField(target, "tmdbSeasons");
+}
+
+function normalizeSeerrTargetWithSeasonField(
+	target: unknown,
+	seasonField: "seasons" | "tmdbSeasons",
+): SeerrTarget | null {
+	if (typeof target !== "object" || target === null) return null;
+	const value = target as Record<string, unknown>;
+	if (value.mediaType !== "movie" && value.mediaType !== "tv") return null;
+	const tmdbId = parseTmdbIdOrNull(value.tmdbId);
+	if (tmdbId === null) return null;
+	if (value.mediaType === "movie") return { mediaType: "movie", tmdbId };
+
+	const rawSeasons = value[seasonField];
+	if (
+		rawSeasons !== undefined &&
+		(!Array.isArray(rawSeasons) ||
+			rawSeasons.some((season) => !Number.isSafeInteger(season) || season < 0))
+	)
+		return null;
+	const seasons = normalizeSeasonNumbers(
+		(rawSeasons as readonly number[] | undefined) ?? [],
+	);
+	return {
+		mediaType: "tv",
+		tmdbId,
+		...(seasons.length === 0 ? {} : { seasons }),
+	};
+}
+
+export type SeerrTargetWithEvidence = SeerrTarget;
 
 export type ArrUpstreamTarget =
-	| {
-			provider: "sonarr";
-			providerId: TvdbId;
-			season?: number;
-	  }
-	| {
-			provider: "radarr";
-			providerId: TmdbId;
-	  };
-
-export type SeerrUpstreamTarget = SeerrTargetWithEvidence;
+	| { provider: "sonarr"; providerId: TvdbId; season?: number }
+	| { provider: "radarr"; providerId: TmdbId };
 
 export type AutoResult =
 	| {
@@ -48,13 +66,7 @@ export type AutoResult =
 			season?: number;
 			matchedTitle?: string;
 	  }
-	| {
-			kind: "unmapped";
-	  }
-	| {
-			kind: "ambiguous";
-			targets: ArrUpstreamTarget[];
-	  };
+	| { kind: "unmapped" };
 
 export type MappingSource = "manual" | "upstream" | "auto";
 
@@ -66,13 +78,8 @@ export type MappingResult =
 			season?: number;
 			matchedTitle?: string;
 	  }
-	| {
-			kind: "ignored";
-	  }
-	| {
-			kind: "ambiguous";
-			targets: ArrUpstreamTarget[];
-	  }
+	| { kind: "ignored" }
+	| { kind: "ambiguous"; targets: ArrUpstreamTarget[] }
 	| {
 			kind: "unmapped";
 			hadResolveAttempt: boolean;

@@ -179,8 +179,6 @@ function getRequestSeasonSelection(input: {
 		input.publicSettings?.partialRequestsEnabled
 			? getDefaultSelectedSeasons({
 					mappedSeasons: input.target.seasons,
-					tmdbMappedSeasons: input.target.tmdbSeasons,
-					tvdbMappedSeasons: input.target.tvdbSeasons,
 					seasons: input.details.seasons,
 					enableSpecialEpisodes:
 						input.publicSettings.enableSpecialEpisodes,

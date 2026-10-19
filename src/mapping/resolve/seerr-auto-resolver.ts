@@ -10,14 +10,12 @@ import {
 	type AutomaticWriteToken,
 	type SeerrAutoResult,
 } from "@/mapping/auto.store";
+import type { SeerrMappingOutcome } from "@/mapping/effective-mapping";
 import type { EffectiveSeerrTarget } from "@/mapping/mapping.service";
+import { searchCandidate } from "@/mapping/resolve/candidate-search";
 import { searchMediaFromHint } from "@/mapping/resolve/resolve";
-import {
-	findTitleMatchForTerm,
-	getSearchTerms,
-	type SearchMedia,
-} from "@/mapping/resolve/title-matching";
-import type { SeerrTarget } from "@/mapping/seerr-target";
+import type { SearchMedia } from "@/mapping/resolve/title-matching";
+import type { SeerrTarget } from "@/mapping/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MyAnimeListId } from "@/myanimelist/types";
 import type { TmdbId } from "@/providers/schemas";
@@ -41,7 +39,7 @@ type SeerrAutoResolverDependencies = {
 		identity: SourceIdentity;
 		mediaType: SeerrMediaType;
 		anilistId: AniListId | null;
-	}): Promise<EffectiveSeerrTarget | null>;
+	}): Promise<SeerrMappingOutcome & { anilistId?: AniListId }>;
 	getAutoResult(
 		identity: SourceIdentity,
 		mediaType: SeerrMediaType,
@@ -80,44 +78,38 @@ function toEffectiveTarget(
 	};
 }
 
-async function searchForMatch(input: {
+async function searchSeerrCandidate(input: {
 	media: SearchMedia;
 	mediaType: SeerrMediaType;
 	searchedTitleKeys: Set<string>;
 	searchMedia(query: string): Promise<SeerrSearchResult[]>;
 }): Promise<SearchMatch | null> {
-	const profile = input.mediaType === "movie" ? "radarr" : "sonarr";
-	const targetYear = input.media.startDate?.year ?? undefined;
-	for (const term of getSearchTerms(profile, input.media)) {
-		if (input.searchedTitleKeys.has(term.canonical)) continue;
-		input.searchedTitleKeys.add(term.canonical);
-
-		const searchResults = await input.searchMedia(term.display);
-		const results = searchResults.filter(
-			(result) => result.mediaType === input.mediaType,
-		);
-		const match = findTitleMatchForTerm(
-			profile,
-			term,
-			targetYear,
-			results.map((result) => ({
+	const resultsById = new Map<number, SeerrSearchResult>();
+	const match = await searchCandidate({
+		provider: input.mediaType === "movie" ? "radarr" : "sonarr",
+		media: input.media,
+		rejectedProviderIds: [],
+		searchedTitleKeys: input.searchedTitleKeys,
+		searchProviderCandidates: async (_provider, title) => {
+			const searchResults = await input.searchMedia(title);
+			const results = searchResults.filter(
+				(result) => result.mediaType === input.mediaType,
+			);
+			resultsById.clear();
+			for (const result of results) resultsById.set(result.tmdbId, result);
+			return results.map((result) => ({
 				providerId: result.tmdbId,
 				title: result.title,
 				...(result.alternateTitles === undefined
 					? {}
 					: { alternateTitles: result.alternateTitles }),
 				...(result.year === undefined ? {} : { year: result.year }),
-			})),
-		);
-		if (!match) continue;
-
-		const result = results.find(
-			(candidate) => candidate.tmdbId === match.providerId,
-		);
-		if (result) return { result, matchedTitle: match.matchedTitle };
-	}
-
-	return null;
+			}));
+		},
+	});
+	if (!match) return null;
+	const result = resultsById.get(match.providerId);
+	return result ? { result, matchedTitle: match.matchedTitle } : null;
 }
 
 function collectTitles(
@@ -204,7 +196,6 @@ async function buildMatchedTarget(input: {
 	return {
 		mediaType: "tv",
 		tmdbId: input.match.result.tmdbId,
-		...(details.tvdbId === undefined ? {} : { tvdbId: details.tvdbId }),
 		...(inferredSeason !== undefined && hasInferredSeason
 			? { seasons: [inferredSeason] }
 			: {}),
@@ -214,9 +205,11 @@ async function buildMatchedTarget(input: {
 export function createSeerrAutoResolver(
 	dependencies: SeerrAutoResolverDependencies,
 ): (input: SeerrAutoResolverInput) => Promise<EffectiveSeerrTarget | null> {
-	return async (
+	// The resolver intentionally branches across cache, retry, enrichment, and write outcomes.
+	// eslint-disable-next-line complexity
+	return async function resolveSeerrTarget(
 		input: SeerrAutoResolverInput,
-	): Promise<EffectiveSeerrTarget | null> => {
+	): Promise<EffectiveSeerrTarget | null> {
 		const writeToken = captureAutomaticWriteToken();
 		const canonicalAniListId = input.anilistId ?? undefined;
 		const identity = {
@@ -225,11 +218,19 @@ export function createSeerrAutoResolver(
 			anilistId: input.anilistId,
 		};
 		const effective = await dependencies.getEffectiveTarget(identity);
+		if (effective.kind === "conflict") return null;
 		if (
-			effective &&
+			effective.kind === "mapped" &&
 			(input.forceRetry !== true || effective.source !== "automatic")
 		) {
-			return effective;
+			return {
+				...(effective.anilistId === undefined
+					? {}
+					: { anilistId: effective.anilistId }),
+				source:
+					effective.source === "upstream" ? "anibridge" : effective.source,
+				...effective.target,
+			};
 		}
 
 		const cached = await dependencies.getAutoResult(
@@ -255,7 +256,7 @@ export function createSeerrAutoResolver(
 			...(input.metadata === undefined ? {} : { metadata: input.metadata }),
 		});
 		let match = hintMedia
-			? await searchForMatch({
+			? await searchSeerrCandidate({
 					media: hintMedia,
 					mediaType: input.mediaType,
 					searchedTitleKeys,
@@ -267,7 +268,7 @@ export function createSeerrAutoResolver(
 		if (!match) {
 			enrichedMedia = await loadEnrichedMedia(input, dependencies);
 			if (enrichedMedia) {
-				match = await searchForMatch({
+				match = await searchSeerrCandidate({
 					media: enrichedMedia,
 					mediaType: input.mediaType,
 					searchedTitleKeys,

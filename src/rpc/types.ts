@@ -8,9 +8,12 @@ import type {
 	AniListMetadata,
 } from "@/anilist/types";
 import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
-import type { SeerrTarget } from "@/mapping/seerr-target";
 import type { SourceIdentity } from "@/mapping/source-identity";
-import type { MappingResult, SeerrUpstreamTarget } from "@/mapping/types";
+import type {
+	MappingResult,
+	SeerrTarget,
+	SeerrTargetWithEvidence,
+} from "@/mapping/types";
 import type { MyAnimeListMetadata } from "@/myanimelist/types";
 import type { ProviderOpenTarget } from "@/providers/provider-links";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
@@ -88,9 +91,9 @@ export type SetManualMappingInput = {
 	source: SourceIdentity;
 	force?: boolean;
 } & (
-		| { provider: "sonarr"; providerId: TvdbId }
-		| { provider: "radarr"; providerId: TmdbId }
-	);
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId }
+);
 
 export type ClearManualMappingInput = {
 	source: SourceIdentity;
@@ -103,9 +106,9 @@ export type ClearMappingIgnoreInput = ClearManualMappingInput;
 export type SetMappingRejectedCandidateInput = {
 	source: SourceIdentity;
 } & (
-		| { provider: "sonarr"; providerId: TvdbId }
-		| { provider: "radarr"; providerId: TmdbId }
-	);
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId }
+);
 
 export type ClearMappingRejectedCandidateInput =
 	SetMappingRejectedCandidateInput;
@@ -193,7 +196,7 @@ export type GetSeerrMediaStatusOutput = SeerrStatusSummary;
 export type SeerrRequestTarget = {
 	anilistId?: AniListId | undefined;
 	source: SeerrTargetSource;
-} & SeerrUpstreamTarget;
+} & SeerrTargetWithEvidence;
 
 export type SetManualSeerrTargetInput = {
 	source: SourceIdentity;

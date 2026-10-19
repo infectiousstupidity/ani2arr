@@ -5,7 +5,11 @@ import {
 	radarrLibrary,
 	sonarrLibrary,
 } from "@/background/api-services";
-import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
+import type { EffectiveMappingRecord } from "@/mapping/effective-mapping";
+import {
+	setIgnored,
+	setManualMapping,
+} from "@/mapping/manual.store";
 import {
 	getSourceAliasesByAniListId,
 	getUniqueAniListIdForSource,
@@ -29,8 +33,16 @@ const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
 	getMappingIdentities: vi.fn(),
-	listEffectiveMappingsByProvider:
-		listEffectiveMappingsByProviderMock,
+	listEffectiveMappingsByProvider: listEffectiveMappingsByProviderMock,
+}));
+
+vi.mock("@/mapping/manual.store", () => ({
+	clearIgnored: vi.fn(),
+	clearManualMapping: vi.fn(),
+	clearRejectedAutoCandidate: vi.fn(),
+	rejectAutoCandidate: vi.fn(),
+	setIgnored: vi.fn(),
+	setManualMapping: vi.fn(),
 }));
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -45,9 +57,8 @@ vi.mock("@/background/api-services", () => ({
 	},
 	mappingService: {
 		getLinkedAniListIds: vi.fn(),
-		setIgnored: vi.fn(),
-		setManualMapping: vi.fn(),
 	},
+
 	radarrLibrary: {
 		getMovieSnapshots: vi.fn(),
 	},
@@ -216,6 +227,33 @@ describe("mappingHandlers", () => {
 		});
 	});
 
+	it("keeps an unresolved upstream conflict under Needs review", async () => {
+		mockMappingRecords({
+			radarr: [
+				mappingRecord(aid(39), "radarr", {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "radarr", providerId: tmdb(39) },
+						{ provider: "radarr", providerId: tmdb(40) },
+					],
+				}),
+			],
+		});
+		getProviderConfigMock.mockResolvedValue(credentials);
+
+		await expect(mappingHandlers.getMappings()).resolves.toContainEqual(
+			expect.objectContaining({
+				key: "radarr:ambiguous:anilist:39",
+				rows: [
+					expect.objectContaining({
+						anilistId: aid(39),
+						mappingRowStatus: "needs-review",
+					}),
+				],
+			}),
+		);
+	});
+
 	it("uses the only ambiguous target already present in the library", async () => {
 		const existingProviderId = tvdb(40);
 
@@ -268,8 +306,8 @@ describe("mappingHandlers", () => {
 		await expect(
 			mappingHandlers.setManualMapping({
 				provider: "sonarr",
-					providerId: tvdb(20),
-					source,
+				providerId: tvdb(20),
+				source,
 			}),
 		).rejects.toMatchObject({
 			code: ErrorCode.VALIDATION_ERROR,
@@ -278,8 +316,28 @@ describe("mappingHandlers", () => {
 			},
 		});
 
-		expect(mappingService.setManualMapping).not.toHaveBeenCalled();
+		expect(setManualMapping).not.toHaveBeenCalled();
 		expect(bumpMappingsRevisionMock).not.toHaveBeenCalled();
+	});
+
+	it("rejects malformed runtime mapping identities and provider IDs", async () => {
+		await expect(
+			mappingHandlers.setManualMapping({
+				provider: "sonarr",
+				providerId: 0 as ReturnType<typeof tvdb>,
+				source: { source: "mal", id: mal(5114) },
+			}),
+		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+		await expect(
+			mappingHandlers.setMappingIgnore({
+				provider: "plex" as "sonarr",
+				source: { source: "mal", id: mal(5114) },
+			}),
+		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+		expect(() =>
+			mappingHandlers.getMappingIdentities([0 as ReturnType<typeof aid>]),
+		).toThrow(expect.objectContaining({ code: ErrorCode.VALIDATION_ERROR }));
+		expect(setManualMapping).not.toHaveBeenCalled();
 	});
 
 	it("keeps a MAL-only mutation when no AniList crosswalk exists", async () => {
@@ -293,11 +351,7 @@ describe("mappingHandlers", () => {
 		).resolves.toEqual({ ok: true });
 
 		expect(getUniqueAniListIdForSource).toHaveBeenCalledWith(source);
-		expect(mappingService.setIgnored).toHaveBeenCalledWith(
-			"sonarr",
-			source,
-			undefined,
-		);
+		expect(setIgnored).toHaveBeenCalledWith("sonarr", source, undefined);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 });

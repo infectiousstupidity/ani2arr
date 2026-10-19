@@ -4,9 +4,7 @@ import type { AnimeFormat } from "@/shared/types/anime-format";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
-import {
-	parseAniListId,
-} from "@/anilist/types";
+import { parseAniListId } from "@/anilist/types";
 import {
 	captureAutomaticWriteToken,
 	clearAutoResults,
@@ -121,7 +119,7 @@ describe("Seerr automatic resolver", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		cached = null;
-		getEffectiveTarget.mockResolvedValue(null);
+		getEffectiveTarget.mockResolvedValue({ kind: "missing" });
 		getAutoResult.mockImplementation(async () => cached);
 		setAutoResult.mockImplementation(
 			async (
@@ -136,6 +134,18 @@ describe("Seerr automatic resolver", () => {
 		);
 		loadAniListMedia.mockRejectedValue(new Error("not needed"));
 		loadMyAnimeListMetadata.mockRejectedValue(new Error("not needed"));
+	});
+
+	it("short-circuits conflicts before cache, search, or write", async () => {
+		getEffectiveTarget.mockResolvedValue({ kind: "conflict" });
+
+		await expect(
+			resolve(request("Perfect Blue", { format: "MOVIE" })),
+		).resolves.toBeNull();
+
+		expect(getAutoResult).not.toHaveBeenCalled();
+		expect(searchMedia).not.toHaveBeenCalled();
+		expect(setAutoResult).not.toHaveBeenCalled();
 	});
 
 	it("stores one confident movie search result", async () => {
@@ -164,6 +174,29 @@ describe("Seerr automatic resolver", () => {
 			matchedTitle: "Perfect Blue",
 		});
 		expect(getTvDetails).not.toHaveBeenCalled();
+	});
+
+	it("does not search the same title again after metadata enrichment", async () => {
+		searchMedia.mockResolvedValue([]);
+		loadAniListMedia.mockResolvedValue({
+			id: source.id,
+			format: "MOVIE",
+			title: { english: "Perfect Blue" },
+			synonyms: [],
+			seasonYear: 1998,
+		});
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toBeNull();
+
+		expect(searchMedia).toHaveBeenCalledOnce();
+		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
 	});
 
 	it("returns null when a mapped automatic write is rejected", async () => {
@@ -206,7 +239,7 @@ describe("Seerr automatic resolver", () => {
 		const getAutoResultReal = vi.fn(getSeerrAutoResult);
 		const setAutoResultReal = vi.fn(setSeerrAutoResult);
 		const realResolve = createSeerrAutoResolver({
-			getEffectiveTarget: vi.fn().mockResolvedValue(null),
+			getEffectiveTarget: vi.fn().mockResolvedValue({ kind: "missing" }),
 			getAutoResult: getAutoResultReal,
 			setAutoResult: setAutoResultReal,
 			loadAniListMedia,
@@ -255,7 +288,9 @@ describe("Seerr automatic resolver", () => {
 		async ({ malId, anilistId, expectedKey }) => {
 			await clearAutoResults();
 			const malSource = { source: "mal", id: malId } as const;
-			const getEffectiveTargetReal = vi.fn().mockResolvedValue(null);
+			const getEffectiveTargetReal = vi
+				.fn()
+				.mockResolvedValue({ kind: "missing" });
 			const getAutoResultReal = vi.fn(getSeerrAutoResult);
 			const setAutoResultReal = vi.fn(setSeerrAutoResult);
 			const realResolve = createSeerrAutoResolver({
@@ -310,7 +345,7 @@ describe("Seerr automatic resolver", () => {
 
 	it("captures before effective-target reads and rejects a stale real-store write", async () => {
 		await clearAutoResults();
-		const effectiveRead = createDeferred<null>();
+		const effectiveRead = createDeferred<{ kind: "missing" }>();
 		const realResolve = createSeerrAutoResolver({
 			getEffectiveTarget: () => effectiveRead.promise,
 			getAutoResult: getSeerrAutoResult,
@@ -329,7 +364,7 @@ describe("Seerr automatic resolver", () => {
 		);
 
 		await clearAutoResults();
-		effectiveRead.resolve(null);
+		effectiveRead.resolve({ kind: "missing" });
 
 		await expect(pending).resolves.toBeNull();
 		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
@@ -339,7 +374,7 @@ describe("Seerr automatic resolver", () => {
 		await clearAutoResults();
 		const providerResult = createDeferred<ReturnType<typeof movie>[]>();
 		const realResolve = createSeerrAutoResolver({
-			getEffectiveTarget: vi.fn().mockResolvedValue(null),
+			getEffectiveTarget: vi.fn().mockResolvedValue({ kind: "missing" }),
 			getAutoResult: getSeerrAutoResult,
 			setAutoResult: setSeerrAutoResult,
 			loadAniListMedia,
@@ -361,7 +396,7 @@ describe("Seerr automatic resolver", () => {
 		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
 	});
 
-	it("fetches TV details and stores the TVDB ID", async () => {
+	it("uses TV details only to validate the inferred TMDB season", async () => {
 		searchMedia.mockResolvedValue([
 			tv(209_867, "Frieren: Beyond Journey's End", 2023),
 		]);
@@ -383,13 +418,12 @@ describe("Seerr automatic resolver", () => {
 		).resolves.toMatchObject({
 			mediaType: "tv",
 			tmdbId: tmdb(209_867),
-			tvdbId: tvdb(424_536),
 		});
 
 		expect(getTvDetails).toHaveBeenCalledWith(tmdb(209_867));
 		expect(cached).toMatchObject({
 			kind: "mapped",
-			target: { tvdbId: tvdb(424_536) },
+			target: { mediaType: "tv", tmdbId: tmdb(209_867) },
 		});
 	});
 

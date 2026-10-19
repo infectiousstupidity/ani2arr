@@ -4,11 +4,10 @@ import type { AniListId } from "@/anilist/types";
 import { PROVIDERS, type Provider } from "@/providers/types";
 import { listAniListAutomaticLayers } from "./auto.store";
 import {
-	hasMappingState,
-	selectMappingResult,
 	type EffectiveMappingRecord,
 	type MappingSelectionRecords,
-} from "./mapping-facts";
+	selectArrMapping,
+} from "./effective-mapping";
 import { listAniListManualLayers } from "./manual.store";
 import type { SourceIdentity } from "./source-identity";
 import type { MappingResult } from "./types";
@@ -29,48 +28,41 @@ export async function listEffectiveMappingsByProvider(): Promise<
 		listAniListUpstreamLayers(),
 		listAniListAutomaticLayers(),
 	]);
-	const manualByAniListId = new Map(
+	const manual = new Map(
 		manualRecords.map(({ anilistId, record }) => [anilistId, record]),
 	);
-	const upstreamByAniListId = new Map(
+	const upstream = new Map(
 		upstreamRecords.map(({ anilistId, record }) => [anilistId, record]),
 	);
-	const automaticByAniListId = new Map(
+	const automatic = new Map(
 		automaticRecords.map(({ anilistId, record }) => [anilistId, record]),
 	);
-	const anilistIds = new Set([
-		...manualByAniListId.keys(),
-		...upstreamByAniListId.keys(),
-		...automaticByAniListId.keys(),
+	const ids = new Set([
+		...manual.keys(),
+		...upstream.keys(),
+		...automatic.keys(),
 	]);
-	const sonarr: EffectiveMappingRecord[] = [];
-	const radarr: EffectiveMappingRecord[] = [];
-
-	for (const anilistId of [...anilistIds].toSorted(
-		(left, right) => left - right,
-	)) {
+	const result: Record<Provider, EffectiveMappingRecord[]> = {
+		sonarr: [],
+		radarr: [],
+	};
+	for (const anilistId of [...ids].toSorted((left, right) => left - right)) {
 		const records: MappingSelectionRecords = {
-			manual: manualByAniListId.get(anilistId) ?? null,
-			upstream: upstreamByAniListId.get(anilistId) ?? null,
-			automatic: automaticByAniListId.get(anilistId) ?? null,
+			manual: manual.get(anilistId) ?? null,
+			direct: upstream.get(anilistId) ?? null,
+			canonical: null,
+			automatic: automatic.get(anilistId) ?? null,
 		};
-		if (hasMappingState("sonarr", records)) {
-			sonarr.push({
+		for (const provider of PROVIDERS) {
+			if (!hasMappingState(provider, records)) continue;
+			result[provider].push({
 				anilistId,
-				provider: "sonarr",
-				result: selectMappingResult("sonarr", records),
-			});
-		}
-		if (hasMappingState("radarr", records)) {
-			radarr.push({
-				anilistId,
-				provider: "radarr",
-				result: selectMappingResult("radarr", records),
+				provider,
+				result: selectArrMapping(provider, records),
 			});
 		}
 	}
-
-	return { sonarr, radarr };
+	return result;
 }
 
 export async function getMappingIdentities(
@@ -78,14 +70,12 @@ export async function getMappingIdentities(
 ): Promise<ActiveMappingIdentity[]> {
 	const requestedIds = new Set(ids);
 	if (requestedIds.size === 0) return [];
-
 	const recordsByProvider = await listEffectiveMappingsByProvider();
-	const identitiesByKey = new Map<string, ActiveMappingIdentity>();
-
+	const identities = new Map<string, ActiveMappingIdentity>();
 	for (const provider of PROVIDERS) {
 		for (const record of recordsByProvider[provider]) {
 			if (!requestedIds.has(record.anilistId)) continue;
-			identitiesByKey.set(createIdentityKey(provider, record.anilistId), {
+			identities.set(`${provider}:${record.anilistId}`, {
 				source: { source: "anilist", id: record.anilistId },
 				anilistId: record.anilistId,
 				provider,
@@ -93,17 +83,28 @@ export async function getMappingIdentities(
 			});
 		}
 	}
-
 	return [...requestedIds].flatMap((anilistId) =>
 		PROVIDERS.flatMap((provider) => {
-			const identity = identitiesByKey.get(
-				createIdentityKey(provider, anilistId),
-			);
+			const identity = identities.get(`${provider}:${anilistId}`);
 			return identity ? [identity] : [];
 		}),
 	);
 }
 
-function createIdentityKey(provider: Provider, anilistId: AniListId): string {
-	return `${provider}:${anilistId}`;
+function hasMappingState(
+	provider: Provider,
+	records: MappingSelectionRecords,
+): boolean {
+	if (records.manual?.decisions?.[provider]) return true;
+	const slot = provider === "sonarr" ? "tvdbShow" : "tmdbMovie";
+	if (
+		[records.manual, records.direct, records.automatic].some(
+			(record) =>
+				record?.facts[slot] !== undefined ||
+				record?.conflicts?.[slot] !== undefined,
+		)
+	)
+		return true;
+	const lane = provider === "sonarr" ? "sonarrTvdb" : "radarrTmdbMovie";
+	return (records.automatic?.attempts?.[lane]?.expiresAt ?? 0) > Date.now();
 }

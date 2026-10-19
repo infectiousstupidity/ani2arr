@@ -18,49 +18,38 @@ import {
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import {
-	normalizeExternalIdLayer,
-	type LayerStore,
-	type ManualLayerRecord,
+	createMappingRecord,
+	type MappingStore,
+	type ManualMappingRecord,
 	type ManualProviderDecision,
-	type TvShowPairEvidence,
-} from "./external-id-facts";
+} from "./mapping-record";
 import { normalizeSeasonNumbers } from "./season-numbers";
-import { normalizeSeerrTarget, type SeerrTarget } from "./seerr-target";
+import {
+	normalizeLegacySeerrTarget,
+	normalizeSeerrTarget,
+	type SeerrTarget,
+} from "./types";
 
 export type ManualMapping = {
 	providerId: number;
-	season?: number;
 };
-
-export type ManualFacts =
-	| {
-			mapping: ManualMapping;
-			rejectedProviderIds?: number[];
-	  }
-	| {
-			ignored: true;
-			rejectedProviderIds?: number[];
-	  }
-	| {
-			rejectedProviderIds: number[];
-	  };
 
 export type ManualRecord = {
 	anilistId: AniListId;
-	record: ManualLayerRecord;
+	record: ManualMappingRecord;
 };
 
 type V1Override = { tvdbId: unknown; updatedAt: unknown };
 type V1Ignore = { updatedAt: unknown };
 
 const MANUAL_KEY = "mapping:manual";
-const LEGACY_SEERR_KEY = "mapping:seerr-targets";
+const LEGACY_SEERR_KEY = `mapping:${"seerr"}-targets`;
 const V1_LOCAL_OVERRIDE_KEY = "mappingOverridesCache";
 const V1_LOCAL_IGNORE_KEY = "ignoredMappingsCache";
 const V1_SYNC_OVERRIDE_KEY = "mappingOverrides";
 const V1_SYNC_IGNORE_KEY = "ignoredMappings";
 
-const manualMappings = storage.defineItem<LayerStore<ManualLayerRecord>>(
+const manualMappings = storage.defineItem<MappingStore<ManualMappingRecord>>(
 	"local:mapping:manual",
 	{ fallback: { version: 1, records: {} } },
 );
@@ -70,12 +59,11 @@ let writes: Promise<void> = Promise.resolve();
 export async function getManualLayerRecord(
 	identity: SourceIdentity | AniListId,
 	anilistId?: AniListId,
-): Promise<ManualLayerRecord | null> {
+): Promise<ManualMappingRecord | null> {
 	const source = normalizeSourceIdentity(identity);
 	const store = await readManualStore();
-	const canonical = store.records[
-		sourceIdentityKey(storageIdentity(source, anilistId))
-	];
+	const canonical =
+		store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
 	const alias = store.records[sourceIdentityKey(source)];
 	if (canonical && alias && canonical !== alias) {
 		return mergeManualRecords(canonical, alias);
@@ -95,7 +83,7 @@ export async function listAniListManualLayers(): Promise<ManualRecord[]> {
 }
 
 export function getManualDecision(
-	record: ManualLayerRecord | null,
+	record: ManualMappingRecord | null,
 	provider: Provider,
 ): ManualProviderDecision | null {
 	return record?.decisions?.[provider] ?? null;
@@ -118,7 +106,7 @@ export async function setManualMapping(
 		if (provider === "sonarr") {
 			record.facts.tvdbShow = providerId as TvdbId;
 			delete record.conflicts?.tvdbShow;
-			setScope(record, "tvdbShow", providerId as TvdbId, mapping.season);
+			delete record.scopes?.tvdbShow;
 		} else {
 			record.facts.tmdbMovie = providerId as TmdbId;
 			delete record.conflicts?.tmdbMovie;
@@ -177,7 +165,10 @@ export async function clearIgnored(
 	await updateManualStore((store) => {
 		const record = getExistingMutableRecord(store, identity, anilistId);
 		if (!record?.decisions?.[provider]?.ignored) return;
-		const rejectedProviderIds = rejectedIds(record.decisions[provider], provider);
+		const rejectedProviderIds = rejectedIds(
+			record.decisions[provider],
+			provider,
+		);
 		setDecision(
 			record,
 			provider,
@@ -195,14 +186,24 @@ export async function rejectAutoCandidate(
 	providerId: number,
 	anilistId?: AniListId,
 ): Promise<void> {
+	const parsedProviderId =
+		provider === "sonarr"
+			? parseTvdbIdOrNull(providerId)
+			: parseTmdbIdOrNull(providerId);
+	if (parsedProviderId === null)
+		throw new Error("Invalid rejected candidate ID.");
+
 	await updateManualStore((store) => {
 		const record = getMutableRecord(store, identity, anilistId);
 		const previous = record.decisions?.[provider];
 		const rejectedProviderIds = rejectedIds(previous, provider);
-		if (rejectedProviderIds.includes(providerId)) return;
+		if (rejectedProviderIds.includes(parsedProviderId)) return;
 		setDecision(record, provider, {
 			...(previous?.ignored ? { ignored: true as const } : {}),
-			...decisionWithRejected(provider, [...rejectedProviderIds, providerId]),
+			...decisionWithRejected(provider, [
+				...rejectedProviderIds,
+				parsedProviderId,
+			]),
 		});
 	});
 }
@@ -213,13 +214,20 @@ export async function clearRejectedAutoCandidate(
 	providerId: number,
 	anilistId?: AniListId,
 ): Promise<void> {
+	const parsedProviderId =
+		provider === "sonarr"
+			? parseTvdbIdOrNull(providerId)
+			: parseTmdbIdOrNull(providerId);
+	if (parsedProviderId === null)
+		throw new Error("Invalid rejected candidate ID.");
+
 	await updateManualStore((store) => {
 		const record = getExistingMutableRecord(store, identity, anilistId);
 		const previous = record?.decisions?.[provider];
 		const previousRejected = rejectedIds(previous, provider);
-		if (!record || !previousRejected.includes(providerId)) return;
+		if (!record || !previousRejected.includes(parsedProviderId)) return;
 		const rejectedProviderIds = previousRejected.filter(
-			(id) => id !== providerId,
+			(id) => id !== parsedProviderId,
 		);
 		setDecision(record, provider, {
 			...(previous?.ignored ? { ignored: true as const } : {}),
@@ -247,7 +255,7 @@ export async function setManualSeerrTarget(
 
 		record.facts.tmdbShow = normalized.tmdbId;
 		delete record.conflicts?.tmdbShow;
-		setSeerrTvEvidence(record, normalized);
+		setTmdbShowScope(record, normalized);
 	});
 }
 
@@ -266,7 +274,6 @@ export async function clearManualSeerrTarget(
 			delete record.facts.tmdbShow;
 			delete record.conflicts?.tmdbShow;
 			delete record.scopes?.tmdbShow;
-			delete record.tvShowPairs;
 		}
 		removeEmptyRecord(store, identity, anilistId);
 	});
@@ -281,7 +288,10 @@ export async function consolidateManualAliases(
 ): Promise<void> {
 	await updateManualStore((store) => {
 		for (const [anilistId, aliases] of aliasesByAniListId) {
-			const canonicalKey = sourceIdentityKey({ source: "anilist", id: anilistId });
+			const canonicalKey = sourceIdentityKey({
+				source: "anilist",
+				id: anilistId,
+			});
 			let canonical = store.records[canonicalKey];
 			for (const alias of aliases.toSorted((left, right) =>
 				sourceIdentityKey(left).localeCompare(sourceIdentityKey(right)),
@@ -298,10 +308,12 @@ export async function consolidateManualAliases(
 }
 
 export async function clearManualFacts(): Promise<void> {
-	const next = writes.catch(() => {}).then(async () => {
-		await manualMappings.setValue({ version: 1, records: {} });
-		await removeLegacyManualKeys();
-	});
+	const next = writes
+		.catch(() => {})
+		.then(async () => {
+			await manualMappings.setValue({ version: 1, records: {} });
+			await removeLegacyManualKeys();
+		});
 	writes = next.then(
 		() => {},
 		() => {},
@@ -310,14 +322,16 @@ export async function clearManualFacts(): Promise<void> {
 }
 
 async function updateManualStore(
-	update: (store: LayerStore<ManualLayerRecord>) => void,
+	update: (store: MappingStore<ManualMappingRecord>) => void,
 ): Promise<void> {
-	const next = writes.catch(() => {}).then(async () => {
-		const store = await readManualStore();
-		update(store);
-		await manualMappings.setValue(store);
-		await removeLegacyManualKeys();
-	});
+	const next = writes
+		.catch(() => {})
+		.then(async () => {
+			const store = await readManualStore();
+			update(store);
+			await manualMappings.setValue(store);
+			await removeLegacyManualKeys();
+		});
 	writes = next.then(
 		() => {},
 		() => {},
@@ -325,7 +339,7 @@ async function updateManualStore(
 	await next;
 }
 
-async function readManualStore(): Promise<LayerStore<ManualLayerRecord>> {
+async function readManualStore(): Promise<MappingStore<ManualMappingRecord>> {
 	const [local, sync] = await Promise.all([
 		browser.storage.local.get([
 			MANUAL_KEY,
@@ -342,11 +356,11 @@ async function readManualStore(): Promise<LayerStore<ManualLayerRecord>> {
 function decodeManualStore(
 	local: Record<string, unknown>,
 	sync: Record<string, unknown>,
-): LayerStore<ManualLayerRecord> {
+): MappingStore<ManualMappingRecord> {
 	const current = local[MANUAL_KEY];
-	if (isLayerStore(current)) return cloneLayerStore(current);
+	if (isMappingStore(current)) return cloneMappingStore(current);
 
-	const records: Record<string, ManualLayerRecord> = {};
+	const records: Record<string, ManualMappingRecord> = {};
 	decodeProviderBuckets(current, records);
 	decodeLegacySeerrTargets(local[LEGACY_SEERR_KEY], records);
 	decodeV1Manual(local, sync, records);
@@ -355,7 +369,7 @@ function decodeManualStore(
 
 function decodeProviderBuckets(
 	value: unknown,
-	records: Record<string, ManualLayerRecord>,
+	records: Record<string, ManualMappingRecord>,
 ): void {
 	if (!isObject(value)) return;
 	for (const provider of ["sonarr", "radarr"] as const) {
@@ -383,7 +397,10 @@ function decodeProviderBuckets(
 				if (id === null) continue;
 				record.facts.tvdbShow = id;
 				const season = validSeason(rawFacts.mapping.season);
-				if (season !== undefined) setScope(record, "tvdbShow", id, season);
+				if (season !== undefined) {
+					record.scopes ??= {};
+					record.scopes.tvdbShow = { id, seasons: [season] };
+				}
 			} else {
 				const id = parseTmdbIdOrNull(rawFacts.mapping.providerId);
 				if (id !== null) record.facts.tmdbMovie = id;
@@ -394,20 +411,20 @@ function decodeProviderBuckets(
 
 function decodeLegacySeerrTargets(
 	value: unknown,
-	records: Record<string, ManualLayerRecord>,
+	records: Record<string, ManualMappingRecord>,
 ): void {
 	if (!isObject(value)) return;
 	for (const [rawKey, rawTarget] of Object.entries(value)) {
 		const key = legacySourceKey(rawKey);
 		if (!key || !isObject(rawTarget)) continue;
-		const normalized = normalizeSeerrTarget(rawTarget as SeerrTarget);
+		const normalized = normalizeLegacySeerrTarget(rawTarget as SeerrTarget);
 		if (!normalized) continue;
 		const record = (records[key] ??= emptyRecord());
 		if (normalized.mediaType === "movie") {
 			record.facts.tmdbMovie ??= normalized.tmdbId;
 		} else {
 			record.facts.tmdbShow = normalized.tmdbId;
-			setSeerrTvEvidence(record, normalized);
+			setTmdbShowScope(record, normalized);
 		}
 	}
 }
@@ -415,7 +432,7 @@ function decodeLegacySeerrTargets(
 function decodeV1Manual(
 	local: Record<string, unknown>,
 	sync: Record<string, unknown>,
-	records: Record<string, ManualLayerRecord>,
+	records: Record<string, ManualMappingRecord>,
 ): void {
 	const overrides = newestV1Entries<V1Override>([
 		local[V1_LOCAL_OVERRIDE_KEY],
@@ -458,7 +475,8 @@ function newestV1Entries<T extends { updatedAt: unknown }>(
 			const previous = entries.get(key);
 			if (
 				!previous ||
-				updatedAt > (validTimestamp(previous.updatedAt) ?? Number.NEGATIVE_INFINITY)
+				updatedAt >
+					(validTimestamp(previous.updatedAt) ?? Number.NEGATIVE_INFINITY)
 			) {
 				entries.set(key, candidate);
 			}
@@ -468,9 +486,9 @@ function newestV1Entries<T extends { updatedAt: unknown }>(
 }
 
 function mergeManualRecords(
-	canonical: ManualLayerRecord | undefined,
-	alias: ManualLayerRecord,
-): ManualLayerRecord {
+	canonical: ManualMappingRecord | undefined,
+	alias: ManualMappingRecord,
+): ManualMappingRecord {
 	if (!canonical) return structuredClone(alias);
 	const merged = structuredClone(canonical);
 	for (const slot of ["tmdbMovie", "tmdbShow", "tvdbShow"] as const) {
@@ -491,24 +509,21 @@ function mergeManualRecords(
 			});
 		}
 	}
-	if (
-		!merged.tvShowPairs &&
-		alias.tvShowPairs &&
-		merged.facts.tmdbShow === alias.facts.tmdbShow
-	) {
-		merged.tvShowPairs = structuredClone(alias.tvShowPairs);
-	}
 	for (const provider of ["sonarr", "radarr"] as const) {
 		if (merged.decisions?.[provider] === undefined) {
-			setDecision(merged, provider, structuredClone(alias.decisions?.[provider]));
+			setDecision(
+				merged,
+				provider,
+				structuredClone(alias.decisions?.[provider]),
+			);
 		}
 	}
 	return merged;
 }
 
 function copySlot(
-	target: ManualLayerRecord,
-	source: ManualLayerRecord,
+	target: ManualMappingRecord,
+	source: ManualMappingRecord,
 	slot: "tmdbMovie" | "tmdbShow" | "tvdbShow",
 ): void {
 	const fact = source.facts[slot];
@@ -527,8 +542,8 @@ function copySlot(
 	}
 }
 
-function setSeerrTvEvidence(
-	record: ManualLayerRecord,
+function setTmdbShowScope(
+	record: ManualMappingRecord,
 	target: Extract<SeerrTarget, { mediaType: "tv" }>,
 ): void {
 	const seasons = normalizeSeasonNumbers(target.seasons ?? []);
@@ -538,35 +553,10 @@ function setSeerrTvEvidence(
 	} else {
 		delete record.scopes?.tmdbShow;
 	}
-	if (target.tvdbId === undefined) {
-		delete record.tvShowPairs;
-		return;
-	}
-	record.tvShowPairs = [
-		{
-			tmdbShow: target.tmdbId,
-			tvdbShow: target.tvdbId,
-			...(seasons.length > 0 ? { tmdbSeasons: seasons, tvdbSeasons: seasons } : {}),
-		},
-	];
-}
-
-function setScope(
-	record: ManualLayerRecord,
-	slot: "tmdbShow" | "tvdbShow",
-	id: TmdbId | TvdbId,
-	season: number | undefined,
-): void {
-	if (season === undefined) {
-		delete record.scopes?.[slot];
-		return;
-	}
-	record.scopes ??= {};
-	Object.assign(record.scopes, { [slot]: { id, seasons: [season] } });
 }
 
 function setDecision(
-	record: ManualLayerRecord,
+	record: ManualMappingRecord,
 	provider: Provider,
 	decision: ManualProviderDecision | undefined,
 ): void {
@@ -606,26 +596,26 @@ function decisionWithRejected(
 }
 
 function getMutableRecord(
-	store: LayerStore<ManualLayerRecord>,
+	store: MappingStore<ManualMappingRecord>,
 	identity: SourceIdentity | AniListId,
 	anilistId?: AniListId,
-): ManualLayerRecord {
+): ManualMappingRecord {
 	const key = recordKey(identity, anilistId);
 	consolidateIdentityAlias(store, identity, anilistId);
 	return (store.records[key] ??= emptyRecord());
 }
 
 function getExistingMutableRecord(
-	store: LayerStore<ManualLayerRecord>,
+	store: MappingStore<ManualMappingRecord>,
 	identity: SourceIdentity | AniListId,
 	anilistId?: AniListId,
-): ManualLayerRecord | undefined {
+): ManualMappingRecord | undefined {
 	consolidateIdentityAlias(store, identity, anilistId);
 	return store.records[recordKey(identity, anilistId)];
 }
 
 function consolidateIdentityAlias(
-	store: LayerStore<ManualLayerRecord>,
+	store: MappingStore<ManualMappingRecord>,
 	identity: SourceIdentity | AniListId,
 	anilistId: AniListId | undefined,
 ): void {
@@ -643,7 +633,7 @@ function consolidateIdentityAlias(
 }
 
 function removeEmptyRecord(
-	store: LayerStore<ManualLayerRecord>,
+	store: MappingStore<ManualMappingRecord>,
 	identity: SourceIdentity | AniListId,
 	anilistId?: AniListId,
 ): void {
@@ -661,50 +651,119 @@ function recordKey(
 	);
 }
 
-function emptyRecord(): ManualLayerRecord {
+function emptyRecord(): ManualMappingRecord {
 	return { facts: {} };
 }
 
-function isEmptyRecord(record: ManualLayerRecord): boolean {
+function isEmptyRecord(record: ManualMappingRecord): boolean {
 	return (
 		Object.keys(record.facts).length === 0 &&
 		!Object.values(record.conflicts ?? {}).some(Boolean) &&
 		!Object.values(record.scopes ?? {}).some(Boolean) &&
-		!(record.tvShowPairs?.length) &&
 		!Object.values(record.decisions ?? {}).some(Boolean)
 	);
 }
 
-function isLayerStore(value: unknown): value is LayerStore<ManualLayerRecord> {
+function isMappingStore(
+	value: unknown,
+): value is MappingStore<ManualMappingRecord> {
 	return isObject(value) && value.version === 1 && isObject(value.records);
 }
 
-function cloneLayerStore(
-	store: LayerStore<ManualLayerRecord>,
-): LayerStore<ManualLayerRecord> {
-	const records: Record<string, ManualLayerRecord> = {};
+function cloneMappingStore(
+	store: MappingStore<ManualMappingRecord>,
+): MappingStore<ManualMappingRecord> {
+	const records: Record<string, ManualMappingRecord> = {};
 	for (const [key, record] of Object.entries(store.records)) {
 		if (parseSourceIdentityKey(key) === null || !isObject(record)) continue;
-		records[key] = normalizeManualRecord(record as ManualLayerRecord);
+		records[key] = normalizeManualRecord(record as ManualMappingRecord);
 	}
 	return { version: 1, records };
 }
 
-function normalizeManualRecord(record: ManualLayerRecord): ManualLayerRecord {
-	const layer = normalizeExternalIdLayer({
-		facts: isObject(record.facts) ? record.facts : {},
-		...(isObject(record.conflicts) ? { conflicts: record.conflicts } : {}),
-		...(isObject(record.scopes) ? { scopes: record.scopes } : {}),
-		...(Array.isArray(record.tvShowPairs)
-			? { tvShowPairs: record.tvShowPairs as TvShowPairEvidence[] }
-			: {}),
-	});
+function normalizeManualRecord(
+	record: ManualMappingRecord,
+): ManualMappingRecord {
+	const layer = decodeCurrentMappingRecord(record);
+	const decisions = isObject(record.decisions)
+		? {
+				...decodeDecision("sonarr", record.decisions.sonarr),
+				...decodeDecision("radarr", record.decisions.radarr),
+			}
+		: {};
 	return {
 		...layer,
-		...(isObject(record.decisions)
-			? { decisions: structuredClone(record.decisions) }
-			: {}),
+		...(Object.keys(decisions).length > 0 ? { decisions } : {}),
 	};
+}
+
+function decodeCurrentMappingRecord(record: Record<string, unknown>) {
+	const facts = isObject(record.facts) ? record.facts : {};
+	const conflicts = isObject(record.conflicts) ? record.conflicts : {};
+	const scopes = isObject(record.scopes) ? record.scopes : {};
+	const tmdbMovie = [
+		facts.tmdbMovie,
+		...(Array.isArray(conflicts.tmdbMovie) ? conflicts.tmdbMovie : []),
+	].flatMap((value) => {
+		const id = parseTmdbIdOrNull(value);
+		return id === null ? [] : [id];
+	});
+	const tmdbShow = decodeShowCandidates(
+		facts.tmdbShow,
+		conflicts.tmdbShow,
+		scopes.tmdbShow,
+		parseTmdbIdOrNull,
+	);
+	const tvdbShow = decodeShowCandidates(
+		facts.tvdbShow,
+		conflicts.tvdbShow,
+		scopes.tvdbShow,
+		parseTvdbIdOrNull,
+	);
+	return createMappingRecord({ tmdbMovie, tmdbShow, tvdbShow });
+}
+
+function decodeShowCandidates<TId extends number>(
+	fact: unknown,
+	conflict: unknown,
+	scope: unknown,
+	parseId: (value: unknown) => TId | null,
+): Array<{ id: TId; seasons?: number[] }> {
+	const raw = [fact, ...(Array.isArray(conflict) ? conflict : [])];
+	return raw.flatMap((value) => {
+		const candidate: Record<string, unknown> = isObject(value)
+			? value
+			: { id: value };
+		const id = parseId(candidate.id);
+		if (id === null) return [];
+		const matchedScope: Record<string, unknown> =
+			isObject(scope) && parseId(scope.id) === id ? scope : candidate;
+		const seasons = validSeasons(matchedScope.seasons);
+		return [{ id, ...(seasons?.length ? { seasons } : {}) }];
+	});
+}
+
+function decodeDecision(
+	provider: Provider,
+	value: unknown,
+): Partial<Record<Provider, ManualProviderDecision>> {
+	if (!isObject(value)) return {};
+	const rawRejected =
+		provider === "sonarr" ? value.rejectedTvdbShow : value.rejectedTmdbMovie;
+	const rejected = Array.isArray(rawRejected)
+		? rawRejected.flatMap((rawId) => {
+				const id =
+					provider === "sonarr"
+						? parseTvdbIdOrNull(rawId)
+						: parseTmdbIdOrNull(rawId);
+				return id === null ? [] : [id];
+			})
+		: [];
+	const decision: ManualProviderDecision = {
+		...(value.ignored === true ? { ignored: true } : {}),
+		...decisionWithRejected(provider, rejected),
+	};
+	return Object.keys(decision).length > 0 ? { [provider]: decision } : {};
 }
 
 function legacySourceKey(rawKey: string): string | null {
@@ -714,6 +773,15 @@ function legacySourceKey(rawKey: string): string | null {
 	return anilistId !== null && rawKey === String(anilistId)
 		? sourceIdentityKey({ source: "anilist", id: anilistId })
 		: null;
+}
+
+function validSeasons(value: unknown): number[] | undefined {
+	return Array.isArray(value)
+		? value.flatMap((season) => {
+				const valid = validSeason(season);
+				return valid === undefined ? [] : [valid];
+			})
+		: undefined;
 }
 
 function validSeason(value: unknown): number | undefined {

@@ -2,13 +2,12 @@
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
-import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
+import { parseTmdbId } from "@/providers/schemas";
 import type { SeerrRequestTarget } from "@/rpc/types";
 import { toSeerrRequestInput } from "./seerr-request-input";
 
 const aid = parseAniListId;
 const tmdb = parseTmdbId;
-const tvdb = parseTvdbId;
 
 describe("toSeerrRequestInput", () => {
 	it("converts an automatic movie target", () => {
@@ -30,7 +29,6 @@ describe("toSeerrRequestInput", () => {
 			anilistId: aid(100),
 			mediaType: "tv",
 			tmdbId: tmdb(200),
-			tvdbId: tvdb(300),
 			seasons: [1, 2],
 			source: "anibridge",
 		};
@@ -38,7 +36,6 @@ describe("toSeerrRequestInput", () => {
 		expect(toSeerrRequestInput(target)).toEqual({
 			mediaType: "tv",
 			tmdbId: tmdb(200),
-			tvdbId: tvdb(300),
 			seasons: [1, 2],
 		});
 	});

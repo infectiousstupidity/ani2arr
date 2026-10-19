@@ -36,7 +36,10 @@ describe("title matching", () => {
 	it.each([
 		["[Oshi no Ko] 3rd Season", "Oshi no Ko"],
 		["Attack on Titan Final Season", "Attack on Titan"],
-		["Bleach: Thousand-Year Blood War Part 2", "Bleach: Thousand-Year Blood War"],
+		[
+			"Bleach: Thousand-Year Blood War Part 2",
+			"Bleach: Thousand-Year Blood War",
+		],
 		["Kusuriya no Hitorigoto 3rd Season Part 2", "Kusuriya no Hitorigoto"],
 		["Some Show Cour II", "Some Show"],
 		["Some Show S2", "Some Show"],
@@ -46,17 +49,14 @@ describe("title matching", () => {
 
 	it("preserves Sonarr reboot years while cleaning season suffixes", () => {
 		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Ranma 1/2 (2024) 3rd Season",
-			),
+			sanitizeLookupDisplayForProvider("sonarr", "Ranma 1/2 (2024) 3rd Season"),
 		).toBe("Ranma 1/2 2024");
 	});
 
 	it("keeps Radarr movie-style part suffixes", () => {
-		expect(sanitizeLookupDisplayForProvider("radarr", "Movie Title Part 2")).toBe(
-			"Movie Title Part 2",
-		);
+		expect(
+			sanitizeLookupDisplayForProvider("radarr", "Movie Title Part 2"),
+		).toBe("Movie Title Part 2");
 	});
 
 	it("deduplicates canonical provider title keys", () => {
@@ -67,7 +67,9 @@ describe("title matching", () => {
 			synonyms: ["One Punch Man!"],
 		});
 
-		expect(terms).toEqual([{ canonical: "one punch man", display: "One-Punch Man" }]);
+		expect(terms).toEqual([
+			{ canonical: "one punch man", display: "One-Punch Man" },
+		]);
 		expect(canonicalTitleKeyForProvider("sonarr", "One Punch Man!")).toBe(
 			"one punch man",
 		);
@@ -132,10 +134,23 @@ describe("title matching", () => {
 		).toEqual({ providerId: 451_479, matchedTitle: "Ranma 1/2 2024" });
 	});
 
-	it("does not accept weak Haikyuu figure-animation result", () => {
+	it("selects the higher-scoring candidate when both are close", () => {
+		expect(
+			matchSonarr("Close Match Story", [
+				{ providerId: 10, title: "Close Match Story XX" },
+				{ providerId: 20, title: "Close Match Story X" },
+			]),
+		).toEqual({ providerId: 20, matchedTitle: "Close Match Story" });
+	});
+
+	it("does not accept a top candidate below minimum confidence", () => {
 		expect(
 			matchSonarr("Haikyuu!!: Bakemono-tachi no Iku Tokoro", [
-				{ providerId: 460_412, title: "Haikyuu!! Figure Animation", year: 2020 },
+				{
+					providerId: 460_412,
+					title: "Haikyuu!! Figure Animation",
+					year: 2020,
+				},
 			]),
 		).toBeNull();
 	});

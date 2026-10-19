@@ -11,51 +11,33 @@ import {
 	type TvdbId,
 } from "@/providers/schemas";
 import {
-	createExternalIdLayer,
-	normalizeExternalIdLayer,
-	type ExternalIdLayer,
-} from "./external-id-facts";
+	createMappingRecord,
+	type MappingRecord,
+	type UpstreamMappingRecord,
+} from "./mapping-record";
 import { normalizeSeasonNumbers } from "./season-numbers";
-import {
-	normalizeSeerrTarget,
-	projectSeerrTarget,
-	type SeerrTarget,
-} from "./seerr-target";
+import { normalizeLegacySeerrTarget, type SeerrTarget } from "./types";
 import {
 	parseSourceIdentityKey,
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
-import type { SeerrUpstreamTarget, UpstreamSourceRecord } from "./types";
 
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPSTREAM_KEY = "mapping:upstream";
 
-export type UpstreamLayerRecord = ExternalIdLayer & {
-	linkedAniListId?: AniListId;
-};
-
 type UpstreamSnapshot = {
 	version: 1;
-	records: Record<string, UpstreamLayerRecord>;
+	records: Record<string, UpstreamMappingRecord>;
 	fetchedAt: number;
 	etag?: string;
 };
 
 export type SourceUpstreamLayers = {
 	anilistId: AniListId | null;
-	direct: ExternalIdLayer | null;
-	canonical: ExternalIdLayer | null;
+	direct: MappingRecord | null;
+	canonical: MappingRecord | null;
 };
-
-type SeerrTargetProjection =
-	| { kind: "missing" }
-	| { kind: "target"; target: SeerrUpstreamTarget }
-	| { kind: "conflict" };
-
-export type SourceSeerrUpstreamMapping = {
-	anilistId: AniListId | null;
-} & SeerrTargetProjection;
 
 const upstreamMappings = storage.defineItem<UpstreamSnapshot | null>(
 	"local:mapping:upstream",
@@ -89,7 +71,7 @@ export async function getSourceUpstreamLayers(
 }
 
 export async function listAniListUpstreamLayers(): Promise<
-	Array<{ anilistId: AniListId; record: UpstreamLayerRecord }>
+	Array<{ anilistId: AniListId; record: UpstreamMappingRecord }>
 > {
 	const snapshot = await readSnapshot();
 	return Object.entries(snapshot?.records ?? {}).flatMap(([rawKey, record]) => {
@@ -147,29 +129,6 @@ export async function getSourceAliasesByAniListId(): Promise<
 	return aliasesByAniListId;
 }
 
-export async function getSourceSeerrUpstreamMapping(
-	source: SourceIdentity,
-	mediaType?: "movie" | "tv",
-): Promise<SourceSeerrUpstreamMapping> {
-	const layers = await getSourceUpstreamLayers(source);
-	const direct = layers.direct
-		? projectSeerrLayer(layers.direct, mediaType)
-		: { kind: "missing" as const };
-	if (
-		direct.kind !== "missing" ||
-		source.source === "anilist" ||
-		layers.anilistId === null
-	) {
-		return { anilistId: layers.anilistId, ...direct };
-	}
-	return {
-		anilistId: layers.anilistId,
-		...(layers.canonical
-			? projectSeerrLayer(layers.canonical, mediaType)
-			: { kind: "missing" as const }),
-	};
-}
-
 export async function migrateUpstreamStore(): Promise<void> {
 	const next = writes
 		.catch(() => {})
@@ -212,12 +171,7 @@ export async function refreshUpstreamMappings(): Promise<boolean> {
 				return false;
 			}
 
-			const records = Object.fromEntries(
-				Object.entries(result.parsed.records).map(([key, record]) => [
-					key,
-					upstreamLayerFromSourceRecord(record),
-				]),
-			);
+			const records = result.parsed.records;
 			const changed =
 				JSON.stringify(previous?.records ?? {}) !== JSON.stringify(records);
 			await upstreamMappings.setValue({
@@ -267,7 +221,7 @@ function decodeSnapshot(value: unknown): UpstreamSnapshot | null {
 		};
 	}
 
-	let records: Record<string, UpstreamLayerRecord> = {};
+	let records: Record<string, UpstreamMappingRecord> = {};
 	if (isObject(value.records)) {
 		records = decodeRawSourceRecords(value.records);
 	} else if (isObject(value.entries)) {
@@ -293,21 +247,12 @@ function decodeSnapshot(value: unknown): UpstreamSnapshot | null {
 
 function decodeLayerRecords(
 	value: Record<string, unknown>,
-): Record<string, UpstreamLayerRecord> {
-	const records: Record<string, UpstreamLayerRecord> = {};
+): Record<string, UpstreamMappingRecord> {
+	const records: Record<string, UpstreamMappingRecord> = {};
 	for (const [key, rawRecord] of Object.entries(value)) {
 		if (parseSourceIdentityKey(key) === null || !isObject(rawRecord)) continue;
 		const linkedAniListId = parseAniListIdOrNull(rawRecord.linkedAniListId);
-		const layer = normalizeExternalIdLayer({
-			facts: isObject(rawRecord.facts) ? rawRecord.facts : {},
-			...(isObject(rawRecord.conflicts)
-				? { conflicts: rawRecord.conflicts }
-				: {}),
-			...(isObject(rawRecord.scopes) ? { scopes: rawRecord.scopes } : {}),
-			...(Array.isArray(rawRecord.tvShowPairs)
-				? { tvShowPairs: rawRecord.tvShowPairs }
-				: {}),
-		});
+		const layer = decodeCurrentMappingRecord(rawRecord);
 		records[key] = {
 			...layer,
 			...(linkedAniListId === null ? {} : { linkedAniListId }),
@@ -316,10 +261,61 @@ function decodeLayerRecords(
 	return records;
 }
 
+function decodeCurrentMappingRecord(
+	record: Record<string, unknown>,
+): MappingRecord {
+	const facts = isObject(record.facts) ? record.facts : {};
+	const conflicts = isObject(record.conflicts) ? record.conflicts : {};
+	const scopes = isObject(record.scopes) ? record.scopes : {};
+	const tmdbMovie = [
+		facts.tmdbMovie,
+		...(Array.isArray(conflicts.tmdbMovie) ? conflicts.tmdbMovie : []),
+	].flatMap((value) => {
+		const id = parseTmdbIdOrNull(value);
+		return id === null ? [] : [id];
+	});
+	return createMappingRecord({
+		tmdbMovie,
+		tmdbShow: decodeShowCandidates(
+			facts.tmdbShow,
+			conflicts.tmdbShow,
+			scopes.tmdbShow,
+			parseTmdbIdOrNull,
+		),
+		tvdbShow: decodeShowCandidates(
+			facts.tvdbShow,
+			conflicts.tvdbShow,
+			scopes.tvdbShow,
+			parseTvdbIdOrNull,
+		),
+	});
+}
+
+function decodeShowCandidates<TId extends number>(
+	fact: unknown,
+	conflict: unknown,
+	scope: unknown,
+	parseId: (value: unknown) => TId | null,
+): Array<{ id: TId; seasons?: number[] }> {
+	return [fact, ...(Array.isArray(conflict) ? conflict : [])].flatMap(
+		(value) => {
+			const candidate: Record<string, unknown> = isObject(value)
+				? value
+				: { id: value };
+			const id = parseId(candidate.id);
+			if (id === null) return [];
+			const matchedScope: Record<string, unknown> =
+				isObject(scope) && parseId(scope.id) === id ? scope : candidate;
+			const seasons = validSeasons(matchedScope.seasons);
+			return [{ id, ...(seasons?.length ? { seasons } : {}) }];
+		},
+	);
+}
+
 function decodeRawSourceRecords(
 	value: Record<string, unknown>,
-): Record<string, UpstreamLayerRecord> {
-	const records: Record<string, UpstreamLayerRecord> = {};
+): Record<string, UpstreamMappingRecord> {
+	const records: Record<string, UpstreamMappingRecord> = {};
 	for (const [key, rawRecord] of Object.entries(value)) {
 		if (parseSourceIdentityKey(key) === null) continue;
 		let record: Record<string, unknown> | null = null;
@@ -341,8 +337,8 @@ function decodeRawSourceRecords(
 function decodeV2Mappings(
 	mappings: Record<string, unknown>,
 	seerrTargets: unknown,
-): Record<string, UpstreamLayerRecord> {
-	const records: Record<string, UpstreamLayerRecord> = {};
+): Record<string, UpstreamMappingRecord> {
+	const records: Record<string, UpstreamMappingRecord> = {};
 	for (const [rawId, rawTargets] of Object.entries(mappings)) {
 		const anilistId = parseAniListIdOrNull(Number(rawId));
 		if (
@@ -362,7 +358,7 @@ function decodeV2Mappings(
 			!isObject(rawTarget)
 		)
 			continue;
-		const target = normalizeSeerrTarget(rawTarget as SeerrTarget);
+		const target = normalizeLegacySeerrTarget(rawTarget as SeerrTarget);
 		if (!target) continue;
 		const record = (records[`anilist:${anilistId}`] ??= { facts: {} });
 		mergeLegacySeerrTarget(record, target);
@@ -370,18 +366,7 @@ function decodeV2Mappings(
 	return records;
 }
 
-function upstreamLayerFromSourceRecord(
-	record: UpstreamSourceRecord,
-): UpstreamLayerRecord {
-	return {
-		...layerFromRawTargets(record.targets),
-		...(record.linkedAniListId === undefined
-			? {}
-			: { linkedAniListId: record.linkedAniListId }),
-	};
-}
-
-function layerFromRawTargets(targets: readonly unknown[]): ExternalIdLayer {
+function layerFromRawTargets(targets: readonly unknown[]): MappingRecord {
 	const tmdbMovie: TmdbId[] = [];
 	const tmdbShow: Array<{ id: TmdbId; seasons?: number[] }> = [];
 	const tvdbShow: Array<{ id: TvdbId; seasons?: number[] }> = [];
@@ -414,27 +399,11 @@ function layerFromRawTargets(targets: readonly unknown[]): ExternalIdLayer {
 			}
 		}
 	}
-	const layer = createExternalIdLayer({ tmdbMovie, tmdbShow, tvdbShow });
-	const tmdbId = layer.facts.tmdbShow;
-	const tvdbId = layer.facts.tvdbShow;
-	if (tmdbId === undefined || tvdbId === undefined) return layer;
-	const tmdbSeasons = candidateSeasons(tmdbShow, tmdbId);
-	const tvdbSeasons = candidateSeasons(tvdbShow, tvdbId);
-	return {
-		...layer,
-		tvShowPairs: [
-			{
-				tmdbShow: tmdbId,
-				tvdbShow: tvdbId,
-				...(tmdbSeasons.length > 0 ? { tmdbSeasons } : {}),
-				...(tvdbSeasons.length > 0 ? { tvdbSeasons } : {}),
-			},
-		],
-	};
+	return createMappingRecord({ tmdbMovie, tmdbShow, tvdbShow });
 }
 
 function mergeLegacySeerrTarget(
-	record: UpstreamLayerRecord,
+	record: UpstreamMappingRecord,
 	target: SeerrTarget,
 ): void {
 	if (target.mediaType === "movie") {
@@ -447,35 +416,13 @@ function mergeLegacySeerrTarget(
 		record.scopes ??= {};
 		record.scopes.tmdbShow = { id: target.tmdbId, seasons };
 	}
-	if (target.tvdbId !== undefined) {
-		record.tvShowPairs = [
-			{
-				tmdbShow: target.tmdbId,
-				tvdbShow: target.tvdbId,
-				...(seasons.length > 0
-					? { tmdbSeasons: seasons, tvdbSeasons: seasons }
-					: {}),
-			},
-		];
-	}
 }
 
-function projectSeerrLayer(
-	layer: ExternalIdLayer,
-	mediaType?: "movie" | "tv",
-): SeerrTargetProjection {
-	const projection = projectSeerrTarget({ upstream: layer }, mediaType);
-	return projection.kind === "target"
-		? { kind: "target", target: projection.target }
-		: { kind: projection.kind };
-}
-
-function withoutLink(record: UpstreamLayerRecord): ExternalIdLayer {
+function withoutLink(record: UpstreamMappingRecord): MappingRecord {
 	return structuredClone({
 		facts: record.facts,
 		...(record.conflicts ? { conflicts: record.conflicts } : {}),
 		...(record.scopes ? { scopes: record.scopes } : {}),
-		...(record.tvShowPairs ? { tvShowPairs: record.tvShowPairs } : {}),
 	});
 }
 
@@ -488,15 +435,14 @@ function showCandidate<TId extends number>(
 		: { id };
 }
 
-function candidateSeasons<TId extends number>(
-	candidates: readonly { id: TId; seasons?: number[] }[],
-	id: TId,
-): number[] {
-	return normalizeSeasonNumbers(
-		candidates.flatMap((candidate) =>
-			candidate.id === id ? (candidate.seasons ?? []) : [],
-		),
-	);
+function validSeasons(value: unknown): number[] | undefined {
+	return Array.isArray(value)
+		? value.flatMap((season) =>
+				Number.isSafeInteger(season) && (season as number) >= 0
+					? [season as number]
+					: [],
+			)
+		: undefined;
 }
 
 function validTimestamp(value: unknown): number | null {

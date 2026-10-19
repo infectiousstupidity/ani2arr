@@ -22,8 +22,7 @@ export function SeerrRequestInfoPane(props: {
 	const targetFallbackTitle = target
 		? `${target.mediaType === "movie" ? "Movie" : "TV"} TMDB ID: ${target.tmdbId}`
 		: "";
-	const tvdbId =
-		details?.tvdbId ?? (target?.mediaType === "tv" ? target.tvdbId : undefined);
+	const tvdbId = details?.tvdbId;
 
 	return (
 		<div className={RIGHT_PANE_SCROLL_CLASS}>

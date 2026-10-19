@@ -17,6 +17,17 @@ import {
 import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
+import {
+	requireAniListId,
+	requireMediaType,
+	requireSeasons,
+	requireSeerrSeasons,
+	requireSourceIdentity,
+	requireTmdbId,
+	requireTvdbId,
+} from "./mapping-validation";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrMediaDetailsInput,
@@ -63,15 +74,17 @@ function buildSeerrLinkedEntry(
 
 export const seerrHandlers = {
 	async getSeerrTarget(input: GetSeerrTargetInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+		const source = requireSourceIdentity(input.source);
+		const mediaType = requireMediaType(input.mediaType);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
 		if (
 			input.title != null ||
 			input.metadata != null ||
 			input.forceRetry === true
 		) {
 			return resolveSeerrAutomaticTarget({
-				source: input.source,
-				mediaType: input.mediaType,
+				source,
+				mediaType,
 				anilistId: linkedAniListId,
 				...(input.title == null ? {} : { title: input.title }),
 				...(input.metadata == null ? {} : { metadata: input.metadata }),
@@ -80,40 +93,53 @@ export const seerrHandlers = {
 					: { forceRetry: input.forceRetry }),
 			});
 		}
-		return mappingService.getSeerrTarget(
-			input.source,
-			input.mediaType,
-			linkedAniListId,
-		);
+		return mappingService.getSeerrTarget(source, mediaType, linkedAniListId);
 	},
 
 	async getSeerrTargets(input: GetSeerrTargetsInput) {
-		return mappingService.listSeerrTargets(input);
+		if (!Array.isArray(input)) {
+			throw createError(
+				ErrorCode.VALIDATION_ERROR,
+				"Invalid Seerr target list.",
+				"Invalid Seerr target list.",
+			);
+		}
+		return mappingService.listSeerrTargets(
+			input.map((item) => ({
+				anilistId: requireAniListId(item?.anilistId),
+				mediaType: requireMediaType(item?.mediaType),
+			})),
+		);
 	},
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
-		await setManualSeerrTarget(
-			input.source,
-			input.mediaType === "movie"
-				? { mediaType: "movie", tmdbId: input.tmdbId }
+		const source = requireSourceIdentity(input.source);
+		const mediaType = requireMediaType(input.mediaType);
+		const tmdbId = requireTmdbId(input.tmdbId);
+		const tvInput = input as { seasons?: unknown };
+		const target =
+			mediaType === "movie"
+				? { mediaType: "movie" as const, tmdbId }
 				: {
-						mediaType: "tv",
-						tmdbId: input.tmdbId,
-						...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
-						...(input.seasons === undefined ? {} : { seasons: input.seasons }),
-					},
-			linkedAniListId ?? undefined,
-		);
+						mediaType: "tv" as const,
+						tmdbId,
+						...(tvInput.seasons === undefined
+							? {}
+							: { seasons: requireSeasons(tvInput.seasons) }),
+					};
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
+		await setManualSeerrTarget(source, target, linkedAniListId ?? undefined);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualSeerrTarget(input: ClearManualSeerrTargetInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+		const source = requireSourceIdentity(input.source);
+		const mediaType = requireMediaType(input.mediaType);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
 		await clearManualSeerrTarget(
-			input.source,
-			input.mediaType,
+			source,
+			mediaType,
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -121,16 +147,40 @@ export const seerrHandlers = {
 	},
 
 	async requestInSeerr(input: RequestInSeerrInput) {
+		const mediaType = requireMediaType(input.mediaType);
+		const tmdbId = requireTmdbId(input.tmdbId);
+		const tvInput = input as { tvdbId?: unknown; seasons?: unknown };
+		const validated =
+			mediaType === "movie"
+				? { mediaType, tmdbId }
+				: {
+						mediaType,
+						tmdbId,
+						...(tvInput.tvdbId === undefined
+							? {}
+							: { tvdbId: requireTvdbId(tvInput.tvdbId) }),
+						seasons: requireSeerrSeasons(tvInput.seasons),
+					};
 		const connection = await requireSeerrConnection();
 		return seerrClient.requestMedia(
-			buildSeerrRequestPayload(input),
+			buildSeerrRequestPayload(validated),
 			connection,
 		);
 	},
 
 	async getSeerrMediaStatus(input: GetSeerrMediaStatusInput) {
+		const mediaType = requireMediaType(input.mediaType);
+		const tmdbId = requireTmdbId(input.tmdbId);
+		const tvInput = input as { seasons?: unknown };
+		const validated = {
+			mediaType,
+			tmdbId,
+			...(mediaType === "tv" && tvInput.seasons !== undefined
+				? { seasons: requireSeerrSeasons(tvInput.seasons) }
+				: {}),
+		};
 		const connection = await requireSeerrConnection();
-		return seerrClient.getMediaStatus(input, connection);
+		return seerrClient.getMediaStatus(validated, connection);
 	},
 
 	async searchSeerrMedia(input: { query: string }) {
@@ -139,8 +189,12 @@ export const seerrHandlers = {
 	},
 
 	async getSeerrMediaDetails(input: GetSeerrMediaDetailsInput) {
+		const validated = {
+			mediaType: requireMediaType(input.mediaType),
+			tmdbId: requireTmdbId(input.tmdbId),
+		};
 		const connection = await requireSeerrConnection();
-		return seerrClient.getMediaDetails(input, connection);
+		return seerrClient.getMediaDetails(validated, connection);
 	},
 
 	async getSeerrPublicSettings() {
@@ -149,9 +203,11 @@ export const seerrHandlers = {
 	},
 
 	async getSeerrLinkedAniListEntries(input: GetSeerrLinkedAniListEntriesInput) {
-		const targets = await mappingService.listAllSeerrTargets(input.mediaType);
+		const mediaType = requireMediaType(input.mediaType);
+		const tmdbId = requireTmdbId(input.tmdbId);
+		const targets = await mappingService.listAllSeerrTargets(mediaType);
 		const ids = targets
-			.filter((target) => seerrTargetsMatch(input, target))
+			.filter((target) => seerrTargetsMatch({ mediaType, tmdbId }, target))
 			.map((target) => target.anilistId);
 
 		if (ids.length === 0) return [];

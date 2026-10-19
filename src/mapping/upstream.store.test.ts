@@ -11,10 +11,10 @@ import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import {
 	clearUpstreamMappings,
 	getSourceAliasesByAniListId,
-	getSourceSeerrUpstreamMapping,
 	getSourceUpstreamLayers,
 	getUniqueAniListIdForSource,
 	getUniqueAniListIdsForSources,
+	migrateUpstreamStore,
 	refreshUpstreamMappings,
 } from "./upstream.store";
 
@@ -100,6 +100,28 @@ describe("refreshUpstreamMappings", () => {
 		await clearUpstreamMappings();
 	});
 
+	it("decodes malformed current-v1 nested upstream fields safely", async () => {
+		await seedLayerSnapshot({
+			"anilist:1": {
+				facts: { tmdbMovie: "bad", tmdbShow: tmdb(10) },
+				scopes: { tmdbShow: { id: tmdb(10), seasons: [-1, 3] } },
+				linkedAniListId: 0,
+			},
+		});
+
+		await expect(getSourceUpstreamLayers(anilistSource(1))).resolves.toEqual({
+			anilistId: aid(1),
+			direct: {
+				facts: { tmdbShow: tmdb(10) },
+				scopes: { tmdbShow: { id: tmdb(10), seasons: [3] } },
+			},
+			canonical: {
+				facts: { tmdbShow: tmdb(10) },
+				scopes: { tmdbShow: { id: tmdb(10), seasons: [3] } },
+			},
+		});
+	});
+
 	it.each([
 		{
 			name: "oversized payload",
@@ -181,6 +203,37 @@ describe("refreshUpstreamMappings", () => {
 		});
 		expect(setSpy).not.toHaveBeenCalled();
 		setSpy.mockRestore();
+	});
+
+	it("uses only released v2 TMDB-specific Seerr seasons", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				mappings: { 1: [] },
+				seerrTargets: {
+					1: {
+						mediaType: "tv",
+						tmdbId: tmdb(400),
+						tvdbId: tvdb(500),
+						seasons: [2],
+						tmdbSeasons: [3],
+					},
+				},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await migrateUpstreamStore();
+
+		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
+		expect(stored[UPSTREAM_STORAGE_KEY]).toMatchObject({
+			version: 1,
+			records: {
+				"anilist:1": {
+					facts: { tmdbShow: tmdb(400) },
+					scopes: { tmdbShow: { id: tmdb(400), seasons: [3] } },
+				},
+			},
+		});
 	});
 
 	it("forces a full refresh for fresh legacy snapshots", async () => {
@@ -345,41 +398,6 @@ describe("refreshUpstreamMappings", () => {
 		);
 	});
 
-	it("falls back to AniList Seerr facts only when direct MAL facts are missing", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		await seedSnapshot(
-			{
-				"anilist:21": [{ kind: "tmdb-movie", id: tmdb(400) }],
-			},
-			{ linkedAniListIds: { [sourceIdentityKey(source)]: aid(21) } },
-		);
-
-		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
-			anilistId: aid(21),
-			kind: "target",
-			target: { mediaType: "movie", tmdbId: tmdb(400) },
-		});
-	});
-
-	it("does not replace conflicting direct MAL facts with an AniList target", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		await seedSnapshot(
-			{
-				"anilist:21": [{ kind: "tmdb-movie", id: tmdb(400) }],
-				"mal:5114": [
-					{ kind: "tmdb-movie", id: tmdb(100) },
-					{ kind: "tmdb-movie", id: tmdb(200) },
-				],
-			},
-			{ linkedAniListIds: { [sourceIdentityKey(source)]: aid(21) } },
-		);
-
-		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
-			anilistId: aid(21),
-			kind: "conflict",
-		});
-	});
-
 	it("returns a direct MAL target without an AniList alias", async () => {
 		const source = { source: "mal", id: mal(59_571) } as const;
 		await seedSnapshot({
@@ -389,11 +407,6 @@ describe("refreshUpstreamMappings", () => {
 		await expect(getSourceUpstreamLayers(source)).resolves.toMatchObject({
 			anilistId: null,
 			direct: { facts: { tmdbMovie: tmdb(1_333_100) } },
-		});
-		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
-			anilistId: null,
-			kind: "target",
-			target: { mediaType: "movie", tmdbId: tmdb(1_333_100) },
 		});
 	});
 

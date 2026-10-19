@@ -8,15 +8,21 @@ import {
 	sonarrLibrary,
 } from "@/background/api-services";
 import { getProviderConfig } from "@/background/provider-config";
-import type {
-	AniListId,
-} from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import {
 	getMappingIdentities,
 	listEffectiveMappingsByProvider,
 } from "@/mapping/list-mappings";
-import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
+import type { EffectiveMappingRecord } from "@/mapping/effective-mapping";
 import type { MappingResult } from "@/mapping/types";
+import {
+	clearIgnored as clearManualIgnored,
+	clearManualMapping as clearStoredManualMapping,
+	clearRejectedAutoCandidate,
+	rejectAutoCandidate,
+	setIgnored as setManualIgnored,
+	setManualMapping as setStoredManualMapping,
+} from "@/mapping/manual.store";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import {
 	getSourceAliasesByAniListId,
@@ -36,6 +42,12 @@ import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
+import {
+	requireAniListId,
+	requireProvider,
+	requireProviderId,
+	requireSourceIdentity,
+} from "./mapping-validation";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -429,22 +441,32 @@ async function assertNoConflictingLinkedIds(input: {
 
 export const mappingHandlers = {
 	getMappingIdentities(ids: GetMappingIdentitiesInput) {
-		return getMappingIdentities(ids);
+		if (!Array.isArray(ids)) {
+			throw createError(
+				ErrorCode.VALIDATION_ERROR,
+				"Invalid AniList ID list.",
+				"Invalid AniList ID list.",
+			);
+		}
+		return getMappingIdentities(ids.map((id) => requireAniListId(id)));
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		const providerId = requireProviderId(provider, input.providerId);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
 		await assertNoConflictingLinkedIds({
-			provider: input.provider,
+			provider,
 			currentAniListId: linkedAniListId,
-			providerId: input.providerId,
+			providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});
 
-		await mappingService.setManualMapping(
-			input.provider,
-			input.source,
-			input.providerId,
+		await setStoredManualMapping(
+			provider,
+			source,
+			{ providerId },
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -452,10 +474,12 @@ export const mappingHandlers = {
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
-		await mappingService.clearManualMapping(
-			input.provider,
-			input.source,
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
+		await clearStoredManualMapping(
+			provider,
+			source,
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -463,10 +487,12 @@ export const mappingHandlers = {
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
-		await mappingService.setIgnored(
-			input.provider,
-			input.source,
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
+		await setManualIgnored(
+			provider,
+			source,
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -474,10 +500,12 @@ export const mappingHandlers = {
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
-		await mappingService.clearIgnored(
-			input.provider,
-			input.source,
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
+		await clearManualIgnored(
+			provider,
+			source,
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -485,11 +513,14 @@ export const mappingHandlers = {
 	},
 
 	async setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
-		await mappingService.rejectCandidate(
-			input.provider,
-			input.source,
-			input.providerId,
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		const providerId = requireProviderId(provider, input.providerId);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
+		await rejectAutoCandidate(
+			provider,
+			source,
+			providerId,
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -499,11 +530,14 @@ export const mappingHandlers = {
 	async clearMappingRejectedCandidate(
 		input: ClearMappingRejectedCandidateInput,
 	) {
-		const linkedAniListId = await getUniqueAniListIdForSource(input.source);
-		await mappingService.clearRejectedCandidate(
-			input.provider,
-			input.source,
-			input.providerId,
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		const providerId = requireProviderId(provider, input.providerId);
+		const linkedAniListId = await getUniqueAniListIdForSource(source);
+		await clearRejectedAutoCandidate(
+			provider,
+			source,
+			providerId,
 			linkedAniListId ?? undefined,
 		);
 		await bumpMappingsRevision();
@@ -515,13 +549,27 @@ export const mappingHandlers = {
 	},
 
 	getMappingInspection(input: GetMappingInspectionInput) {
-		return getMappingInspection(input, {
-			mappingService,
-			anilistMetadataStore,
-		});
+		const source = requireSourceIdentity(input.source);
+		const provider = requireProvider(input.provider);
+		return getMappingInspection(
+			{ source, provider },
+			{
+				mappingService,
+				anilistMetadataStore,
+			},
+		);
 	},
 
 	async resolveAniListIdsForSources(sources: SourceIdentity[]) {
-		return getUniqueAniListIdsForSources(sources);
+		if (!Array.isArray(sources)) {
+			throw createError(
+				ErrorCode.VALIDATION_ERROR,
+				"Invalid mapping source list.",
+				"Invalid mapping source list.",
+			);
+		}
+		return getUniqueAniListIdsForSources(
+			sources.map((source) => requireSourceIdentity(source)),
+		);
 	},
 };

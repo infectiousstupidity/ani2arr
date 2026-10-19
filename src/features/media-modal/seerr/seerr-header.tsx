@@ -53,22 +53,13 @@ function getTargetIdLinks(
 ): SeerrTargetIdLink[] {
 	if (!target) return [];
 
-	const links: SeerrTargetIdLink[] = [
+	return [
 		{
 			label: `TMDB ID: ${target.tmdbId}`,
 			href: buildTmdbUrl(target),
 			ariaLabel: "Open in TMDB",
 		},
 	];
-	if (target.mediaType === "tv" && target.tvdbId !== undefined) {
-		links.push({
-			label: `TVDB ID: ${target.tvdbId}`,
-			href: `https://thetvdb.com/dereferrer/series/${target.tvdbId}`,
-			ariaLabel: "Open in TVDB",
-		});
-	}
-
-	return links;
 }
 
 export function SeerrHeader(props: {

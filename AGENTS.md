@@ -6,14 +6,24 @@ Use global base skills when relevant.
 
 Ani2arr is a WXT browser extension for AniList/AniChart pages with Sonarr, Radarr, and Seerr integration.
 
-Relevant skills:
+## Relevant skills:
 
 - `wxt-browser-extension` for extension runtime, entrypoints, storage, messaging, manifest, and content-script work.
 - `react-best-practices` for React UI work.
 - `boring-architecture` for boundary or data-flow changes.
-- `security-scanning` for audit, Gitleaks, Semgrep, or dependency security work.
-- `simplicity-review` for code, folder, architecture, and plan simplification.
-- `Context7` for up to date dependency and API docs. Do not rely on your training data.
+- `code-simplicity-review` for code, folder, architecture, and plan simplification.
+- `context7` for up to date dependency and API docs. Do not rely on your training data.
+- `small-code` for implementing or reviewing features, fixes, refactors, dependencies, or cleanup where over-engineering is a risk
+
+## Working Method
+
+- Review, explain, and diagnose requests are read-only. Do not edit or scaffold unless explicitly asked.
+- For non-trivial work, state: Goal, Non-goals, and Done when.
+- Before architecture work, inspect current callers, canonical types, active plans, and the dirty worktree.
+- Do not add a wrapper, helper, type, prop, or file without a demonstrated current need. Reuse or inline first.
+- Do not add internal compatibility shims unless explicitly requested.
+- Use plain English and concrete examples. Avoid unexplained architecture jargon.
+- Test only critical behavior with a high risk and cost of regression; otherwise, do not add tests.
 
 ## Commands
 

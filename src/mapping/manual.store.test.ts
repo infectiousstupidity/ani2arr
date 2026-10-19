@@ -5,10 +5,12 @@ import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import {
 	clearManualFacts,
+	clearRejectedAutoCandidate,
 	consolidateManualAliases,
 	getManualLayerRecord,
 	listAniListManualLayers,
 	migrateManualStore,
+	rejectAutoCandidate,
 	setIgnored,
 	setManualMapping,
 	setManualSeerrTarget,
@@ -41,6 +43,59 @@ describe("manual mapping store", () => {
 		});
 	});
 
+	it("clears a stored season scope when replacing a Sonarr mapping", async () => {
+		await browser.storage.local.set({
+			[MANUAL_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: { tvdbShow: tvdb(10) },
+						scopes: { tvdbShow: { id: tvdb(10), seasons: [2] } },
+					},
+				},
+			},
+		});
+
+		await setManualMapping("sonarr", aid(1), { providerId: tvdb(20) });
+
+		await expect(getManualLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tvdbShow: tvdb(20) },
+		});
+	});
+
+	it("rejects invalid rejected-candidate writes without changing storage", async () => {
+		for (const testCase of [
+			{
+				prepare: () =>
+					setManualMapping("sonarr", aid(1), { providerId: tvdb(10) }),
+				write: () => rejectAutoCandidate("sonarr", aid(1), 0),
+			},
+			{
+				prepare: async () => {
+					await setManualMapping("radarr", aid(1), { providerId: tmdb(20) });
+					await rejectAutoCandidate("radarr", aid(1), tmdb(30));
+				},
+				write: () =>
+					clearRejectedAutoCandidate(
+						"radarr",
+						aid(1),
+						Number.MAX_SAFE_INTEGER + 1,
+					),
+			},
+		]) {
+			await clearManualFacts();
+			await testCase.prepare();
+			const before = await browser.storage.local.get(MANUAL_STORAGE_KEY);
+
+			await expect(testCase.write()).rejects.toThrow(
+				"Invalid rejected candidate ID.",
+			);
+			await expect(
+				browser.storage.local.get(MANUAL_STORAGE_KEY),
+			).resolves.toEqual(before);
+		}
+	});
+
 	it("serializes concurrent writes without losing records", async () => {
 		await Promise.all([
 			setManualMapping("sonarr", aid(1), { providerId: tvdb(10) }),
@@ -63,7 +118,9 @@ describe("manual mapping store", () => {
 		await browser.storage.local.set({
 			[MANUAL_STORAGE_KEY]: {
 				sonarr: {
-					"anilist:1": { mapping: { providerId: tvdb(10) } },
+					"anilist:1": {
+						mapping: { providerId: tvdb(10), season: 2 },
+					},
 					"mal:5114": { mapping: { providerId: tvdb(78_874) } },
 				},
 				radarr: {},
@@ -76,7 +133,10 @@ describe("manual mapping store", () => {
 		await expect(listAniListManualLayers()).resolves.toEqual([
 			{
 				anilistId: aid(1),
-				record: { facts: { tvdbShow: tvdb(10) } },
+				record: {
+					facts: { tvdbShow: tvdb(10) },
+					scopes: { tvdbShow: { id: tvdb(10), seasons: [2] } },
+				},
 			},
 		]);
 	});
@@ -92,9 +152,7 @@ describe("manual mapping store", () => {
 			anilistId,
 		);
 
-		await expect(
-			getManualLayerRecord(source, anilistId),
-		).resolves.toEqual({
+		await expect(getManualLayerRecord(source, anilistId)).resolves.toEqual({
 			facts: { tvdbShow: tvdb(424_536) },
 		});
 		await expect(
@@ -115,6 +173,29 @@ describe("manual mapping store", () => {
 				record: { facts: { tvdbShow: tvdb(424_536) } },
 			},
 		]);
+	});
+
+	it("decodes malformed current-v1 nested manual fields safely", async () => {
+		await browser.storage.local.set({
+			[MANUAL_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: { tmdbMovie: "bad", tvdbShow: tvdb(10) },
+						scopes: { tvdbShow: { id: tvdb(10), seasons: [-1, 2] } },
+						decisions: {
+							sonarr: { ignored: "yes", rejectedTvdbShow: [tvdb(30), 0] },
+						},
+					},
+				},
+			},
+		});
+
+		await expect(getManualLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tvdbShow: tvdb(10) },
+			scopes: { tvdbShow: { id: tvdb(10), seasons: [2] } },
+			decisions: { sonarr: { rejectedTvdbShow: [tvdb(30)] } },
+		});
 	});
 
 	it("reads canonical and pre-link alias facts together before consolidating on mutation", async () => {
@@ -235,6 +316,7 @@ describe("manual mapping store", () => {
 					tmdbId: tmdb(400),
 					tvdbId: tvdb(500),
 					seasons: [2],
+					tmdbSeasons: [3],
 				},
 			},
 		});
@@ -246,20 +328,33 @@ describe("manual mapping store", () => {
 		});
 		await expect(getManualLayerRecord(aid(2))).resolves.toEqual({
 			facts: { tmdbShow: tmdb(400) },
-			scopes: { tmdbShow: { id: tmdb(400), seasons: [2] } },
-			tvShowPairs: [
-				{
-					tmdbShow: tmdb(400),
-					tvdbShow: tvdb(500),
-					tmdbSeasons: [2],
-					tvdbSeasons: [2],
-				},
-			],
+			scopes: { tmdbShow: { id: tmdb(400), seasons: [3] } },
 		});
 		await expect(
 			browser.storage.local.get("mapping:seerr-targets"),
 		).resolves.toEqual({});
 	});
+
+	it.each([
+		{
+			name: "media discriminator",
+			target: { mediaType: "series", tmdbId: 400 },
+		},
+		{
+			name: "non-array seasons",
+			target: { mediaType: "tv", tmdbId: 400, seasons: 2 },
+		},
+	])(
+		"skips released Seerr targets with malformed $name",
+		async ({ target }) => {
+			await browser.storage.local.set({
+				"mapping:seerr-targets": { 1: target },
+			});
+
+			await expect(migrateManualStore()).resolves.toBeUndefined();
+			await expect(getManualLayerRecord(aid(1))).resolves.toBeNull();
+		},
+	);
 
 	it("consolidates aliases canonical-first and copies only compatible evidence", async () => {
 		await browser.storage.local.set({
@@ -276,9 +371,6 @@ describe("manual mapping store", () => {
 							tvdbShow: tvdb(20),
 						},
 						scopes: { tmdbShow: { id: tmdb(60), seasons: [1] } },
-						tvShowPairs: [
-							{ tmdbShow: tmdb(60), tvdbShow: tvdb(70) },
-						],
 						decisions: {
 							radarr: { rejectedTmdbMovie: [tmdb(31)] },
 						},
@@ -286,9 +378,6 @@ describe("manual mapping store", () => {
 					"mal:3": {
 						facts: { tmdbMovie: tmdb(40), tmdbShow: tmdb(50) },
 						scopes: { tmdbShow: { id: tmdb(50), seasons: [2] } },
-						tvShowPairs: [
-							{ tmdbShow: tmdb(50), tvdbShow: tvdb(80) },
-						],
 						decisions: { sonarr: { ignored: true } },
 					},
 				},
@@ -314,7 +403,6 @@ describe("manual mapping store", () => {
 				tvdbShow: tvdb(10),
 			},
 			scopes: { tmdbShow: { id: tmdb(50), seasons: [2] } },
-			tvShowPairs: [{ tmdbShow: tmdb(50), tvdbShow: tvdb(80) }],
 			decisions: {
 				sonarr: { ignored: true },
 				radarr: { rejectedTmdbMovie: [tmdb(31)] },

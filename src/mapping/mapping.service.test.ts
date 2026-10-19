@@ -12,6 +12,7 @@ import {
 } from "./auto.store";
 import {
 	clearManualFacts,
+	clearManualMapping,
 	clearManualSeerrTarget,
 	setManualMapping,
 	setManualSeerrTarget,
@@ -63,14 +64,18 @@ describe("MappingService", () => {
 		await setManualMapping("radarr", source, { providerId: tmdb(20) });
 		const service = new MappingService(vi.fn());
 
-		await expect(service.getMapping("radarr", source, source.id)).resolves.toEqual({
+		await expect(
+			service.getMapping("radarr", source, source.id),
+		).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
 			providerId: tmdb(20),
 		});
 
-		await service.clearManualMapping("radarr", source);
-		await expect(service.getMapping("radarr", source, source.id)).resolves.toEqual({
+		await clearManualMapping("radarr", source);
+		await expect(
+			service.getMapping("radarr", source, source.id),
+		).resolves.toEqual({
 			kind: "mapped",
 			source: "upstream",
 			providerId: tmdb(10),
@@ -96,7 +101,9 @@ describe("MappingService", () => {
 			providerId: tvdb(78_874),
 			matchedTitle: "Fullmetal Alchemist",
 		});
-		await expect(service.getMapping("sonarr", source, null)).resolves.toMatchObject({
+		await expect(
+			service.getMapping("sonarr", source, null),
+		).resolves.toMatchObject({
 			kind: "mapped",
 			providerId: tvdb(78_874),
 		});
@@ -181,26 +188,25 @@ describe("MappingService", () => {
 		expect(resolver).not.toHaveBeenCalled();
 	});
 
-	it("projects Seerr TV from shared facts without promoting pair evidence", async () => {
+	it("keeps manual Seerr TV independent from Sonarr", async () => {
 		const source = { source: "anilist", id: aid(3) } as const;
 		await setManualSeerrTarget(source, {
 			mediaType: "tv",
 			tmdbId: tmdb(500),
-			tvdbId: tvdb(700),
 			seasons: [2],
 		});
 		const service = new MappingService(vi.fn());
 
-		await expect(service.getSeerrTarget(source, "tv", source.id)).resolves.toMatchObject({
+		await expect(
+			service.getSeerrTarget(source, "tv", source.id),
+		).resolves.toMatchObject({
 			mediaType: "tv",
 			tmdbId: tmdb(500),
-			tvdbId: tvdb(700),
 			source: "manual",
 		});
-		await expect(service.getMapping("sonarr", source, source.id)).resolves.toEqual({
-			kind: "unmapped",
-			hadResolveAttempt: false,
-		});
+		await expect(
+			service.getMapping("sonarr", source, source.id),
+		).resolves.toMatchObject({ kind: "unmapped" });
 	});
 
 	it("clearing Seerr TV retains an independent Sonarr fact", async () => {
@@ -209,16 +215,63 @@ describe("MappingService", () => {
 		await setManualSeerrTarget(source, {
 			mediaType: "tv",
 			tmdbId: tmdb(800),
-			tvdbId: tvdb(900),
 		});
 		await clearManualSeerrTarget(source, "tv");
 		const service = new MappingService(vi.fn());
 
-		await expect(service.getSeerrTarget(source, "tv", source.id)).resolves.toBeNull();
-		await expect(service.getMapping("sonarr", source, source.id)).resolves.toMatchObject({
+		await expect(
+			service.getSeerrTarget(source, "tv", source.id),
+		).resolves.toBeNull();
+		await expect(
+			service.getMapping("sonarr", source, source.id),
+		).resolves.toMatchObject({
 			kind: "mapped",
 			providerId: tvdb(900),
 		});
+	});
+
+	it("covers Seerr bulk, list-all, and reverse-read surfaces", async () => {
+		await setManualSeerrTarget(aid(10), {
+			mediaType: "movie",
+			tmdbId: tmdb(100),
+		});
+		await setManualSeerrTarget(aid(20), {
+			mediaType: "movie",
+			tmdbId: tmdb(200),
+		});
+		await seedUpstream({
+			"anilist:30": { facts: { tmdbMovie: tmdb(100) } },
+		});
+		const service = new MappingService(vi.fn());
+
+		await expect(
+			service.listSeerrTargets([
+				{ anilistId: aid(10), mediaType: "movie" },
+				{ anilistId: aid(30), mediaType: "movie" },
+			]),
+		).resolves.toEqual([
+			{
+				anilistId: aid(10),
+				source: "manual",
+				mediaType: "movie",
+				tmdbId: tmdb(100),
+			},
+			{
+				anilistId: aid(30),
+				source: "anibridge",
+				mediaType: "movie",
+				tmdbId: tmdb(100),
+			},
+		]);
+		await expect(service.listAllSeerrTargets("movie")).resolves.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ anilistId: aid(20), tmdbId: tmdb(200) }),
+				expect.objectContaining({ anilistId: aid(30), tmdbId: tmdb(100) }),
+			]),
+		);
+		await expect(
+			service.getLinkedAniListIds("radarr", tmdb(100)),
+		).resolves.toEqual([aid(10), aid(30)]);
 	});
 
 	it("finds linked AniList IDs from the same effective records", async () => {

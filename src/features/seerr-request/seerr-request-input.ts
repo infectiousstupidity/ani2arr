@@ -26,7 +26,6 @@ export function toSeerrRequestInput(
 	return {
 		mediaType: "tv",
 		tmdbId: target.tmdbId,
-		...(target.tvdbId === undefined ? {} : { tvdbId: target.tvdbId }),
 		seasons: seasons === "all" ? "all" : [...seasons],
 	};
 }

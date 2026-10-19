@@ -27,11 +27,7 @@ export function getSeerrTargetSeasonKey(
 ): string {
 	if (target?.mediaType !== "tv") return "";
 
-	return [
-		`effective:${target.seasons?.join(",") ?? ""}`,
-		`tmdb:${target.tmdbSeasons?.join(",") ?? ""}`,
-		`tvdb:${target.tvdbSeasons?.join(",") ?? ""}`,
-	].join("|");
+	return `tmdb:${target.seasons?.join(",") ?? ""}`;
 }
 
 export function isSelectableSeerrSeason(

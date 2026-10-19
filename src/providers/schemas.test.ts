@@ -29,6 +29,7 @@ describe("provider ID helpers", () => {
 	it("rejects invalid concrete provider external IDs", () => {
 		expect(parseTvdbIdOrNull("100")).toBeNull();
 		expect(parseTmdbIdOrNull(0)).toBeNull();
+		expect(parseTvdbIdOrNull(Number.MAX_SAFE_INTEGER + 1)).toBeNull();
 		expect(() => parseTvdbId(1.5)).toThrow(/Invalid TVDB ID/);
 		expect(() => parseTmdbId("200")).toThrow(/Invalid TMDB ID/);
 	});

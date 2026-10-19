@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { seerrHandlers } from "./seerr.handlers";
 
 const apiServicesMock = vi.hoisted(() => ({
@@ -14,8 +15,14 @@ const apiServicesMock = vi.hoisted(() => ({
 		listAllSeerrTargets: vi.fn(),
 		listSeerrTargets: vi.fn(),
 	},
-	seerrClient: {},
+	seerrClient: {
+		requestMedia: vi.fn(),
+		getMediaStatus: vi.fn(),
+		getMediaDetails: vi.fn(),
+	},
 }));
+
+const requireSeerrConnectionMock = vi.hoisted(() => vi.fn());
 
 const manualStoreMock = vi.hoisted(() => ({
 	clearManualSeerrTarget: vi.fn(),
@@ -28,7 +35,7 @@ const getUniqueAniListIdForSourceMock = vi.hoisted(() => vi.fn());
 vi.mock("@/background/api-services", () => apiServicesMock);
 
 vi.mock("@/background/provider-config", () => ({
-	requireSeerrConnection: vi.fn(),
+	requireSeerrConnection: requireSeerrConnectionMock,
 }));
 
 vi.mock("@/mapping/manual.store", () => manualStoreMock);
@@ -44,7 +51,6 @@ vi.mock("@/rpc/revision-signals", () => ({
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
-const tvdb = parseTvdbId;
 
 describe("seerrHandlers", () => {
 	beforeEach(() => {
@@ -116,13 +122,12 @@ describe("seerrHandlers", () => {
 		{ name: "linked", linkedAniListId: aid(100) },
 		{ name: "unlinked", linkedAniListId: null },
 	])(
-		"stores a complete manual TV target for a $name MAL source",
+		"stores a TMDB-only manual TV target for a $name MAL source",
 		async ({ linkedAniListId }) => {
 			const input = {
 				source: { source: "mal", id: mal(5114) } as const,
 				mediaType: "tv" as const,
 				tmdbId: tmdb(123),
-				tvdbId: tvdb(456),
 				seasons: [2],
 			};
 			getUniqueAniListIdForSourceMock.mockResolvedValue(linkedAniListId);
@@ -137,7 +142,6 @@ describe("seerrHandlers", () => {
 				{
 					mediaType: "tv",
 					tmdbId: input.tmdbId,
-					tvdbId: input.tvdbId,
 					seasons: input.seasons,
 				},
 				linkedAniListId ?? undefined,
@@ -145,6 +149,79 @@ describe("seerrHandlers", () => {
 			expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 		},
 	);
+
+	it("rejects malformed runtime IDs, media types, and seasons", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		await expect(
+			seerrHandlers.getSeerrTarget({
+				source,
+				mediaType: "series" as "tv",
+			}),
+		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+		await expect(
+			seerrHandlers.getSeerrTargets([
+				{ anilistId: 0 as ReturnType<typeof aid>, mediaType: "movie" },
+			]),
+		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+		await expect(
+			seerrHandlers.setManualSeerrTarget({
+				source,
+				mediaType: "tv",
+				tmdbId: tmdb(1),
+				seasons: [-1],
+			}),
+		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
+		expect(getUniqueAniListIdForSourceMock).not.toHaveBeenCalled();
+		expect(manualStoreMock.setManualSeerrTarget).not.toHaveBeenCalled();
+		expect(bumpMappingsRevisionMock).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{
+			name: "request media type",
+			call: () =>
+				seerrHandlers.requestInSeerr({
+					mediaType: "series" as "tv",
+					tmdbId: tmdb(1),
+					seasons: [1],
+				}),
+		},
+		{
+			name: "request TVDB ID",
+			call: () =>
+				seerrHandlers.requestInSeerr({
+					mediaType: "tv",
+					tmdbId: tmdb(1),
+					tvdbId: 0 as ReturnType<typeof parseTvdbId>,
+					seasons: [1],
+				}),
+		},
+		{
+			name: "status seasons",
+			call: () =>
+				seerrHandlers.getSeerrMediaStatus({
+					mediaType: "tv",
+					tmdbId: tmdb(1),
+					seasons: [-1],
+				}),
+		},
+		{
+			name: "details TMDB ID",
+			call: () =>
+				seerrHandlers.getSeerrMediaDetails({
+					mediaType: "movie",
+					tmdbId: Number.NaN as ReturnType<typeof tmdb>,
+				}),
+		},
+	])("rejects invalid $name before provider calls", async ({ call }) => {
+		await expect(call()).rejects.toMatchObject({
+			code: ErrorCode.VALIDATION_ERROR,
+		});
+		expect(requireSeerrConnectionMock).not.toHaveBeenCalled();
+		expect(apiServicesMock.seerrClient.requestMedia).not.toHaveBeenCalled();
+		expect(apiServicesMock.seerrClient.getMediaStatus).not.toHaveBeenCalled();
+		expect(apiServicesMock.seerrClient.getMediaDetails).not.toHaveBeenCalled();
+	});
 
 	it("returns AniList entries sharing the same effective Seerr target", async () => {
 		apiServicesMock.mappingService.listAllSeerrTargets.mockResolvedValue([

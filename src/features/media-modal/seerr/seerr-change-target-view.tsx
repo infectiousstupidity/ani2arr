@@ -48,8 +48,6 @@ function currentTargetDefaultSeasons(input: {
 
 	return getDefaultSelectedSeasons({
 		mappedSeasons: input.currentTarget.seasons,
-		tmdbMappedSeasons: input.currentTarget.tmdbSeasons,
-		tvdbMappedSeasons: input.currentTarget.tvdbSeasons,
 		seasons: input.selectedDetails.seasons,
 	});
 }
@@ -70,7 +68,6 @@ function canSaveTvTarget(
 
 function buildTvManualTargetInput(input: {
 	source: SourceIdentity;
-	selectedDetails: SeerrMediaDetails | null;
 	selectedResult: SeerrSearchResult | null;
 	draftSeasons: readonly number[];
 }): SetManualSeerrTargetInput | null {
@@ -85,9 +82,6 @@ function buildTvManualTargetInput(input: {
 		source: input.source,
 		mediaType: "tv",
 		tmdbId: input.selectedResult.tmdbId,
-		...(input.selectedDetails?.tvdbId === undefined
-			? {}
-			: { tvdbId: input.selectedDetails.tvdbId }),
 		seasons: [...input.draftSeasons],
 	};
 }
@@ -198,7 +192,6 @@ export function SeerrChangeTargetView(props: {
 	const saveTvTarget = (): void => {
 		const input = buildTvManualTargetInput({
 			source,
-			selectedDetails,
 			selectedResult,
 			draftSeasons,
 		});
