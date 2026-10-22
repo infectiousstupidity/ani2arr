@@ -59,6 +59,9 @@ import type {
 	ClearManualSeerrTargetInput,
 	SearchSeerrMediaInput,
 	SearchSeerrMediaOutput,
+	CheckSeerrSessionInput,
+	TestSeerrApiKeyConnectionInput,
+	SeerrConnectionCheckOutput,
 } from "./types";
 
 export interface Ani2arrApi {
@@ -79,9 +82,14 @@ export interface Ani2arrApi {
 	testRadarrConnection(
 		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
-	testSeerrConnection(
-		input: ProviderConnectionTestInput,
-	): Promise<{ ok: true }>;
+	checkSeerrSession(
+		input: CheckSeerrSessionInput,
+	): Promise<SeerrConnectionCheckOutput>;
+	testSeerrApiKeyConnection(
+		input: TestSeerrApiKeyConnectionInput,
+	): Promise<SeerrConnectionCheckOutput>;
+	checkConfiguredSeerrConnection(): Promise<SeerrConnectionCheckOutput>;
+	checkConfiguredSeerrCsrfSupport(): Promise<{ ok: true }>;
 	requestInSeerr(input: RequestInSeerrInput): Promise<RequestInSeerrOutput>;
 	getSeerrMediaStatus(
 		input: GetSeerrMediaStatusInput,

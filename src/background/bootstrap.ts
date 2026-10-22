@@ -9,7 +9,7 @@ import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
 import { getExtensionOptionsSnapshot } from "@/settings/store";
 import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import {
 	logError,
 	normalizeError,
@@ -40,6 +40,7 @@ const A2AMessageSchema = v.union([
 			v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
 		),
 		targetAnilistId: v.optional(AniListIdSchema),
+		enableSeerrCsrf: v.optional(v.literal(true)),
 	}),
 ]);
 
@@ -49,7 +50,7 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 		return (
 			hasConfiguredProviderCredentials(options, "sonarr") ||
 			hasConfiguredProviderCredentials(options, "radarr") ||
-			hasConfiguredSeerrCredentials(options)
+			hasConfiguredSeerrConnection(options)
 		);
 	} catch (error) {
 		logError(normalizeError(error), "Background:shouldWarmMappingsCache");
@@ -123,12 +124,13 @@ export const bootstrapBackground = (): void => {
 			}
 
 			if (msg.type === "OPEN_OPTIONS_PAGE") {
-				const targetHash = msg.targetAnilistId
-					? `?anilistId=${msg.targetAnilistId}`
-					: "";
-				const hash = [msg.sectionId, targetHash]
-					.filter((p): p is string => !!p)
-					.join("");
+				const params = new URLSearchParams();
+				if (msg.targetAnilistId) {
+					params.set("anilistId", String(msg.targetAnilistId));
+				}
+				if (msg.enableSeerrCsrf) params.set("enableCsrf", "1");
+				const query = params.size > 0 ? `?${params.toString()}` : "";
+				const hash = `${msg.sectionId ?? ""}${query}`;
 				const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
 
 				browser.tabs.create({ url }).catch(() => {

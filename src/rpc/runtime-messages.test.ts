@@ -57,4 +57,24 @@ describe("openOptionsPage", () => {
 			timestamp: 789,
 		});
 	});
+
+	it("opens Seerr with the explicit CSRF recovery action", () => {
+		const sendMessage = vi
+			.spyOn(browser.runtime, "sendMessage")
+			.mockResolvedValue();
+		vi.spyOn(Date, "now").mockReturnValue(999);
+
+		openOptionsPage({
+			sectionId: "seerr",
+			enableSeerrCsrf: true,
+		});
+
+		expect(sendMessage).toHaveBeenCalledWith({
+			_a2a: true,
+			type: "OPEN_OPTIONS_PAGE",
+			sectionId: "seerr",
+			enableSeerrCsrf: true,
+			timestamp: 999,
+		});
+	});
 });

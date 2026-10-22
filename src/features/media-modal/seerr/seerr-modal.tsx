@@ -15,11 +15,6 @@ import { SeerrRequestView } from "./seerr-request-view";
 
 type SeerrView = "request" | "change-target";
 
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
-}
-
 function getConnectorState(input: {
 	view: SeerrView;
 	selectedResult: SeerrSearchResult | null;
@@ -59,9 +54,6 @@ export function SeerrModal({
 		enabled: isConfigured && target !== null,
 	});
 	const details = detailsQuery.data ?? null;
-	const detailsError = detailsQuery.error
-		? getErrorMessage(detailsQuery.error, "Failed to load Seerr media details.")
-		: null;
 	const targetTitle = getTargetTitle({ target, details });
 	const header = (
 		<SeerrHeader
@@ -99,10 +91,11 @@ export function SeerrModal({
 	return (
 		<SeerrRequestView
 			anilistId={anilistId}
+			authMode={base.options?.seerr.authMode ?? null}
 			container={container}
 			contentContainer={contentContainer}
 			details={details}
-			detailsError={detailsError}
+			detailsError={detailsQuery.error ?? null}
 			header={header}
 			isConfigured={isConfigured}
 			isLoading={targetQuery.isLoading || detailsQuery.isLoading}

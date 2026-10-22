@@ -3,6 +3,27 @@
 
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 
+export type SeerrAuth =
+	| {
+			mode: "session";
+	  }
+	| {
+			mode: "apiKey";
+			apiKey: string;
+	  };
+
+export interface SeerrAccountSummary {
+	id: number;
+	displayName: string;
+	avatar?: string;
+}
+
+export interface SeerrConnection {
+	url: string;
+	auth: SeerrAuth;
+	account?: SeerrAccountSummary;
+}
+
 export type SeerrMediaType = "movie" | "tv";
 export type SeerrTargetSource = "manual" | "anibridge";
 

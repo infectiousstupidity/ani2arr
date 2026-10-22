@@ -16,6 +16,7 @@ import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
 import { SeerrClient } from "@/providers/seerr/client";
+import { getSeerrXsrfToken } from "@/providers/seerr/csrf-token";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
@@ -27,11 +28,12 @@ import {
 	getExtensionOptionsSnapshot,
 	resetAllSettingsSnapshot,
 } from "@/settings/store";
+import { removeSeerrCsrfCookiePermission } from "@/settings/provider-permissions";
 import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
 } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
 import {
@@ -83,6 +85,7 @@ export const radarrClient = new RadarrClient({
 });
 export const seerrClient = new SeerrClient({
 	hasUrlPermission: createHasUrlPermission("seerr"),
+	getCsrfToken: getSeerrXsrfToken,
 });
 
 export const sonarrLibrary = new SonarrLibrary(sonarrClient);
@@ -169,7 +172,7 @@ export const handleProviderConnectionChanged = async (
 	if (
 		hasConfiguredProviderCredentials(options, "sonarr") ||
 		hasConfiguredProviderCredentials(options, "radarr") ||
-		hasConfiguredSeerrCredentials(options)
+		hasConfiguredSeerrConnection(options)
 	) {
 		await refreshUpstreamMappings();
 	}
@@ -243,4 +246,5 @@ export const resetExtensionState = async (): Promise<void> => {
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);
+	await removeSeerrCsrfCookiePermission();
 };

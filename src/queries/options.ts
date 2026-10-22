@@ -11,6 +11,7 @@ import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import {
 	getPublicOptionsSnapshot,
 	getExtensionOptionsSnapshot,
@@ -144,11 +145,11 @@ export const useSaveSeerrConnection = () => {
 	return useMutation<
 		ExtensionOptions,
 		ExtensionError,
-		{ credentials: ProviderCredentials | null }
+		{ connection: SeerrConnection | null }
 	>({
-		mutationFn: async ({ credentials }) => {
+		mutationFn: async ({ connection }) => {
 			try {
-				return await saveSeerrConnectionSnapshot(credentials);
+				return await saveSeerrConnectionSnapshot(connection);
 			} catch (error) {
 				throw normalizeError(error);
 			}

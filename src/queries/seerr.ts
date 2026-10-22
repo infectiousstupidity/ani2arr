@@ -4,7 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
-import type { ProviderCredentials } from "@/providers/types";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	GetSeerrMediaDetailsInput,
@@ -15,32 +15,47 @@ import type {
 	RequestInSeerrInput,
 	RequestInSeerrOutput,
 	SearchSeerrMediaOutput,
+	SeerrConnectionCheckOutput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
 } from "@/rpc/types";
-import type { ExtensionError } from "@/shared/errors/error.types";
+import {
+	ErrorCode,
+	type ExtensionError,
+} from "@/shared/errors/error.types";
 import { normalizeMetadataIds, queryKeys } from "./query-keys";
 
-export const useSeerrConnectionCheck = (options: {
-	credentials?: ProviderCredentials | null;
+const NON_RETRYABLE_SEERR_ERRORS = new Set<ErrorCode>([
+	ErrorCode.SEERR_AUTH_REQUIRED,
+	ErrorCode.SEERR_ACCOUNT_CHANGED,
+	ErrorCode.SEERR_SESSION_UNAVAILABLE,
+	ErrorCode.SEERR_CSRF_REQUIRED,
+	ErrorCode.SEERR_PERMISSION_DENIED,
+	ErrorCode.SEERR_QUOTA_EXCEEDED,
+]);
+
+function shouldRetrySeerrQuery(
+	failureCount: number,
+	error: ExtensionError,
+): boolean {
+	return failureCount < 1 && !NON_RETRYABLE_SEERR_ERRORS.has(error.code);
+}
+
+export const useConfiguredSeerrConnectionCheck = (options: {
+	configuredConnection?: SeerrConnection | null;
 	enabled?: boolean;
 }) =>
-	useQuery<{ ok: true }, ExtensionError>({
+	useQuery<SeerrConnectionCheckOutput, ExtensionError>({
 		queryKey: queryKeys.seerrConnection(
-			getProviderConnectionScope(options.credentials),
+			options.configuredConnection
+				? `${options.configuredConnection.auth.mode}:${getProviderConnectionScope(
+						options.configuredConnection,
+					)}`
+				: "configured",
 		),
-		queryFn: async () => {
-			if (!options.credentials) {
-				throw new Error("Seerr credentials are required to verify the connection.");
-			}
-
-			return getAni2arrApi().testSeerrConnection({
-				credentials: options.credentials,
-			});
-		},
+		queryFn: () => getAni2arrApi().checkConfiguredSeerrConnection(),
 		enabled:
-			(options.enabled ?? true) &&
-			Boolean(options.credentials?.url && options.credentials.apiKey),
+			(options.enabled ?? true) && Boolean(options.configuredConnection),
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		refetchOnMount: "always",
@@ -70,7 +85,7 @@ export const useSeerrMediaStatus = (options: {
 		enabled: (options.enabled ?? true) && options.requestInput !== null,
 		staleTime: 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
-		retry: 1,
+		retry: shouldRetrySeerrQuery,
 	});
 
 export const useSeerrTargets = (
@@ -117,7 +132,7 @@ export const useSeerrMediaDetails = (options: {
 		enabled: (options.enabled ?? true) && options.input !== null,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
-		retry: 1,
+		retry: shouldRetrySeerrQuery,
 	});
 
 export const useSeerrLinkedAniListEntries = (options: {
@@ -136,7 +151,7 @@ export const useSeerrLinkedAniListEntries = (options: {
 		enabled: (options.enabled ?? true) && options.input !== null,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
-		retry: 1,
+		retry: shouldRetrySeerrQuery,
 	});
 
 export const useSeerrSearch = (options: {
@@ -151,7 +166,7 @@ export const useSeerrSearch = (options: {
 		enabled: (options.enabled ?? true) && query.length > 0,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
-		retry: 1,
+		retry: shouldRetrySeerrQuery,
 	});
 };
 

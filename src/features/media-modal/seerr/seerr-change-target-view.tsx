@@ -20,6 +20,7 @@ import {
 	useSeerrSearch,
 	useSetManualSeerrTarget,
 } from "@/queries/seerr";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import type { AniListHeaderData, MediaModalContainer } from "../types";
 import { ModalShell } from "../chrome/modal-shell";
 import { SeerrChangeTargetInfoPane } from "./seerr-change-target-info-pane";
@@ -81,11 +82,6 @@ function buildTvManualTargetInput(input: {
 			: { tvdbId: input.selectedDetails.tvdbId }),
 		seasons: [...input.draftSeasons],
 	};
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
 }
 
 export function SeerrChangeTargetView(props: {
@@ -160,10 +156,13 @@ export function SeerrChangeTargetView(props: {
 			: defaultManualTargetSeasons;
 	const searchQuery = searchQueryDraft ?? defaultQuery;
 	const searchError = search.error
-		? getErrorMessage(search.error, "Failed to search Seerr.")
+		? getUserErrorMessage(search.error, "Failed to search Seerr.")
 		: null;
 	const saveError = setManualTarget.error
-		? getErrorMessage(setManualTarget.error, "Failed to save Seerr target.")
+		? getUserErrorMessage(
+				setManualTarget.error,
+				"Failed to save Seerr target.",
+			)
 		: null;
 	const saveTvTargetEnabled = canSaveTvTarget(selectedResult, draftSeasons);
 
