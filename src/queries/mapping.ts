@@ -13,17 +13,23 @@ import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
-	GetMappingsInput,
 	GetMappingIdentitiesOutput,
 	GetMappingInspectionOutput,
-	GetMappingsOutput,
+	MappingListGroup,
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
+	SourceRpcInput,
 } from "@/rpc/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
-import { normalizeMetadataIds, queryKeys } from "./query-keys";
+import {
+	normalizeMappingInspectionRequest,
+	normalizeMetadataIds,
+	normalizeSourceKeys,
+	queryKeys,
+} from "./query-keys";
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
@@ -103,10 +109,10 @@ export const useClearMappingRejectedCandidate = () => {
 	});
 };
 
-export const useMappings = (input?: GetMappingsInput) =>
-	useQuery<GetMappingsOutput, ExtensionError>({
-		queryKey: queryKeys.mappings(input),
-		queryFn: () => getAni2arrApi().getMappings(input),
+export const useMappings = () =>
+	useQuery<MappingListGroup[], ExtensionError>({
+		queryKey: queryKeys.mappings(),
+		queryFn: () => getAni2arrApi().getMappings(),
 		staleTime: 45 * 60 * 1000,
 		gcTime: 2 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
@@ -127,18 +133,43 @@ export const useMappingIdentities = (
 	});
 };
 
+export const useSourceAniListIdMap = (
+	sources: readonly SourceIdentity[],
+	options?: { enabled?: boolean },
+) => {
+	const sourceKeys = normalizeSourceKeys(sources);
+	return useQuery<Record<string, AniListId | null>, ExtensionError>({
+		queryKey: queryKeys.sourceAniListIds(sourceKeys),
+		queryFn: () =>
+			getAni2arrApi().resolveAniListIdsForSources([...sources]),
+		enabled: (options?.enabled ?? true) && sourceKeys.length > 0,
+		staleTime: 10 * 60 * 1000,
+		gcTime: 60 * 60 * 1000,
+		refetchOnWindowFocus: false,
+	});
+};
+
+export const mappingInspectionInput = (
+	anilistId: AniListId | undefined,
+	source: SourceIdentity | undefined,
+): SourceRpcInput => {
+	if (source !== undefined) {
+		return anilistId === undefined ? { source } : { source, anilistId };
+	}
+	if (anilistId !== undefined) return { anilistId };
+	throw new Error("Missing mapping inspection source.");
+};
+
 export const useMappingInspection = (
 	provider: Provider,
-	anilistId: AniListId,
-) =>
-	useQuery<GetMappingInspectionOutput, ExtensionError>({
-		queryKey: queryKeys.mappingInspection(provider, anilistId),
-		queryFn: () =>
-			getAni2arrApi().getMappingInspection({
-				provider,
-				anilistId,
-			}),
+	input: AniListId | SourceRpcInput,
+) => {
+	const request = normalizeMappingInspectionRequest(provider, input);
+	return useQuery<GetMappingInspectionOutput, ExtensionError>({
+		queryKey: queryKeys.mappingInspection(request),
+		queryFn: () => getAni2arrApi().getMappingInspection(request),
 		staleTime: 15 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
+};

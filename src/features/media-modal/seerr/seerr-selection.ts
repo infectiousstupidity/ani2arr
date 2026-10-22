@@ -2,6 +2,7 @@
 // src/features/media-modal/seerr/seerr-selection.ts
 
 import type { AniListMediaFormat } from "@/anilist/types";
+import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import type {
 	SeerrMediaType,
 	SeerrSearchResult,
@@ -28,19 +29,32 @@ export function getSeerrTargetSeasonKey(
 	if (target?.mediaType !== "tv") return "";
 
 	return [
-		`effective:${target.seasons.join(",")}`,
+		`effective:${target.seasons?.join(",") ?? ""}`,
 		`tmdb:${target.tmdbSeasons?.join(",") ?? ""}`,
 		`tvdb:${target.tvdbSeasons?.join(",") ?? ""}`,
 	].join("|");
 }
 
+export function isSelectableSeerrSeason(
+	season: Pick<SeerrSeasonStatus, "requestable" | "status">,
+): boolean {
+	return season.requestable || season.status === "partial";
+}
+
 export function getRequestableSeasonNumbers(
 	seasons: readonly SeerrSeasonStatus[] | undefined,
+	enableSpecialEpisodes = true,
 ): number[] {
-	return (seasons ?? [])
-		.filter((season) => season.requestable)
-		.map((season) => season.seasonNumber)
-		.toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers(
+		(seasons ?? [])
+			.filter(
+				(season) =>
+					isSelectableSeerrSeason(season) &&
+					season.episodeCount !== 0 &&
+					(enableSpecialEpisodes || season.seasonNumber !== 0),
+			)
+			.map((season) => season.seasonNumber),
+	);
 }
 
 export type SeerrSeasonAvailabilitySummary = {
@@ -158,37 +172,45 @@ function getSeerrSeasonShape(
 	return "unknown";
 }
 
-function chooseMappedSeasons(input: {
-	mappedSeasons: readonly number[];
-	tmdbMappedSeasons?: readonly number[] | undefined;
-	tvdbMappedSeasons?: readonly number[] | undefined;
-	seasons: readonly SeerrSeasonStatus[] | undefined;
-}): readonly number[] {
-	const shape = getSeerrSeasonShape(input.seasons);
-
-	if (shape === "tvdb" && input.tvdbMappedSeasons?.length) {
-		return input.tvdbMappedSeasons;
-	}
-
-	if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
-		return input.tmdbMappedSeasons;
-	}
-
-	return input.mappedSeasons;
-}
-
-export function getDefaultSelectedSeasons(input: {
-	mappedSeasons: readonly number[];
+export function getMappedSeasonsForDetails(input: {
+	mappedSeasons?: readonly number[] | undefined;
 	tmdbMappedSeasons?: readonly number[] | undefined;
 	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;
 }): number[] {
-	const requestable = new Set(getRequestableSeasonNumbers(input.seasons));
-	const mappedSeasons = chooseMappedSeasons(input);
+	const shape = getSeerrSeasonShape(input.seasons);
+	let mappedSeasons: readonly number[];
 
-	return [...new Set(mappedSeasons)]
-		.filter((season) => requestable.has(season))
-		.toSorted((left, right) => left - right);
+	if (shape === "tvdb" && input.tvdbMappedSeasons?.length) {
+		mappedSeasons = input.tvdbMappedSeasons;
+	} else if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
+		mappedSeasons = input.tmdbMappedSeasons;
+	} else {
+		mappedSeasons = input.mappedSeasons ?? [];
+	}
+
+	return normalizeSeasonNumbers(mappedSeasons);
+}
+
+export function getDefaultSelectedSeasons(input: {
+	mappedSeasons?: readonly number[] | undefined;
+	tmdbMappedSeasons?: readonly number[] | undefined;
+	tvdbMappedSeasons?: readonly number[] | undefined;
+	seasons: readonly SeerrSeasonStatus[] | undefined;
+	enableSpecialEpisodes?: boolean | undefined;
+}): number[] {
+	const requestableSeasons = getRequestableSeasonNumbers(
+		input.seasons,
+		input.enableSpecialEpisodes,
+	);
+	const mappedSeasons = getMappedSeasonsForDetails(input);
+
+	if (mappedSeasons.length === 0) {
+		return requestableSeasons;
+	}
+
+	const requestable = new Set(requestableSeasons);
+	return mappedSeasons.filter((season) => requestable.has(season));
 }
 
 export function toggleSeasonSelection(
@@ -202,7 +224,7 @@ export function toggleSeasonSelection(
 		selected.add(seasonNumber);
 	}
 
-	return [...selected].toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers([...selected]);
 }
 
 export function getTmdbPosterUrl(

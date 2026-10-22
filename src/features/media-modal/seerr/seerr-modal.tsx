@@ -2,9 +2,19 @@
 // src/features/media-modal/seerr/seerr-modal.tsx
 
 import { useState } from "react";
-import type { SeerrMediaDetails, SeerrSearchResult } from "@/providers/seerr/types";
-import { useSeerrMediaDetails, useSeerrTarget } from "@/queries/seerr";
-import type { SeerrRequestTarget } from "@/rpc/types";
+import type { AniListMediaFormat } from "@/anilist/types";
+import type {
+	SeerrMediaDetails,
+	SeerrSearchResult,
+} from "@/providers/seerr/types";
+import {
+	useSeerrMediaDetails,
+	useSeerrPublicSettings,
+	useSeerrTarget,
+} from "@/queries/seerr";
+import { getDirectAniListId, sourceFromInput } from "@/rpc/source-input";
+import type { GetSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
+import { seerrMediaTypeFromAniListFormat } from "@/mapping/seerr-target";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -14,11 +24,6 @@ import { SeerrHeader } from "./seerr-header";
 import { SeerrRequestView } from "./seerr-request-view";
 
 type SeerrView = "request" | "change-target";
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
-}
 
 function getConnectorState(input: {
 	view: SeerrView;
@@ -37,35 +42,90 @@ function getTargetTitle(input: {
 	return `${input.target.mediaType === "movie" ? "Movie" : "TV"} TMDB ID: ${input.target.tmdbId}`;
 }
 
+function shouldLoadSeerrPublicSettings(input: {
+	isConfigured: boolean;
+	target: SeerrRequestTarget | null;
+}): boolean {
+	return input.isConfigured && input.target?.mediaType === "tv";
+}
+
+function isSeerrRequestDataLoading(input: {
+	targetLoading: boolean;
+	detailsLoading: boolean;
+	publicSettingsLoading: boolean;
+	target: SeerrRequestTarget | null;
+}): boolean {
+	if (input.targetLoading || input.detailsLoading) return true;
+	return input.target?.mediaType === "tv" && input.publicSettingsLoading;
+}
+
+function addSeerrMediaType(
+	input: Omit<GetSeerrTargetInput, "mediaType">,
+	mediaType: "movie" | "tv" | null,
+): GetSeerrTargetInput | null {
+	return mediaType === null ? null : { ...input, mediaType };
+}
+
+function getSeerrMediaType(
+	headerFormat: AniListMediaFormat | null | undefined,
+	metadataFormat: AniListMediaFormat | null | undefined,
+): "movie" | "tv" | null {
+	return seerrMediaTypeFromAniListFormat(headerFormat ?? metadataFormat);
+}
+
 export function SeerrModal({
 	state,
 	onClose,
 	container,
 }: SeerrModalProps): React.JSX.Element {
-	const { anilistId, metadataHint } = state;
+	const { metadataHint } = state;
+	const source = sourceFromInput(state);
+	const anilistId = getDirectAniListId(state) ?? undefined;
+	const targetInput = {
+		source,
+		...(anilistId === undefined ? {} : { anilistId }),
+	};
 	const [view, setView] = useState<SeerrView>("request");
 	const [selectedResult, setSelectedResult] =
 		useState<SeerrSearchResult | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
-		anilistId,
+		source,
+		...(anilistId === undefined ? {} : { anilistId }),
+		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
 		metadataHint: metadataHint ?? null,
 	});
 	const isConfigured = base.options?.seerr.isConfigured === true;
-	const targetQuery = useSeerrTarget(anilistId, { enabled: isConfigured });
+	const mediaType = getSeerrMediaType(
+		base.anilistHeaderData.format,
+		base.resolvedMetadata?.format,
+	);
+	const targetQuery = useSeerrTarget(
+		addSeerrMediaType(
+			{
+					...targetInput,
+					title: base.providerRequestTitle,
+					metadata: base.resolvedMetadata,
+			},
+			mediaType,
+		),
+		{ enabled: isConfigured },
+	);
 	const target = targetQuery.data ?? null;
 	const detailsQuery = useSeerrMediaDetails({
-		input: target ? { mediaType: target.mediaType, tmdbId: target.tmdbId } : null,
+		input: target
+			? { mediaType: target.mediaType, tmdbId: target.tmdbId }
+			: null,
 		enabled: isConfigured && target !== null,
 	});
+	const publicSettingsQuery = useSeerrPublicSettings({
+		enabled: shouldLoadSeerrPublicSettings({ isConfigured, target }),
+	});
 	const details = detailsQuery.data ?? null;
-	const detailsError = detailsQuery.error
-		? getErrorMessage(detailsQuery.error, "Failed to load Seerr media details.")
-		: null;
 	const targetTitle = getTargetTitle({ target, details });
 	const header = (
 		<SeerrHeader
-			anilistId={anilistId}
+			source={source}
 			data={base.anilistHeaderData}
 			target={target}
 			details={details}
@@ -80,7 +140,8 @@ export function SeerrModal({
 	if (view === "change-target") {
 		return (
 			<SeerrChangeTargetView
-				anilistId={anilistId}
+				targetInput={targetInput}
+				{...(anilistId === undefined ? {} : { anilistId })}
 				container={container}
 				contentContainer={contentContainer}
 				defaultQuery={base.providerRequestTitle}
@@ -98,14 +159,23 @@ export function SeerrModal({
 
 	return (
 		<SeerrRequestView
-			anilistId={anilistId}
+			targetInput={targetInput}
+			{...(anilistId === undefined ? {} : { anilistId })}
+			authMode={base.options?.seerr.authMode ?? null}
 			container={container}
 			contentContainer={contentContainer}
 			details={details}
-			detailsError={detailsError}
+			detailsError={detailsQuery.error ?? null}
+			publicSettings={publicSettingsQuery.data ?? null}
+			publicSettingsError={publicSettingsQuery.error ?? null}
 			header={header}
 			isConfigured={isConfigured}
-			isLoading={targetQuery.isLoading || detailsQuery.isLoading}
+			isLoading={isSeerrRequestDataLoading({
+				targetLoading: targetQuery.isLoading,
+				detailsLoading: detailsQuery.isLoading,
+				publicSettingsLoading: publicSettingsQuery.isLoading,
+				target,
+			})}
 			onChangeTarget={() => setView("change-target")}
 			onClose={onClose}
 			target={target}

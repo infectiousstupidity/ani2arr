@@ -1,7 +1,6 @@
 /** Pure Radarr setup target and default-value helpers for the media modal. */
 // src/features/media-modal/radarr/radarr-setup-values.ts
 
-import type { AniListId } from "@/anilist/types";
 import * as v from "valibot";
 import {
 	parseTmdbIdOrNull,
@@ -34,7 +33,7 @@ export type RadarrSetupTarget = {
 );
 
 type CreateRadarrSetupTargetInput = {
-	anilistId: AniListId;
+	identityKey: string;
 	status: GetMovieStatusOutput | null | undefined;
 	targetTitle: string;
 	storedDefaults: Partial<RadarrFormState> | null | undefined;
@@ -117,7 +116,7 @@ export function canShowRadarrSetup(input: {
 }
 
 export function getRadarrSetupTarget({
-	anilistId,
+	identityKey,
 	providerFolderName,
 	status,
 	storedDefaults,
@@ -128,7 +127,7 @@ export function getRadarrSetupTarget({
 
 		return {
 			mode: "edit",
-			key: `radarr:edit:${anilistId}:${movie.id}`,
+			key: `radarr:edit:${identityKey}:${movie.id}`,
 			tmdbId: movie.tmdbId,
 			title: movie.title,
 			movie,
@@ -153,7 +152,7 @@ export function getRadarrSetupTarget({
 
 	return {
 		mode: "add",
-		key: `radarr:add:${anilistId}:${tmdbId}`,
+		key: `radarr:add:${identityKey}:${tmdbId}`,
 		tmdbId,
 		title: targetTitle,
 		initialFormValues: getRadarrAddDefaults(storedDefaults),

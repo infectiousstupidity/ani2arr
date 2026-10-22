@@ -2,30 +2,22 @@
 // src/providers/sonarr/add.ts
 
 import type {
-	SonarrAddPayloadOptions,
+	SonarrAddSeriesPayload,
 	SonarrLookupSeries,
-	SonarrQualityProfileId,
 	SonarrSeries,
-	SonarrTagId,
-	TvdbId,
 } from "./types";
 import type { SonarrClient } from "./client";
 import type { SonarrSeriesType } from "./schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	TvdbId,
+} from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { SonarrFormState } from "./form-state";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { resolveProviderTagIds } from "../provider-tags";
-
-export type SonarrAddSeriesPayload = {
-	rootFolderPath: string;
-	qualityProfileId: SonarrQualityProfileId;
-	seriesType: SonarrSeriesType;
-	seasonFolder: boolean;
-	monitored: boolean;
-	tags: SonarrTagId[];
-	addOptions: SonarrAddPayloadOptions;
-} & SonarrLookupSeries;
 
 type AddSonarrSeriesInput = {
 	tvdbId: TvdbId;
@@ -43,13 +35,13 @@ function buildAddSonarrSeriesPayload(
 	series: SonarrLookupSeries,
 	options: {
 		rootFolderPath: string;
-		qualityProfileId: SonarrQualityProfileId;
+		qualityProfileId: ProviderQualityProfileId;
 		seriesType: SonarrSeriesType;
 		seasonFolder: boolean;
 		monitor: SonarrAddSeriesPayload["addOptions"]["monitor"];
 		searchForMissingEpisodes: boolean;
 		searchForCutoffUnmetEpisodes: boolean;
-		tags: SonarrTagId[];
+		tags: ProviderTagId[];
 	},
 ): SonarrAddSeriesPayload {
 	return {
@@ -181,10 +173,10 @@ async function resolveSonarrAddPayload(input: {
 }
 
 function resolveRequiredQualityProfileId(input: {
-	value: SonarrQualityProfileId | undefined;
-	fallback: SonarrQualityProfileId | undefined;
+	value: ProviderQualityProfileId | undefined;
+	fallback: ProviderQualityProfileId | undefined;
 	actionLabel: "add";
-}): SonarrQualityProfileId {
+}): ProviderQualityProfileId {
 	const resolvedValue =
 		typeof input.value === "number" && Number.isFinite(input.value)
 			? input.value

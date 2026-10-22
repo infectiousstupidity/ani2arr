@@ -1,8 +1,5 @@
-/** Tests for shared media modal AniList metadata and title resolution. */
-// src/features/media-modal/anilist-modal-data.test.ts
-
 import { describe, expect, it } from "vitest";
-import { parseAniListId, type AniListMedia } from "@/anilist/types";
+import { type AniListMedia, parseAniListId } from "@/anilist/types";
 import { resolveMediaModalMetadata } from "./anilist-modal-data";
 
 function createMedia(overrides: Partial<AniListMedia> = {}): AniListMedia {
@@ -15,19 +12,32 @@ function createMedia(overrides: Partial<AniListMedia> = {}): AniListMedia {
 	};
 }
 
+function resolveMetadata(
+	id: number,
+	overrides: Partial<Parameters<typeof resolveMediaModalMetadata>[0]> = {},
+) {
+	const anilistId = parseAniListId(id);
+	return resolveMediaModalMetadata({
+		source: { source: "anilist", id: anilistId },
+		anilistId,
+		anilistMedia: null,
+		metadataBatchData: undefined,
+		myAnimeListMetadata: undefined,
+		metadataHint: null,
+		preferredTitleLanguage: "english",
+		...overrides,
+	});
+}
+
 describe("resolveMediaModalMetadata", () => {
 	it("uses the configured preferred AniList title language for provider requests", () => {
-		const result = resolveMediaModalMetadata({
-			anilistId: parseAniListId(1),
+		const result = resolveMetadata(1, {
 			anilistMedia: createMedia({
 				title: {
 					english: "English Title",
-					romaji: "Romaji Title",
 					native: "Native Title",
 				},
 			}),
-			metadataBatchData: undefined,
-			metadataHint: null,
 			preferredTitleLanguage: "native",
 		});
 
@@ -38,13 +48,7 @@ describe("resolveMediaModalMetadata", () => {
 	});
 
 	it("uses synthetic fallback title and omits provider payload title without usable titles", () => {
-		const result = resolveMediaModalMetadata({
-			anilistId: parseAniListId(123),
-			anilistMedia: null,
-			metadataBatchData: undefined,
-			metadataHint: null,
-			preferredTitleLanguage: "english",
-		});
+		const result = resolveMetadata(123);
 
 		expect(result.fallbackTitle).toBe("AniList #123");
 		expect(result.providerRequestTitle).toBe("AniList #123");
@@ -52,8 +56,7 @@ describe("resolveMediaModalMetadata", () => {
 	});
 
 	it("builds header data from AniList media fields", () => {
-		const result = resolveMediaModalMetadata({
-			anilistId: parseAniListId(2),
+		const result = resolveMetadata(2, {
 			anilistMedia: createMedia({
 				format: "TV",
 				bannerImage: "https://img.example/banner.jpg",
@@ -67,9 +70,6 @@ describe("resolveMediaModalMetadata", () => {
 					english: "Header Title",
 				},
 			}),
-			metadataBatchData: undefined,
-			metadataHint: null,
-			preferredTitleLanguage: "english",
 		});
 
 		expect(result.anilistHeaderData).toEqual({
@@ -82,19 +82,12 @@ describe("resolveMediaModalMetadata", () => {
 	});
 
 	it("uses metadata hints as cover fallback when media has no cover image", () => {
-		const result = resolveMediaModalMetadata({
-			anilistId: parseAniListId(3),
-			anilistMedia: createMedia({
-				title: {
-					romaji: "Hint Cover Title",
-				},
-			}),
-			metadataBatchData: undefined,
+		const result = resolveMetadata(3, {
+			anilistMedia: createMedia(),
 			metadataHint: {
 				coverImage: "https://img.example/hint-cover.jpg",
 				format: "MOVIE",
 			},
-			preferredTitleLanguage: "romaji",
 		});
 
 		expect(result.anilistHeaderData.coverImage).toBe(
@@ -104,12 +97,10 @@ describe("resolveMediaModalMetadata", () => {
 	});
 
 	it("keeps the DOM title for status when AniList media changes display titles", () => {
-		const result = resolveMediaModalMetadata({
-			anilistId: parseAniListId(4),
+		const result = resolveMetadata(4, {
 			anilistMedia: createMedia({
 				title: {
 					english: "Frieren: Beyond Journey's End",
-					romaji: "Sousou no Frieren",
 				},
 			}),
 			metadataBatchData: {
@@ -117,29 +108,24 @@ describe("resolveMediaModalMetadata", () => {
 					{
 						id: parseAniListId(4),
 						titles: { romaji: "Sousou no Frieren" },
-						seasonYear: 2027,
-						format: "TV",
 					},
 				],
 			},
 			metadataHint: {
 				title: "Sousou no Frieren 3rd Season",
-				format: "TV",
 			},
-			preferredTitleLanguage: "english",
 		});
 
 		expect(result.providerRequestTitle).toBe("Frieren: Beyond Journey's End");
 		expect(result.statusTitle).toBe("Sousou no Frieren 3rd Season");
-		expect(result.statusMetadata?.titles).toEqual({ romaji: "Sousou no Frieren" });
+		expect(result.statusMetadata?.titles).toEqual({
+			romaji: "Sousou no Frieren",
+		});
 	});
 
 	it("does not let full AniList media alter status metadata", () => {
-		const result = resolveMediaModalMetadata({
-			anilistId: parseAniListId(5),
+		const result = resolveMetadata(5, {
 			anilistMedia: createMedia({
-				id: parseAniListId(5),
-				title: { english: "Full Media Title" },
 				synonyms: ["Full Media Synonym"],
 				relations: {
 					edges: [
@@ -157,13 +143,9 @@ describe("resolveMediaModalMetadata", () => {
 					{
 						id: parseAniListId(5),
 						titles: { english: "Canonical Title" },
-						seasonYear: 2027,
-						format: "TV",
 					},
 				],
 			},
-			metadataHint: { title: "DOM Title", format: "TV" },
-			preferredTitleLanguage: "english",
 		});
 
 		expect(result.resolvedMetadata?.synonyms).toEqual(["Full Media Synonym"]);

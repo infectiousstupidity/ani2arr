@@ -10,7 +10,9 @@ import { ConfirmProvider } from '@/shared/ui/feedback/confirm-provider';
 import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
 import { BrowseOverlays } from '@/content/browse/browse-overlays';
 import { createExtensionQueryClient } from '@/queries/query-client';
+import { queryKeys } from '@/queries/query-keys';
 import {
+  BROWSE_CREATED_ATTRIBUTE,
   BROWSE_OVERLAY_CONTAINER_CLASS,
   BROWSE_PROCESSED_ATTRIBUTE,
   type BrowseAdapter,
@@ -38,6 +40,11 @@ const cleanupDomArtifacts = (): void => {
     .querySelectorAll<HTMLElement>(`.${CSS.escape(BROWSE_OVERLAY_CONTAINER_CLASS)}`)) {
     container.remove();
   }
+
+  for (const element of document
+    .querySelectorAll<HTMLElement>(`[${CSS.escape(BROWSE_CREATED_ATTRIBUTE)}]`)) {
+    element.remove();
+  }
 };
 
 export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOptions) => {
@@ -63,7 +70,8 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
       }
     };
 
-    const mount = async () => {
+    const mount = async (publicOptions: PublicOptions) => {
+      queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
       if (ui) return;
 
       ensureLightDomStyles();
@@ -119,8 +127,8 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
 
     const main = createContentEntrypointShell({
       isEligible: ({ url, publicOptions }) => options.isEligible({ url, publicOptions }),
-      mount: async () => {
-        await mount();
+      mount: async ({ publicOptions }) => {
+        await mount(publicOptions);
       },
       remove,
     });

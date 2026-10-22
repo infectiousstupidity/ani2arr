@@ -1,7 +1,7 @@
 /** Options-page controls for browse-card and anime-page UI enablement and visibility settings. */
 // src/options-page/pages/ui-page.tsx
 
-import { useState, type ComponentType } from "react";
+import type { ComponentType } from "react";
 import { AppWindow, Check, ChevronDown, ExternalLink, Heart, Languages, LayoutGrid, Send } from "lucide-react";
 import {
 	ANILIST_TITLE_LANGUAGES,
@@ -14,12 +14,12 @@ import type {
 	BrowseCardPrimaryStatus,
 	PublicOptions,
 } from "@/settings/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
+import { Label } from "@/shared/ui/primitives/label";
+import { Switch } from "@/shared/ui/primitives/switch";
 import { cn } from "@/shared/utils/cn";
-import { RadarrIcon, SonarrIcon } from "../components/icons";
+import { RadarrIcon, SonarrIcon } from "@/features/provider-ui/provider-icons";
 import { SettingsSection } from "../components/settings-section";
-import { Label } from "../components/ui/label";
-import { Switch } from "../components/ui/switch";
-import { getActionErrorMessage } from "../hooks/action-helpers";
 
 type BrowseCardMode = BadgeVisibility | "hidden";
 type BrowseCardProvider = keyof Omit<
@@ -160,7 +160,7 @@ function BrowseCardModeControl(props: {
 		<div className="flex min-h-30 min-w-0 flex-col justify-center gap-4">
 			<div className="flex min-w-0 items-center gap-2.5 text-text-primary">
 				<Icon className="h-5 w-5 shrink-0" />
-				<Label id={labelId} className="truncate text-sm font-semibold">
+				<Label id={labelId} className="mb-0 inline truncate text-sm font-semibold">
 					Show on {label} browse cards?
 				</Label>
 			</div>
@@ -191,7 +191,7 @@ function AnimePageSwitch(props: {
 			<div className="flex min-h-11 w-full items-center justify-between gap-4">
 				<div className="flex min-w-0 items-center gap-2.5 text-text-primary">
 					<Icon className="h-5 w-5 shrink-0" />
-					<Label htmlFor={id} className="cursor-pointer text-sm font-semibold">
+					<Label htmlFor={id} className="mb-0 inline cursor-pointer text-sm font-semibold">
 						Show on {label} anime pages
 					</Label>
 				</div>
@@ -210,21 +210,17 @@ function AnimePageSwitch(props: {
 export const UiPage = (): React.JSX.Element | null => {
 	const { data: publicOptions } = usePublicOptions();
 	const saveOptions = useSavePublicOptions();
-	const [saveError, setSaveError] = useState<string | null>(null);
 	const uiOptions = publicOptions?.ui;
 	const isSaving = saveOptions.isPending;
+	const saveError = saveOptions.error
+		? getUserErrorMessage(saveOptions.error, "Failed to save UI settings.")
+		: null;
 
-	const updateSettings = async (
+	const updateSettings = (
 		updater: (current: PublicOptions) => PublicOptions,
-	): Promise<void> => {
+	): void => {
 		if (!publicOptions || isSaving) return;
-		setSaveError(null);
-
-		try {
-			await saveOptions.mutateAsync(updater(publicOptions));
-		} catch (error) {
-			setSaveError(getActionErrorMessage(error, "Failed to save UI settings."));
-		}
+		saveOptions.mutate(updater(publicOptions));
 	};
 
 	const updateTitleLanguage = (language: string): void => {
@@ -338,7 +334,7 @@ export const UiPage = (): React.JSX.Element | null => {
 					<div className="max-w-md space-y-2">
 						<Label
 							id="ui-browse-primary-status-label"
-							className="text-sm font-semibold text-text-primary"
+							className="mb-0 inline text-sm font-semibold text-text-primary"
 						>
 							Primary browse-card status
 						</Label>

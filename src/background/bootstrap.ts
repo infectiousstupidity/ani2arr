@@ -5,11 +5,16 @@ import { browser } from "wxt/browser";
 import * as v from "valibot";
 import { registerAni2arrApi } from "@/rpc";
 import { apiHandlers } from "@/rpc/handlers";
+import { refreshMappingPipeline } from "@/background/mapping-refresh";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
-import { getExtensionOptionsSnapshot } from "@/settings/store";
+import { migrateMappingStorage } from "@/mapping/migrate";
+import {
+	getExtensionOptionsSnapshot,
+	initializeSettingsStorage,
+} from "@/settings/store";
 import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import {
 	logError,
 	normalizeError,
@@ -26,22 +31,16 @@ const AniListIdSchema = v.pipe(
 	v.transform((value): AniListId => value as AniListId),
 );
 
-const A2AMessageSchema = v.union([
-	v.object({
-		_a2a: v.literal(true),
-		type: v.literal("a2a:ping"),
-		timestamp: v.number(),
-	}),
-	v.object({
-		_a2a: v.literal(true),
-		type: v.literal("OPEN_OPTIONS_PAGE"),
-		timestamp: v.number(),
-		sectionId: v.optional(
-			v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
-		),
-		targetAnilistId: v.optional(AniListIdSchema),
-	}),
-]);
+const A2AMessageSchema = v.object({
+	_a2a: v.literal(true),
+	type: v.literal("OPEN_OPTIONS_PAGE"),
+	timestamp: v.number(),
+	sectionId: v.optional(
+		v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
+	),
+	targetAnilistId: v.optional(AniListIdSchema),
+	enableSeerrCsrf: v.optional(v.literal(true)),
+});
 
 async function shouldWarmMappingsCache(): Promise<boolean> {
 	try {
@@ -49,7 +48,7 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 		return (
 			hasConfiguredProviderCredentials(options, "sonarr") ||
 			hasConfiguredProviderCredentials(options, "radarr") ||
-			hasConfiguredSeerrCredentials(options)
+			hasConfiguredSeerrConnection(options)
 		);
 	} catch (error) {
 		logError(normalizeError(error), "Background:shouldWarmMappingsCache");
@@ -69,15 +68,24 @@ async function ensurePeriodicRefresh(): Promise<void> {
 export const bootstrapBackground = (): void => {
 	log.info("Background initializing…");
 
+	const settingsInitialization = initializeSettingsStorage();
+	void settingsInitialization.catch((error) => {
+		logError(normalizeError(error), "Background:initializeSettingsStorage");
+	});
+
 	registerAni2arrApi(apiHandlers);
+	void migrateMappingStorage().catch((error) => {
+		logError(normalizeError(error), "Background:migrateMappingStorage");
+	});
 
 	browser.runtime.onInstalled.addListener(async (details) => {
 		try {
 			if (details.reason === "install" && import.meta.env.MODE !== "test") {
 				browser.runtime.openOptionsPage().catch(() => {});
 			}
+			await settingsInitialization;
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.initMappings();
+				await refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -87,8 +95,9 @@ export const bootstrapBackground = (): void => {
 
 	browser.runtime.onStartup.addListener(async () => {
 		try {
+			await settingsInitialization;
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.initMappings();
+				await refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -101,11 +110,12 @@ export const bootstrapBackground = (): void => {
 
 		void (async () => {
 			try {
+				await settingsInitialization;
 				if (await shouldWarmMappingsCache()) {
-					await apiHandlers.initMappings();
+					await refreshMappingPipeline();
 				}
 			} catch (error) {
-				logError(normalizeError(error), "Background:initMappings:alarm");
+				logError(normalizeError(error), "Background:refreshMappingPipeline:alarm");
 			}
 		})();
 	});
@@ -118,29 +128,23 @@ export const bootstrapBackground = (): void => {
 			if (!parsed.success) return;
 			const msg = parsed.output;
 
-			if (msg.type === "a2a:ping") {
-				return Promise.resolve({ ok: true as const });
+			const params = new URLSearchParams();
+			if (msg.targetAnilistId) {
+				params.set("anilistId", String(msg.targetAnilistId));
 			}
+			if (msg.enableSeerrCsrf) params.set("enableCsrf", "1");
+			const query = params.size > 0 ? `?${params.toString()}` : "";
+			const hash = `${msg.sectionId ?? ""}${query}`;
+			const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
 
-			if (msg.type === "OPEN_OPTIONS_PAGE") {
-				const targetHash = msg.targetAnilistId
-					? `?anilistId=${msg.targetAnilistId}`
-					: "";
-				const hash = [msg.sectionId, targetHash]
-					.filter((p): p is string => !!p)
-					.join("");
-				const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
-
-				browser.tabs.create({ url }).catch(() => {
-					browser.runtime.openOptionsPage().catch(() => {});
-				});
-				return;
-			}
-			return;
+			browser.tabs.create({ url }).catch(() => {
+				browser.runtime.openOptionsPage().catch(() => {});
+			});
 		},
 	);
 
-	getExtensionOptionsSnapshot()
+	settingsInitialization
+		.then(() => getExtensionOptionsSnapshot())
 		.then((options) =>
 			logger.configure({
 				enabled: options.debugLogging || import.meta.env.DEV,

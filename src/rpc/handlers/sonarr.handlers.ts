@@ -2,7 +2,6 @@
 // src/rpc/handlers/sonarr.handlers.ts
 
 import {
-	bumpLibraryRevision,
 	mappingService,
 	scheduleLibraryRefresh,
 	sonarrClient,
@@ -27,6 +26,7 @@ import type {
 } from "@/providers/types";
 import type { TvdbId } from "@/providers/schemas";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
+import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
 import type {
 	AddSonarrInput,
 	GetSeriesStatusOutput,
@@ -36,6 +36,7 @@ import type {
 	UpdateSonarrInput,
 	ValidateTvdbInput,
 } from "@/rpc/types";
+import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeError } from "@/shared/errors/error-utils";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -64,9 +65,12 @@ export const sonarrHandlers = {
 			},
 			{ client: sonarrClient },
 		);
-		await sonarrLibrary.upsertSeriesSnapshot(toSonarrSeriesSnapshot(created));
+		const changed = await sonarrLibrary.upsertSeriesSnapshot(
+			toSonarrSeriesSnapshot(created),
+			credentials,
+		);
 		scheduleLibraryRefresh("sonarr");
-		await bumpLibraryRevision("sonarr");
+		if (changed) await bumpProviderLibraryRevision("sonarr");
 		return created;
 	},
 
@@ -85,15 +89,17 @@ export const sonarrHandlers = {
 				},
 				{ client: sonarrClient },
 			);
-			await sonarrLibrary.upsertSeriesSnapshot(toSonarrSeriesSnapshot(updated));
+			const changed = await sonarrLibrary.upsertSeriesSnapshot(
+				toSonarrSeriesSnapshot(updated),
+				credentials,
+			);
 			scheduleLibraryRefresh("sonarr");
-			await bumpLibraryRevision("sonarr");
+			if (changed) await bumpProviderLibraryRevision("sonarr");
 			return updated;
 		} catch (error) {
 			const normalized = normalizeError(error);
 			if (normalized.details?.partialSuccess === true) {
 				scheduleLibraryRefresh("sonarr");
-				await bumpLibraryRevision("sonarr");
 			}
 			throw normalized;
 		}
@@ -149,10 +155,11 @@ export const sonarrHandlers = {
 			}
 		}
 
-		const linkedAniListIds = await mappingService.getLinkedAniListIdsByProviderIds(
-			"sonarr",
-			uniqueTvdbIds,
-		);
+		const linkedAniListIds =
+			await mappingService.getLinkedAniListIdsByProviderIds(
+				"sonarr",
+				uniqueTvdbIds,
+			);
 		for (const [tvdbId, linked] of linkedAniListIds) {
 			linkedAniListIdsByTvdbId[tvdbId] = linked;
 		}
@@ -203,6 +210,9 @@ async function getSonarrLibraryStatusForRpc(input: {
 	return sonarrLibrary.getSeriesLibraryStatusByTvdbId({
 		tvdbId: input.tvdbId,
 		credentials,
+		onCacheChanged: async () => {
+			await bumpProviderLibraryRevision("sonarr");
+		},
 		...(input.forceVerify === undefined
 			? {}
 			: { forceVerify: input.forceVerify }),
@@ -234,11 +244,15 @@ async function getSeriesStatusFromMappingAndLibrary(
 async function resolveSeriesMapping(
 	input: StatusInput,
 ): Promise<SonarrMappingResult> {
-	const mapping = await mappingService.resolveMapping("sonarr", input.anilistId, {
-		forceRetry: input.force_mapping_retry === true,
-		...(input.title === undefined ? {} : { title: input.title }),
-		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-	});
+	const mapping = await mappingService.resolveMapping(
+		"sonarr",
+		sourceFromInput(input),
+		{
+			forceRetry: input.force_mapping_retry === true,
+			...(input.title === undefined ? {} : { title: input.title }),
+			...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+		},
+	);
 	if (mapping.kind === "mapped") {
 		const tvdbId = parseTvdbIdOrNull(mapping.providerId);
 		if (tvdbId === null) return { kind: "unmapped", mapping };

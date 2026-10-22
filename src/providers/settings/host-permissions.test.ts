@@ -1,6 +1,4 @@
 /** Focused tests for provider host permission pattern derivation and requests. */
-// src/providers/settings/host-permissions.test.ts
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import {
@@ -9,46 +7,18 @@ import {
 } from "./host-permissions";
 
 describe("getProviderHostPermissionPattern", () => {
-	it("uses scheme and host instead of provider URL path or port", () => {
-		expect(
-			getProviderHostPermissionPattern("http://localhost:8989/sonarr"),
-		).toEqual({
+	it.each([
+		["http://localhost:8989/sonarr", "http://localhost/*"],
+		["http://127.0.0.1:7878", "http://127.0.0.1/*"],
+		["https://arr.example/sonarr///", "https://arr.example/*"],
+		["https://arr.example:8443/radarr", "https://arr.example/*"],
+		["https://sonarr.example.com", "https://sonarr.example.com/*"],
+		["https://radarr.example.com", "https://radarr.example.com/*"],
+	])("maps %s to %s", (url, pattern) => {
+		expect(getProviderHostPermissionPattern(url)).toEqual({
 			ok: true,
-			value: "http://localhost/*",
+			value: pattern,
 		});
-		expect(getProviderHostPermissionPattern("http://127.0.0.1:7878")).toEqual(
-			{
-				ok: true,
-				value: "http://127.0.0.1/*",
-			},
-		);
-		expect(
-			getProviderHostPermissionPattern("https://arr.example/sonarr///"),
-		).toEqual({
-			ok: true,
-			value: "https://arr.example/*",
-		});
-		expect(
-			getProviderHostPermissionPattern("https://arr.example:8443/radarr"),
-		).toEqual({
-			ok: true,
-			value: "https://arr.example/*",
-		});
-	});
-
-	it("treats different subdomains as different permission hosts", () => {
-		expect(getProviderHostPermissionPattern("https://sonarr.example.com")).toEqual(
-			{
-				ok: true,
-				value: "https://sonarr.example.com/*",
-			},
-		);
-		expect(getProviderHostPermissionPattern("https://radarr.example.com")).toEqual(
-			{
-				ok: true,
-				value: "https://radarr.example.com/*",
-			},
-		);
 	});
 });
 
@@ -102,20 +72,14 @@ describe("requestProviderHostPermission", () => {
 
 		resolveRequest?.(true);
 
-		await expect(first).resolves.toEqual({
+		const expected = {
 			ok: true,
-			value: {
-				pattern: "https://arr.example/*",
-				granted: true,
-			},
-		});
-		await expect(second).resolves.toEqual({
-			ok: true,
-			value: {
-				pattern: "https://arr.example/*",
-				granted: true,
-			},
-		});
+			value: { pattern: "https://arr.example/*", granted: true },
+		};
+		await expect(Promise.all([first, second])).resolves.toEqual([
+			expected,
+			expected,
+		]);
 		expect(requestSpy).toHaveBeenCalledTimes(1);
 	});
 });

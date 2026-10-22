@@ -1,161 +1,208 @@
-/** Tests for shared React Query invalidation helpers and prefix safety. */
+/** Critical React Query invalidation tests. */
 // src/queries/invalidation.test.ts
 
 import { QueryClient, type QueryKey } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type { AniListId } from "@/anilist/types";
+import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
+import { parseTmdbId } from "@/providers/schemas";
 import {
 	invalidateAfterMappingChange,
 	invalidateAfterMappingsRevision,
 	invalidateAfterProviderLibraryChange,
-	resetAfterProviderConnectionChange,
-} from "@/queries/invalidation";
-import { queryKeys } from "@/queries/query-keys";
+	invalidateAfterSeerrRequest,
+} from "./invalidation";
+import {
+	normalizeMappingInspectionRequest,
+	normalizeProviderLookupRequest,
+	normalizeRadarrStatusRequest,
+	normalizeSeerrMediaStatusRequest,
+	normalizeSonarrStatusRequest,
+	queryKeys,
+} from "./query-keys";
 
-const aid = (value: number): AniListId => value as AniListId;
+const aid = parseAniListId;
+const mal = parseMyAnimeListId;
+const tmdb = parseTmdbId;
 
-const createQueryClient = (): QueryClient =>
-	new QueryClient({
+function createClient(): QueryClient {
+	return new QueryClient({
 		defaultOptions: {
 			queries: {
 				retry: false,
 			},
 		},
 	});
+}
 
-const seed = (queryClient: QueryClient, queryKey: QueryKey): void => {
-	queryClient.setQueryData(queryKey, { ok: true });
-};
+function seed(client: QueryClient, keys: readonly QueryKey[]): void {
+	for (const key of keys) {
+		client.setQueryData(key, true);
+	}
+}
 
-const isInvalidated = (
-	queryClient: QueryClient,
-	queryKey: QueryKey,
-): boolean => queryClient.getQueryState(queryKey)?.isInvalidated === true;
+function isInvalidated(client: QueryClient, key: QueryKey): boolean {
+	return client.getQueryState(key)?.isInvalidated === true;
+}
 
-describe("query invalidation helpers", () => {
-	it("removes all provider-root queries on provider reset", () => {
-		const queryClient = createQueryClient();
-		const sonarrStatus = queryKeys.providerMediaStatus("sonarr", {
-			anilistId: aid(1),
+describe("query invalidation", () => {
+	it("invalidates one Radarr source and its dependent caches", () => {
+		const client = createClient();
+		const source = {
+			source: "mal",
+			id: mal(5114),
+		} as const;
+
+		const affected = [
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ source, title: "Title A" }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ source, title: "Title B" }),
+			),
+			queryKeys.mappings(),
+			queryKeys.mappingIdentities([aid(21)]),
+			queryKeys.mappingInspection(
+				normalizeMappingInspectionRequest("radarr", { source }),
+			),
+			queryKeys.providerLookup(
+				"radarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+			queryKeys.seerrTargets([
+				{ anilistId: aid(21), mediaType: "movie" },
+			]),
+			queryKeys.seerrLinkedAniListEntries({
+				mediaType: "movie",
+				tmdbId: tmdb(100),
+			}),
+		];
+		const unaffected = [
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ source }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ anilistId: aid(22) }),
+			),
+		];
+
+		seed(client, [...affected, ...unaffected]);
+
+		invalidateAfterMappingChange(client, {
+			provider: "radarr",
+			source,
+			anilistId: aid(21),
 		});
-		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
-		const radarrStatus = queryKeys.providerMediaStatus("radarr", {
-			anilistId: aid(1),
-		});
-		seed(queryClient, sonarrStatus);
-		seed(queryClient, sonarrLookup);
-		seed(queryClient, radarrStatus);
 
-		resetAfterProviderConnectionChange(queryClient, "sonarr");
-
-		expect(queryClient.getQueryData(sonarrStatus)).toBeUndefined();
-		expect(queryClient.getQueryData(sonarrLookup)).toBeUndefined();
-		expect(queryClient.getQueryData(radarrStatus)).toEqual({ ok: true });
+		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
+		expect(unaffected.some((key) => isInvalidated(client, key))).toBe(false);
 	});
 
-	it("invalidates the relevant provider caches for mapping changes", () => {
-		const queryClient = createQueryClient();
-		const changedStatus = queryKeys.providerMediaStatus("sonarr", {
-			anilistId: aid(1),
-			title: "A",
-		});
-		const changedStatusVariant = queryKeys.providerMediaStatus("sonarr", {
-			anilistId: aid(1),
-			title: "B",
-		});
-		const otherProviderStatus = queryKeys.providerMediaStatus("radarr", {
-			anilistId: aid(1),
-		});
-		const otherItemStatus = queryKeys.providerMediaStatus("sonarr", {
-			anilistId: aid(2),
-		});
-		const mappings = queryKeys.mappings({ providers: ["sonarr"] });
-		const identities = queryKeys.mappingIdentities([aid(1)]);
-		const inspection = queryKeys.mappingInspection("sonarr", aid(1));
-		const changedProviderLookup = queryKeys.providerLookup("sonarr", "test");
-		const otherProviderLookup = queryKeys.providerLookup("radarr", "test");
-		for (const queryKey of [
-			changedStatus,
-			changedStatusVariant,
-			otherProviderStatus,
-			otherItemStatus,
-			mappings,
-			identities,
-			inspection,
-			changedProviderLookup,
-			otherProviderLookup,
-		]) {
-			seed(queryClient, queryKey);
-		}
+	it("invalidates all mapping-dependent caches after a revision", () => {
+		const client = createClient();
+		const affected = [
+			queryKeys.mappings(),
+			queryKeys.mappingInspection(
+				normalizeMappingInspectionRequest("sonarr", aid(1)),
+			),
+			queryKeys.mappingIdentities([aid(1)]),
+			queryKeys.seerrTargets([{ anilistId: aid(1), mediaType: "tv" }]),
+			queryKeys.seerrLinkedAniListEntries({
+				mediaType: "tv",
+				tmdbId: tmdb(100),
+			}),
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerLookup(
+				"sonarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+			queryKeys.providerLookup(
+				"radarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+		];
 
-		invalidateAfterMappingChange(queryClient, {
-			provider: "sonarr",
-			anilistId: aid(1),
-		});
+		seed(client, affected);
+		invalidateAfterMappingsRevision(client);
 
-		expect(isInvalidated(queryClient, changedStatus)).toBe(true);
-		expect(isInvalidated(queryClient, changedStatusVariant)).toBe(true);
-		expect(isInvalidated(queryClient, mappings)).toBe(true);
-		expect(isInvalidated(queryClient, identities)).toBe(true);
-		expect(isInvalidated(queryClient, inspection)).toBe(true);
-		expect(isInvalidated(queryClient, changedProviderLookup)).toBe(true);
-		expect(isInvalidated(queryClient, otherProviderStatus)).toBe(false);
-		expect(isInvalidated(queryClient, otherItemStatus)).toBe(false);
-		expect(isInvalidated(queryClient, otherProviderLookup)).toBe(false);
+		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
 	});
 
-	it("invalidates mapping roots and all provider statuses for mapping revisions", () => {
-		const queryClient = createQueryClient();
-		const mappings = queryKeys.mappings();
-		const inspection = queryKeys.mappingInspection("sonarr", aid(1));
-		const identities = queryKeys.mappingIdentities([aid(1)]);
-		const sonarrStatus = queryKeys.providerMediaStatus("sonarr", {
-			anilistId: aid(1),
-		});
-		const radarrStatus = queryKeys.providerMediaStatus("radarr", {
-			anilistId: aid(1),
-		});
-		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
-		for (const queryKey of [
-			mappings,
-			inspection,
-			identities,
-			sonarrStatus,
-			radarrStatus,
-			sonarrLookup,
-		]) {
-			seed(queryClient, queryKey);
-		}
+	it("invalidates one provider's library-dependent caches", () => {
+		const client = createClient();
+		const affected = [
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerLookup(
+				"sonarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+			queryKeys.mappings(),
+		];
+		const unaffected = [
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ anilistId: aid(1) }),
+			),
+			queryKeys.providerLookup(
+				"radarr",
+				normalizeProviderLookupRequest({ term: "test" }),
+			),
+		];
 
-		invalidateAfterMappingsRevision(queryClient);
+		seed(client, [...affected, ...unaffected]);
+		invalidateAfterProviderLibraryChange(client, "sonarr");
 
-		expect(isInvalidated(queryClient, mappings)).toBe(true);
-		expect(isInvalidated(queryClient, inspection)).toBe(true);
-		expect(isInvalidated(queryClient, identities)).toBe(true);
-		expect(isInvalidated(queryClient, sonarrStatus)).toBe(true);
-		expect(isInvalidated(queryClient, radarrStatus)).toBe(true);
-		expect(isInvalidated(queryClient, sonarrLookup)).toBe(false);
+		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
+		expect(unaffected.some((key) => isInvalidated(client, key))).toBe(false);
 	});
 
-	it("invalidates provider library-dependent queries for library changes", () => {
-		const queryClient = createQueryClient();
-		const sonarrStatus = queryKeys.providerMediaStatus("sonarr", {
-			anilistId: aid(1),
-		});
-		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
-		const mappings = queryKeys.mappings({ providers: ["sonarr"] });
-		const radarrStatus = queryKeys.providerMediaStatus("radarr", {
-			anilistId: aid(1),
-		});
-		for (const queryKey of [sonarrStatus, sonarrLookup, mappings, radarrStatus]) {
-			seed(queryClient, queryKey);
-		}
+	it("invalidates every Seerr status scope and details for one media item", () => {
+		const client = createClient();
+		const statusKey = (
+			mediaType: "movie" | "tv",
+			tmdbId: ReturnType<typeof tmdb>,
+			seasons?: number[],
+		) =>
+			queryKeys.seerrMediaStatus(
+				normalizeSeerrMediaStatusRequest({
+					mediaType,
+					tmdbId,
+					...(mediaType === "tv" && seasons !== undefined ? { seasons } : {}),
+				}),
+			);
+		const affected = [
+			statusKey("tv", tmdb(100)),
+			statusKey("tv", tmdb(100), [1]),
+			statusKey("tv", tmdb(100), [1, 2]),
+			queryKeys.seerrMediaDetails({ mediaType: "tv", tmdbId: tmdb(100) }),
+		];
+		const unaffected = [
+			statusKey("tv", tmdb(101), [1]),
+			statusKey("movie", tmdb(100)),
+			queryKeys.seerrMediaDetails({ mediaType: "tv", tmdbId: tmdb(101) }),
+		];
 
-		invalidateAfterProviderLibraryChange(queryClient, "sonarr");
+		seed(client, [...affected, ...unaffected]);
+		invalidateAfterSeerrRequest(client, {
+			mediaType: "tv",
+			tmdbId: tmdb(100),
+		});
 
-		expect(isInvalidated(queryClient, sonarrStatus)).toBe(true);
-		expect(isInvalidated(queryClient, sonarrLookup)).toBe(true);
-		expect(isInvalidated(queryClient, mappings)).toBe(true);
-		expect(isInvalidated(queryClient, radarrStatus)).toBe(false);
+		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
+		expect(unaffected.some((key) => isInvalidated(client, key))).toBe(false);
 	});
 });

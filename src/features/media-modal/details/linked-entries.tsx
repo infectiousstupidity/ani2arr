@@ -18,7 +18,7 @@ type MappingDetailsLinkedAniListEntry =
 
 interface MappingLinkedEntriesProps {
 	provider?: Provider;
-	currentAniListId: AniListId;
+	currentAniListId?: AniListId | undefined;
 	heading?: string;
 	linkedAniListIds?: readonly AniListId[];
 	entries?: readonly MappingDetailsLinkedAniListEntry[];

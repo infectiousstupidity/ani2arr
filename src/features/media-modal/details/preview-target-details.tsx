@@ -7,7 +7,7 @@ import { MappingLinkedEntries } from "./linked-entries";
 import { TargetDetailsCard } from "./target-details-card";
 
 type PreviewTargetDetailsProps = {
-	aniListEntryId: AniListId;
+	aniListEntryId?: AniListId | undefined;
 	previewMapping: MediaModalTargetSummary;
 };
 

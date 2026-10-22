@@ -4,19 +4,18 @@
 import { useState } from "react";
 import { Bug, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
+import ConfirmDialog from "@/shared/ui/primitives/confirm-dialog";
+import { Switch } from "@/shared/ui/primitives/switch";
 import { cn } from "@/shared/utils/cn";
 import { SettingsRow, SettingsSection } from "../components/settings-section";
-import { ConfirmDialog } from "../components/ui/alert-dialog";
-import { Switch } from "../components/ui/switch";
 import { useResetExtensionState } from "../hooks/use-reset-extension-state";
-import { getActionErrorMessage } from "../hooks/action-helpers";
 
 export const AdvancedPage = () => {
 	const { data: publicOptions } = usePublicOptions();
 	const saveOptions = useSavePublicOptions();
 	const [showResetDialog, setShowResetDialog] = useState(false);
-	const [saveError, setSaveError] = useState<string | null>(null);
 	const {
 		resetExtensionState,
 		isResetting,
@@ -29,22 +28,19 @@ export const AdvancedPage = () => {
 		?? (resetSuccess
 			? "Settings, mappings, cached data, and permissions were reset."
 			: null);
-	const diagnosticsStatus = saveError;
+	const diagnosticsStatus = saveOptions.error
+		? getUserErrorMessage(
+				saveOptions.error,
+				"Failed to save diagnostics setting.",
+			)
+		: null;
 
-	const updateDebugLogging = async (checked: boolean): Promise<void> => {
+	const updateDebugLogging = (checked: boolean): void => {
 		if (!publicOptions || saveOptions.isPending) return;
-		setSaveError(null);
-
-		try {
-			await saveOptions.mutateAsync({
-				...publicOptions,
-				debugLogging: checked,
-			});
-		} catch (error) {
-			setSaveError(
-				getActionErrorMessage(error, "Failed to save diagnostics setting."),
-			);
-		}
+		saveOptions.mutate({
+			...publicOptions,
+			debugLogging: checked,
+		});
 	};
 
 	return (
@@ -58,13 +54,16 @@ export const AdvancedPage = () => {
 				<div className="rounded-lg border border-border-primary/40 bg-bg-tertiary/10 p-4 text-sm leading-relaxed text-text-secondary md:p-5">
 					<p>
 						ani2arr does not use a developer-operated backend or analytics
-						service. Your Sonarr URL, Radarr URL, API keys, and extension
-						settings are stored locally in the browser.
+						service. Provider URLs, API keys, Seerr connection mode, the
+						last verified Seerr account, and extension settings are stored
+						locally in the browser.
 					</p>
 					<ul className="mt-4 list-disc space-y-2 pl-5 text-xs leading-5">
 						<li>Only the configured provider scheme and host are requested at runtime.</li>
 						<li>Host permissions cannot be limited to subfolders, and Firefox cannot limit them by port.</li>
 						<li>Provider API keys are sent only to their configured provider URLs. HTTP provider URLs send API keys in cleartext; use HTTPS outside trusted localhost or LAN setups.</li>
+						<li>Seerr session cookies remain browser-managed; ani2arr does not store or expose their values.</li>
+						<li>Optional cookie permission is requested only after a CSRF rejection and an explicit user click; ani2arr then reads only the configured Seerr host&apos;s XSRF-TOKEN.</li>
 						<li>AniList and AniChart content UI can show provider library status, matched titles, saved defaults, root folders, quality profiles, tags, and search candidates.</li>
 						<li>
 							AniList metadata is fetched from AniList GraphQL and public mapping
@@ -92,9 +91,7 @@ export const AdvancedPage = () => {
 						id="advanced-debug-logging"
 						checked={debugLogging}
 						disabled={saveOptions.isPending || !publicOptions}
-						onCheckedChange={(checked) =>
-							void updateDebugLogging(checked)
-						}
+						onCheckedChange={updateDebugLogging}
 					/>
 				</SettingsRow>
 				{diagnosticsStatus ? (
@@ -148,10 +145,10 @@ export const AdvancedPage = () => {
 				description="This clears ani2arr configuration, stored manual mappings, cached page data, granted permissions, and session state. Sonarr and Radarr libraries are not affected."
 				confirmText="Reset"
 				cancelText="Cancel"
+				onCancel={() => setShowResetDialog(false)}
 				onConfirm={() => {
 					void resetExtensionState();
 				}}
-				isDestructive={true}
 			/>
 		</div>
 	);

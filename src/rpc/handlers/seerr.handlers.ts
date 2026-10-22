@@ -1,45 +1,41 @@
 /** RPC handlers for Seerr request creation, details, and target mapping reads. */
 // src/rpc/handlers/seerr.handlers.ts
 
-import { anilistMetadataStore, seerrClient } from "@/background/api-services";
-import { requireSeerrCredentials } from "@/background/provider-config";
-import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
+import type { AniListId, AniListMetadata } from "@/anilist/types";
+import {
+	anilistMetadataStore,
+	mappingService,
+	resolveSeerrAutomaticTarget,
+	seerrClient,
+} from "@/background/api-services";
+import { requireSeerrConnection } from "@/background/provider-config";
 import {
 	clearManualSeerrTarget,
-	listAllManualSeerrTargets,
-	getManualSeerrTarget,
-	listManualSeerrTargets,
 	setManualSeerrTarget,
-	type ManualSeerrTarget,
-} from "@/mapping/seerr-target.store";
-import {
-	listAllSeerrUpstreamTargets,
-	listSeerrUpstreamTargets,
-	type SeerrUpstreamRecord,
-} from "@/mapping/upstream.store";
+} from "@/mapping/manual.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
+import { bumpMappingsRevision } from "@/rpc/revision-signals";
+import { resolveAniListIdFromInput, sourceFromInput } from "@/rpc/source-input";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrMediaDetailsInput,
-	GetSeerrTargetInput,
 	GetSeerrMediaStatusInput,
+	GetSeerrTargetInput,
 	GetSeerrTargetsInput,
 	MappingDetailsLinkedAniListEntry,
 	RequestInSeerrInput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
+	SourceRpcInput,
 } from "@/rpc/types";
 
-async function getAniListSeerrTarget(
-	anilistId: GetSeerrTargetInput,
-): Promise<SeerrRequestTarget | null> {
-	const manual = await getManualSeerrTarget(anilistId);
-	if (manual) return { ...manual, source: "manual" };
-
-	const upstream = await listSeerrUpstreamTargets([anilistId]);
-	const target = upstream[0]?.target;
-	return target ? { anilistId, source: "anibridge", ...target } : null;
+async function resolveSeerrTargetIdentity(input: SourceRpcInput) {
+	const anilistId = await resolveAniListIdFromInput(input);
+	return {
+		identity: sourceFromInput(input),
+		...(anilistId === null ? {} : { anilistId }),
+	};
 }
 
 function seerrTargetsMatch(
@@ -73,80 +69,93 @@ function buildSeerrLinkedEntry(
 	};
 }
 
-function mergeSeerrTargets(
-	manualTargets: readonly ManualSeerrTarget[],
-	upstreamTargets: readonly SeerrUpstreamRecord[],
-): SeerrRequestTarget[] {
-	const manualById = new Set(manualTargets.map((target) => target.anilistId));
-	const targets: SeerrRequestTarget[] = [
-		...manualTargets.map((target) => ({ ...target, source: "manual" as const })),
-		...upstreamTargets
-			.filter((record) => !manualById.has(record.anilistId))
-			.map((record) => ({
-				anilistId: record.anilistId,
-				source: "anibridge" as const,
-				...record.target,
-			})),
-	];
-
-	return targets.toSorted((left, right) => left.anilistId - right.anilistId);
-}
-
-async function getEffectiveSeerrTargets(): Promise<SeerrRequestTarget[]> {
-	const [manualTargets, upstreamTargets] = await Promise.all([
-		listAllManualSeerrTargets(),
-		listAllSeerrUpstreamTargets(),
-	]);
-	return mergeSeerrTargets(manualTargets, upstreamTargets);
-}
-
 export const seerrHandlers = {
 	async getSeerrTarget(input: GetSeerrTargetInput) {
-		return getAniListSeerrTarget(input);
+		const identity = await resolveSeerrTargetIdentity(input);
+		if (
+			input.title != null ||
+			input.metadata != null ||
+			input.forceRetry === true
+		) {
+			return resolveSeerrAutomaticTarget({
+				source: identity.identity,
+				mediaType: input.mediaType,
+				...(identity.anilistId === undefined
+					? {}
+					: { anilistId: identity.anilistId }),
+				...(input.title == null ? {} : { title: input.title }),
+				...(input.metadata == null ? {} : { metadata: input.metadata }),
+				...(input.forceRetry === undefined
+					? {}
+					: { forceRetry: input.forceRetry }),
+			});
+		}
+		return mappingService.getSeerrTarget(identity.identity, input.mediaType);
 	},
 
 	async getSeerrTargets(input: GetSeerrTargetsInput) {
-		const [manualTargets, upstreamTargets] = await Promise.all([
-			listManualSeerrTargets(input),
-			listSeerrUpstreamTargets(input),
-		]);
-		return mergeSeerrTargets(manualTargets, upstreamTargets);
+		return mappingService.listSeerrTargets(input);
 	},
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {
-		await setManualSeerrTarget(input);
+		const identity = await resolveSeerrTargetIdentity(input);
+		await setManualSeerrTarget(
+			identity.identity,
+			input.mediaType === "movie"
+				? { mediaType: "movie", tmdbId: input.tmdbId }
+				: {
+						mediaType: "tv",
+						tmdbId: input.tmdbId,
+						...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
+						...(input.seasons === undefined ? {} : { seasons: input.seasons }),
+					},
+			identity.anilistId,
+		);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualSeerrTarget(input: GetSeerrTargetInput) {
-		await clearManualSeerrTarget(input);
+		const identity = await resolveSeerrTargetIdentity(input);
+		await clearManualSeerrTarget(
+			identity.identity,
+			input.mediaType,
+			identity.anilistId,
+		);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async requestInSeerr(input: RequestInSeerrInput) {
-		const credentials = await requireSeerrCredentials();
-		return seerrClient.requestMedia(buildSeerrRequestPayload(input), credentials);
+		const connection = await requireSeerrConnection();
+		return seerrClient.requestMedia(
+			buildSeerrRequestPayload(input),
+			connection,
+		);
 	},
 
 	async getSeerrMediaStatus(input: GetSeerrMediaStatusInput) {
-		const credentials = await requireSeerrCredentials();
-		return {
-			status: await seerrClient.getMediaStatus(input, credentials),
-		};
+		const connection = await requireSeerrConnection();
+		return seerrClient.getMediaStatus(input, connection);
 	},
 
 	async searchSeerrMedia(input: { query: string }) {
-		const credentials = await requireSeerrCredentials();
-		return seerrClient.searchMedia(input.query, credentials);
+		const connection = await requireSeerrConnection();
+		return seerrClient.searchMedia(input.query, connection);
 	},
 
 	async getSeerrMediaDetails(input: GetSeerrMediaDetailsInput) {
-		const credentials = await requireSeerrCredentials();
-		return seerrClient.getMediaDetails(input, credentials);
+		const connection = await requireSeerrConnection();
+		return seerrClient.getMediaDetails(input, connection);
+	},
+
+	async getSeerrPublicSettings() {
+		const connection = await requireSeerrConnection();
+		return seerrClient.getPublicSettings(connection);
 	},
 
 	async getSeerrLinkedAniListEntries(input: GetSeerrLinkedAniListEntriesInput) {
-		const targets = await getEffectiveSeerrTargets();
+		const targets = await mappingService.listAllSeerrTargets(input.mediaType);
 		const ids = targets
 			.filter((target) => seerrTargetsMatch(input, target))
 			.map((target) => target.anilistId);

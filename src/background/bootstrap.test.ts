@@ -1,0 +1,118 @@
+/** Tests for settings migration ordering during background bootstrap. */
+// src/background/bootstrap.test.ts
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { browser } from "wxt/browser";
+
+const initializeSettingsStorageMock = vi.hoisted(() => vi.fn());
+const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn());
+const registerAni2arrApiMock = vi.hoisted(() => vi.fn());
+const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
+const migrateMappingStorageMock = vi.hoisted(() => vi.fn());
+const hasConfiguredProviderCredentialsMock = vi.hoisted(() => vi.fn());
+const hasConfiguredSeerrConnectionMock = vi.hoisted(() => vi.fn());
+const loggerConfigureMock = vi.hoisted(() => vi.fn());
+const backgroundInfoMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/settings/store", () => ({
+	getExtensionOptionsSnapshot: getExtensionOptionsSnapshotMock,
+	initializeSettingsStorage: initializeSettingsStorageMock,
+}));
+
+vi.mock("@/settings/provider-config", () => ({
+	hasConfiguredProviderCredentials: hasConfiguredProviderCredentialsMock,
+}));
+
+vi.mock("@/settings/seerr-config", () => ({
+	hasConfiguredSeerrConnection: hasConfiguredSeerrConnectionMock,
+}));
+
+vi.mock("@/rpc", () => ({
+	registerAni2arrApi: registerAni2arrApiMock,
+}));
+
+vi.mock("@/rpc/handlers", () => ({
+	apiHandlers: {},
+}));
+
+vi.mock("@/background/mapping-refresh", () => ({
+	refreshMappingPipeline: refreshMappingPipelineMock,
+}));
+
+vi.mock("@/mapping/migrate", () => ({
+	migrateMappingStorage: migrateMappingStorageMock,
+}));
+
+vi.mock("@/shared/utils/logger", () => ({
+	logger: {
+		configure: loggerConfigureMock,
+		create: () => ({ info: backgroundInfoMock }),
+	},
+}));
+
+import { bootstrapBackground } from "./bootstrap";
+
+function createDeferred(): {
+	promise: Promise<void>;
+	resolve: () => void;
+} {
+	let resolve!: () => void;
+	const promise = new Promise<void>((resolvePromise) => {
+		resolve = resolvePromise;
+	});
+	return { promise, resolve };
+}
+
+describe("bootstrapBackground", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		hasConfiguredProviderCredentialsMock.mockReturnValue(false);
+		hasConfiguredSeerrConnectionMock.mockReturnValue(false);
+		getExtensionOptionsSnapshotMock.mockResolvedValue({ debugLogging: true });
+		migrateMappingStorageMock.mockImplementation(async () => {});
+	});
+
+	it("registers RPC and starts mapping migration without waiting", async () => {
+		const initialization = createDeferred();
+		const migration = createDeferred();
+		initializeSettingsStorageMock.mockReturnValue(initialization.promise);
+		migrateMappingStorageMock.mockReturnValue(migration.promise);
+
+		bootstrapBackground();
+
+		expect(initializeSettingsStorageMock).toHaveBeenCalledOnce();
+		expect(registerAni2arrApiMock).toHaveBeenCalledOnce();
+		expect(migrateMappingStorageMock).toHaveBeenCalledOnce();
+		expect(registerAni2arrApiMock.mock.invocationCallOrder[0]!).toBeLessThan(
+			migrateMappingStorageMock.mock.invocationCallOrder[0]!,
+		);
+		expect(getExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
+
+		initialization.resolve();
+
+		await vi.waitFor(() => {
+			expect(getExtensionOptionsSnapshotMock).toHaveBeenCalledOnce();
+		});
+		expect(loggerConfigureMock).toHaveBeenCalledWith({ enabled: true });
+		migration.resolve();
+	});
+
+	it("runs the background mapping refresh workflow on startup", async () => {
+		initializeSettingsStorageMock.mockImplementation(async () => {});
+		hasConfiguredProviderCredentialsMock.mockReturnValue(true);
+		let onStartupListener!: Parameters<
+			typeof browser.runtime.onStartup.addListener
+		>[0];
+		const addStartupListener = vi
+			.spyOn(browser.runtime.onStartup, "addListener")
+			.mockImplementation((listener) => {
+				onStartupListener = listener;
+			});
+
+		bootstrapBackground();
+		await onStartupListener();
+
+		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
+		addStartupListener.mockRestore();
+	});
+});

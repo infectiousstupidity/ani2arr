@@ -3,14 +3,16 @@
 
 import type {
 	SonarrEditOptions,
-	SonarrQualityProfileId,
 	SonarrSeries,
-	SonarrSeriesId,
-	TvdbId,
 } from "./types";
 import type { SonarrClient } from "./client";
 import type { SonarrFormState } from "./form-state";
 import type { SonarrEditMonitoringAction } from "./schemas";
+import type {
+	ProviderQualityProfileId,
+	SonarrSeriesId,
+	TvdbId,
+} from "../schemas";
 import type { ProviderCredentials } from "../types";
 import {
 	createError,
@@ -206,9 +208,9 @@ async function resolveMovedSeriesPath(input: {
 }
 
 function resolveRequiredQualityProfileId(input: {
-	value: SonarrQualityProfileId | undefined;
-	fallback: SonarrQualityProfileId | undefined;
-}): SonarrQualityProfileId {
+	value: ProviderQualityProfileId | undefined;
+	fallback: ProviderQualityProfileId | undefined;
+}): ProviderQualityProfileId {
 	const resolvedValue =
 		typeof input.value === "number" && Number.isFinite(input.value)
 			? input.value

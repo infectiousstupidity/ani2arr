@@ -8,6 +8,3 @@ export function Field({ children }: { children: ReactNode }): React.JSX.Element 
 
   return <FormItemContext.Provider value={{ id }}>{children}</FormItemContext.Provider>;
 }
-
-/** LEGACY: Old name kept during form-folder removal; remove after callers use Field. */
-export const FormField = Field;

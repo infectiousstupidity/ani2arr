@@ -1,5 +1,4 @@
-/** Provider connection action hooks for the options page. */
-// src/options-page/hooks/provider-connection-actions.ts
+/** Arr provider connection actions for the options page. */
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,21 +6,12 @@ import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
-import { resetAfterProviderConnectionChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
-import {
-	useExtensionOptions,
-	useSaveProviderConnection,
-	useSaveSeerrConnection,
-} from "@/queries/options";
+import { useSaveProviderConnection } from "@/queries/options";
 import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
-import {
-	cleanupUnusedProviderHostPermission,
-	requestProviderConnectionPermission,
-} from "@/settings/provider-permissions";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
+import { requestProviderConnectionPermission } from "@/settings/provider-permissions";
 import { normalizeProviderConnectionInput } from "@/settings/provider-config";
-import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
-import { getActionErrorMessage } from "./action-helpers";
 
 type FetchFormResources = (
 	api: Ani2arrApi,
@@ -46,7 +36,6 @@ function useProviderConnectionActions({
 	fetchFormResources,
 }: ProviderConnectionActionsOptions) {
 	const queryClient = useQueryClient();
-	const { data: currentSettings } = useExtensionOptions();
 	const saveProviderConnection = useSaveProviderConnection();
 
 	const [isConnecting, setIsConnecting] = useState(false);
@@ -54,8 +43,6 @@ function useProviderConnectionActions({
 
 	const connect = useCallback(
 		async (draftUrl: string, draftApiKey: string) => {
-			if (!currentSettings) return false;
-
 			setIsConnecting(true);
 			setError(null);
 
@@ -77,37 +64,27 @@ function useProviderConnectionActions({
 
 				const api = getAni2arrApi();
 				const formResources = await fetchFormResources(api, normalized);
-
-				const newSettings = await saveProviderConnection.mutateAsync({
+				await saveProviderConnection.mutateAsync({
 					provider,
 					credentials: normalized,
 				});
 
-				resetAfterProviderConnectionChange(queryClient, provider);
 				queryClient.setQueryData(
 					queryKeys.providerFormResources(provider),
 					formResources,
 				);
 
-				await api.notifyProviderConnectionChanged({
-					changedProviders: [provider],
-				});
-
-				await cleanupUnusedProviderHostPermission(
-					currentSettings.providers[provider].url,
-					newSettings,
-				);
-
 				return true;
 			} catch (error_) {
-				setError(getActionErrorMessage(error_, `Failed to connect to ${label}.`));
+				setError(
+					getUserErrorMessage(error_, `Failed to connect to ${label}.`),
+				);
 				return false;
 			} finally {
 				setIsConnecting(false);
 			}
 		},
 		[
-			currentSettings,
 			fetchFormResources,
 			label,
 			provider,
@@ -117,42 +94,25 @@ function useProviderConnectionActions({
 	);
 
 	const disconnect = useCallback(async () => {
-		if (!currentSettings) return false;
-
 		setIsConnecting(true);
 		setError(null);
 
 		try {
-			const oldUrl = currentSettings.providers[provider].url;
-			const newSettings = await saveProviderConnection.mutateAsync({
+			await saveProviderConnection.mutateAsync({
 				provider,
 				credentials: null,
 			});
 
-			resetAfterProviderConnectionChange(queryClient, provider);
-
-			await getAni2arrApi().notifyProviderConnectionChanged({
-				disconnectedProviders: [provider],
-			});
-
-			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
-
 			return true;
 		} catch (error_) {
 			setError(
-				getActionErrorMessage(error_, `Failed to disconnect ${label}.`),
+				getUserErrorMessage(error_, `Failed to disconnect ${label}.`),
 			);
 			return false;
 		} finally {
 			setIsConnecting(false);
 		}
-	}, [
-		currentSettings,
-		label,
-		provider,
-		queryClient,
-		saveProviderConnection,
-	]);
+	}, [label, provider, saveProviderConnection]);
 
 	return { connect, disconnect, isConnecting, error };
 }
@@ -184,105 +144,5 @@ export function useRadarrActions() {
 		disconnectRadarr: actions.disconnect,
 		isConnecting: actions.isConnecting,
 		error: actions.error,
-	};
-}
-
-export function useSeerrActions() {
-	const queryClient = useQueryClient();
-	const { data: currentSettings } = useExtensionOptions();
-	const saveSeerrConnection = useSaveSeerrConnection();
-
-	const [isConnecting, setIsConnecting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const connectSeerr = useCallback(
-		async (draftUrl: string, draftApiKey: string) => {
-			if (!currentSettings) return false;
-
-			setIsConnecting(true);
-			setError(null);
-
-			try {
-				const normalized = normalizeSeerrConnectionInput({
-					url: draftUrl,
-					apiKey: draftApiKey,
-				});
-				if (!normalized) {
-					throw new Error("Please enter a valid Seerr URL and API key.");
-				}
-
-				const permission = await requestProviderConnectionPermission(
-					normalized.url,
-				);
-				if (!permission.ok || !permission.value.granted) {
-					throw new Error("Host permission was denied.");
-				}
-
-				const credentials = {
-					url: normalized.url,
-					apiKey: normalized.apiKey,
-				};
-				const api = getAni2arrApi();
-				await api.testSeerrConnection({ credentials });
-				const newSettings = await saveSeerrConnection.mutateAsync({
-					credentials,
-				});
-
-				queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-					try {
-						await api.initMappings();
-						queryClient.invalidateQueries({
-							queryKey: queryKeys.mappingIdentitiesRoot(),
-						});
-						queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-						queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-					} catch {
-					// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
-				}
-				await cleanupUnusedProviderHostPermission(
-					currentSettings.seerr.url,
-					newSettings,
-				);
-
-				return true;
-			} catch (error_) {
-				setError(getActionErrorMessage(error_, "Failed to connect to Seerr."));
-				return false;
-			} finally {
-				setIsConnecting(false);
-			}
-		},
-		[currentSettings, queryClient, saveSeerrConnection],
-	);
-
-	const disconnectSeerr = useCallback(async () => {
-		if (!currentSettings) return false;
-
-		setIsConnecting(true);
-		setError(null);
-
-		try {
-			const oldUrl = currentSettings.seerr.url;
-			const newSettings = await saveSeerrConnection.mutateAsync({
-				credentials: null,
-			});
-
-			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
-
-			return true;
-		} catch (error_) {
-			setError(getActionErrorMessage(error_, "Failed to disconnect Seerr."));
-			return false;
-		} finally {
-			setIsConnecting(false);
-		}
-	}, [currentSettings, queryClient, saveSeerrConnection]);
-
-	return {
-		connectSeerr,
-		disconnectSeerr,
-		isConnecting,
-		error,
 	};
 }

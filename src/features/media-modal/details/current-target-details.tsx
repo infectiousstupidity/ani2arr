@@ -13,7 +13,7 @@ type MappingDetailsLinkedAniListEntry =
 
 type CurrentTargetDetailsProps = {
 	provider: Provider;
-	aniListEntryId: AniListId;
+	aniListEntryId?: AniListId | undefined;
 	effectiveMapping: MediaModalTargetSummary | null;
 	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
 };

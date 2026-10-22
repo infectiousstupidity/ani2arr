@@ -7,21 +7,27 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	AddRadarrInput,
 	GetMovieStatusOutput,
 	RadarrLookupOutput,
+	SourceRpcInput,
 	StatusInput,
 	UpdateRadarrInput,
 } from "@/rpc/types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { invalidateAfterProviderMediaChange } from "@/queries/invalidation";
-import { queryKeys } from "@/queries/query-keys";
+import {
+	normalizeProviderLookupRequest,
+	normalizeRadarrStatusRequest,
+	queryKeys,
+} from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
+import { sourceFromInput } from "@/rpc/source-input";
 
 const hasQueryKeyPrefix = (
 	queryKey: QueryKey,
@@ -29,7 +35,7 @@ const hasQueryKeyPrefix = (
 ): boolean => prefix.every((part, index) => queryKey[index] === part);
 
 const keepPreviousMovieStatusForSameMedia =
-	(anilistId: AniListId) =>
+	(source: SourceIdentity) =>
 	(
 		previousData: GetMovieStatusOutput | undefined,
 		previousQuery: { queryKey: QueryKey } | undefined,
@@ -38,11 +44,21 @@ const keepPreviousMovieStatusForSameMedia =
 
 		return hasQueryKeyPrefix(
 			previousQuery.queryKey,
-			queryKeys.providerMediaStatusItem("radarr", anilistId),
+			queryKeys.providerMediaStatusItem("radarr", source),
 		)
 			? previousData
 			: undefined;
 	};
+
+function mutationSourceInput(variables: SourceRpcInput): SourceRpcInput {
+	if (variables.source === undefined) {
+		return { anilistId: variables.anilistId };
+	}
+	if ("anilistId" in variables && variables.anilistId !== undefined) {
+		return { source: variables.source, anilistId: variables.anilistId };
+	}
+	return { source: variables.source };
+}
 
 export const useRadarrFormResources = (options?: {
 	enabled?: boolean;
@@ -69,7 +85,7 @@ export const useRadarrFormResources = (options?: {
 };
 
 export const useMovieStatus = (
-	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
+	payload: SourceRpcInput & Pick<StatusInput, "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
 		force_verify?: boolean;
@@ -79,28 +95,21 @@ export const useMovieStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
-	const statusKeyInput = {
-		anilistId: payload.anilistId,
-		...(payload.title === undefined ? {} : { title: payload.title }),
-		...(payload.metadata === undefined ? {} : { metadata: payload.metadata }),
-	};
+	const source = sourceFromInput(payload);
+	const request = normalizeRadarrStatusRequest(payload);
 
 	return useQuery<GetMovieStatusOutput, ExtensionError>({
-		queryKey: queryKeys.providerMediaStatus("radarr", statusKeyInput),
-		queryFn: async () => {
-			const request: StatusInput = { ...statusKeyInput };
-			if (options?.force_verify === true) {
-				request.force_verify = true;
-			}
-			if (options?.force_mapping_retry === true) {
-				request.force_mapping_retry = true;
-			}
-			return getAni2arrApi().getMovieStatus(request);
-		},
-		enabled: !!payload.anilistId && (options?.enabled ?? true),
+		queryKey: queryKeys.providerMediaStatus("radarr", request),
+		queryFn: () =>
+			getAni2arrApi().getMovieStatus({
+				...request,
+				...(forceVerify ? { force_verify: true } : {}),
+				...(forceMappingRetry ? { force_mapping_retry: true } : {}),
+			}),
+		enabled: options?.enabled ?? true,
 		staleTime: forceStatusRefresh ? 0 : 5 * 60 * 1000,
 		...(forceStatusRefresh ? { refetchOnMount: "always" } : {}),
-		placeholderData: keepPreviousMovieStatusForSameMedia(payload.anilistId),
+		placeholderData: keepPreviousMovieStatusForSameMedia(source),
 		refetchOnWindowFocus: false,
 	});
 };
@@ -109,12 +118,12 @@ export const useRadarrLookupSearch = (input: {
 	term: string;
 	enabled: boolean;
 }) => {
-	const term = input.term.trim();
+	const request = normalizeProviderLookupRequest(input);
 
 	return useQuery<RadarrLookupOutput>({
-		queryKey: queryKeys.providerLookup("radarr", term),
-		queryFn: async () => getAni2arrApi().searchRadarr({ term }),
-		enabled: input.enabled && term.length > 0,
+		queryKey: queryKeys.providerLookup("radarr", request),
+		queryFn: () => getAni2arrApi().searchRadarr(request),
+		enabled: input.enabled && request.term.length > 0,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: 1,
@@ -128,7 +137,7 @@ export const useAddMovie = () => {
 		onSuccess: (_createdMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});
@@ -142,7 +151,7 @@ export const useUpdateMovie = () => {
 		onSuccess: (_updatedMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});

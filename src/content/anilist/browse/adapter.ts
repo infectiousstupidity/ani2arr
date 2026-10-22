@@ -58,7 +58,13 @@ const parseAniListCard = (card: Element): HostMediaTarget | null => {
     card.querySelector<HTMLSpanElement>('.hover-data .info span')?.textContent,
   );
 
-  return { anilistId, title, format, mountTarget: cover };
+  return {
+    source: { source: 'anilist', id: anilistId },
+    anilistId,
+    title,
+    format,
+    mountTarget: cover,
+  };
 };
 
 export const anilistBrowseAdapter: BrowseAdapter = {

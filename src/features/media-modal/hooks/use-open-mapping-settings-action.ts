@@ -7,7 +7,7 @@ import type { AniListId } from "@/anilist/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 
 interface UseOpenMappingSettingsActionInput {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	openSource: string | null | undefined;
 }
 
@@ -16,11 +16,14 @@ export function useOpenMappingSettingsAction({
 	openSource,
 }: UseOpenMappingSettingsActionInput): (() => void) | null {
 	const openSettings = useCallback(() => {
+		if (anilistId === undefined) return;
 		openOptionsPage({
 			sectionId: "mappings",
 			targetAnilistId: anilistId,
 		});
 	}, [anilistId]);
 
-	return openSource === "content" ? openSettings : null;
+	return openSource === "content" && anilistId !== undefined
+		? openSettings
+		: null;
 }

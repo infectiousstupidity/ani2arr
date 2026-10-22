@@ -3,18 +3,10 @@
 
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
+import { readProviderErrorMessage } from "./provider-error";
 import type { ProviderCredentials } from "./types";
 
 const REQUEST_TIMEOUT_MS = 15_000;
-const ERROR_BODY_LIMIT = 4000;
-const ERROR_MESSAGE_LIMIT = 240;
-const ERROR_MESSAGE_KEYS = [
-	"errorMessage",
-	"message",
-	"error",
-	"title",
-	"detail",
-] as const;
 
 type ProviderRequestOptions = Omit<RequestInit, "body"> & {
 	json?: unknown;
@@ -131,7 +123,10 @@ export class ProviderApiClient {
 			if (!response.ok) {
 				const providerMessage = await readProviderErrorMessage(
 					response,
-					credentials,
+					{
+						url: credentials.url,
+						apiKey: credentials.apiKey,
+					},
 				);
 				throw createError(
 					ErrorCode.API_ERROR,
@@ -181,87 +176,4 @@ function readVersion(value: unknown): string | undefined {
 	if (!value || typeof value !== "object") return undefined;
 	const version = (value as Record<string, unknown>).version;
 	return typeof version === "string" ? version.trim() || undefined : undefined;
-}
-
-async function readProviderErrorMessage(
-	response: Response,
-	credentials: ProviderCredentials,
-): Promise<string | null> {
-	let body: string;
-	try {
-		const text = await response.text();
-		body = text.slice(0, ERROR_BODY_LIMIT);
-	} catch {
-		return null;
-	}
-
-	const parsed = parseProviderErrorBody(body);
-	const rawMessage = findProviderErrorMessage(parsed ?? body);
-
-	return rawMessage && sanitizeProviderErrorMessage(rawMessage, credentials);
-}
-
-function parseProviderErrorBody(body: string): unknown | null {
-	try {
-		return JSON.parse(body) as unknown;
-	} catch {
-		return null;
-	}
-}
-
-function findProviderErrorMessage(value: unknown, depth = 0): string | null {
-	if (depth > 3 || value === null || value === undefined) return null;
-
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		return trimmed || null;
-	}
-
-	if (Array.isArray(value)) {
-		for (const item of value) {
-			const message = findProviderErrorMessage(item, depth + 1);
-			if (message) return message;
-		}
-		return null;
-	}
-
-	if (typeof value !== "object") return null;
-
-	const record = value as Record<string, unknown>;
-	for (const key of ERROR_MESSAGE_KEYS) {
-		const message = findProviderErrorMessage(record[key], depth + 1);
-		if (message) return message;
-	}
-
-	return findProviderErrorMessage(record.errors, depth + 1);
-}
-
-function sanitizeProviderErrorMessage(
-	message: string,
-	credentials: ProviderCredentials,
-): string | null {
-	let sanitized = message;
-	const apiKey = credentials.apiKey.trim();
-	const baseUrl = credentials.url.trim();
-
-	sanitized = sanitized
-		.replaceAll(/https?:\/\/\S+/gi, "[redacted url]")
-		.replaceAll(/[\da-f]{32,}/gi, "[redacted]");
-
-	if (apiKey) sanitized = sanitized.replaceAll(apiKey, "[redacted]");
-	if (baseUrl) sanitized = sanitized.replaceAll(baseUrl, "[redacted url]");
-
-	sanitized = [...sanitized]
-		.map((character) => {
-			const code = character.codePointAt(0) ?? 0;
-			return code < 32 || code === 127 ? " " : character;
-		})
-		.join("")
-		.replaceAll(/\s+/g, " ")
-		.trim();
-
-	if (!sanitized) return null;
-	return sanitized.length > ERROR_MESSAGE_LIMIT
-		? `${sanitized.slice(0, ERROR_MESSAGE_LIMIT - 3)}...`
-		: sanitized;
 }

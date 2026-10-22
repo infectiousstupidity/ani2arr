@@ -2,16 +2,19 @@
 // src/features/media-modal/radarr/radarr-modal.tsx
 
 import { useMemo, useState } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { parseTmdbIdOrNull } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
+	mappingInspectionInput,
 	useMappingInspection,
 } from "@/queries/mapping";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
-import type { GetMovieStatusOutput } from "@/rpc/types";
+import { sourceFromInput } from "@/rpc/source-input";
+import type { GetMovieStatusOutput, SourceRpcInput } from "@/rpc/types";
 import { createDefaultRadarrFormState as defaultRadarrFormState } from "@/providers/radarr/form-state";
 import { DetailsPanel } from "../details/details-panel";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
@@ -25,7 +28,6 @@ import {
 } from "../helpers";
 import {
 	MappingFooter,
-	MediaModalFooterTransition,
 	SetupFooter,
 } from "../chrome/modal-footer";
 import { ModalHeader } from "../chrome/modal-header";
@@ -140,23 +142,29 @@ function getCurrentTarget(input: {
 	};
 }
 
-function useRadarrModalData(input: {
-	anilistId: AniListId;
+function useRadarrModalData(input: SourceRpcInput & {
 	metadataHint: MediaModalMetadataHint | null;
 }): RadarrModalData {
-	const { anilistId, metadataHint } = input;
-	const base = useMediaModalBaseData({ anilistId, metadataHint });
+	const { anilistId, source, metadataHint } = input;
+	const sourceInput = mappingInspectionInput(anilistId, source);
+	const sourceIdentity = sourceFromInput(sourceInput);
+	const base = useMediaModalBaseData({
+		source: sourceIdentity,
+		anilistId,
+		fallbackLabel: `${sourceIdentity.source === "mal" ? "MAL" : "AniList"} #${sourceIdentity.id}`,
+		metadataHint,
+	});
 	const options = base.options;
 	const isConfigured = options?.providers.radarr.isConfigured === true;
 	const radarrFormResources = useRadarrFormResources({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
 		() => ({
-			anilistId,
+			...mappingInspectionInput(anilistId, source),
 			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
 			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.statusMetadata, base.statusTitle],
+		[anilistId, base.statusMetadata, base.statusTitle, source],
 	);
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
@@ -198,26 +206,32 @@ export function RadarrModal({
 	onClose,
 	container,
 }: RadarrModalProps): React.JSX.Element {
-	const { anilistId, metadataHint, openSource, initialView } = state;
+	const { anilistId, source, metadataHint, openSource, initialView } = state;
+	const sourceInput = mappingInspectionInput(anilistId, source);
+	const sourceIdentity = sourceFromInput(sourceInput);
+	const identityKey = sourceIdentityKey(sourceIdentity);
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<RadarrMappingCandidate | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const data = useRadarrModalData({
-		anilistId,
+		...sourceInput,
 		metadataHint: metadataHint ?? null,
 	});
-	const inspection = useMappingInspection(PROVIDER, anilistId);
+	const inspection = useMappingInspection(
+		PROVIDER,
+		mappingInspectionInput(anilistId, source),
+	);
 	const setupTarget = useMemo(
 		() =>
 			getRadarrSetupTarget({
-				anilistId,
+				identityKey,
 				status: data.rawProviderStatus,
 				targetTitle: data.providerRequestTitle,
 				storedDefaults: data.storedDefaults,
 			}),
 		[
-			anilistId,
+			identityKey,
 			data.providerRequestTitle,
 			data.rawProviderStatus,
 			data.storedDefaults,
@@ -241,7 +255,7 @@ export function RadarrModal({
 	});
 	const setupForm = useRadarrSetupForm({
 		formId: SETUP_FORM_ID,
-		anilistId,
+		sourceInput,
 		target: setupTarget,
 		providerPayloadTitle: data.providerPayloadTitle,
 		fallbackLookupTitle: data.fallbackLookupTitle,
@@ -281,7 +295,7 @@ export function RadarrModal({
 		setView("setup");
 	};
 	const mappingActions = useMappingActions({
-		anilistId,
+		sourceInput,
 		provider: PROVIDER,
 		selectedProviderId: selectedCandidate?.tmdbId ?? null,
 		rejectProviderId: rejectCandidateTmdbId,
@@ -307,7 +321,7 @@ export function RadarrModal({
 					provider={PROVIDER}
 					contentContainer={contentContainer}
 					anilistHeaderData={data.anilistHeaderData}
-					anilistId={anilistId}
+					source={sourceIdentity}
 					isMappingView={isMappingView}
 					isProviderTargetLoading={setupTargetLoading}
 					currentTarget={data.currentTarget}
@@ -340,44 +354,40 @@ export function RadarrModal({
 				/>
 			}
 			footer={
-				<MediaModalFooterTransition
-					modeKey={isMappingView ? "mapping" : "setup"}
-				>
-					{isMappingView ? (
-						<MappingFooter
-							manualMappingActive={data.manualMappingActive}
-							isResettingMapping={mappingActions.isRevertingMapping}
-							canRejectCandidate={rejectCandidateTmdbId !== null}
-							canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
-							canIgnoreTitle={canIgnoreTitle}
-							isRejectingCandidate={mappingActions.isRejectingCandidate}
-							isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
-							isIgnoring={mappingActions.isIgnoring}
-							canApplyMapping={canSubmitMapping}
-							isApplyingMapping={mappingActions.isSubmittingMapping}
-							leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
-							overwriteTargetTitle={overwriteTargetTitle}
-							actionError={mappingActions.actionError}
-							onRejectCandidate={mappingActions.rejectCandidate}
-							onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
-							onIgnoreTitle={mappingActions.ignoreTitle}
-							onLeaveMapping={canShowSetup ? showSetupView : onClose}
-							onResetMapping={mappingActions.resetMapping}
-							onApplyMapping={mappingActions.applyMapping}
-						/>
-					) : (
-						<SetupFooter
-							formId={SETUP_FORM_ID}
-							canSubmit={setupForm.footerState.canSubmit}
-							isBusy={setupForm.footerState.isBusy}
-							isSubmitting={setupForm.footerState.isSubmitting}
-							submitLabel={setupForm.footerState.submitLabel}
-							actionError={setupForm.footerState.actionError}
-							onCancel={onClose}
-							onOpenMapping={showMappingView}
-						/>
-					)}
-				</MediaModalFooterTransition>
+				isMappingView ? (
+					<MappingFooter
+						manualMappingActive={data.manualMappingActive}
+						isResettingMapping={mappingActions.isRevertingMapping}
+						canRejectCandidate={rejectCandidateTmdbId !== null}
+						canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
+						canIgnoreTitle={canIgnoreTitle}
+						isRejectingCandidate={mappingActions.isRejectingCandidate}
+						isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
+						isIgnoring={mappingActions.isIgnoring}
+						canApplyMapping={canSubmitMapping}
+						isApplyingMapping={mappingActions.isSubmittingMapping}
+						leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
+						overwriteTargetTitle={overwriteTargetTitle}
+						actionError={mappingActions.actionError}
+						onRejectCandidate={mappingActions.rejectCandidate}
+						onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
+						onIgnoreTitle={mappingActions.ignoreTitle}
+						onLeaveMapping={canShowSetup ? showSetupView : onClose}
+						onResetMapping={mappingActions.resetMapping}
+						onApplyMapping={mappingActions.applyMapping}
+					/>
+				) : (
+					<SetupFooter
+						formId={SETUP_FORM_ID}
+						canSubmit={setupForm.footerState.canSubmit}
+						isBusy={setupForm.footerState.isBusy}
+						isSubmitting={setupForm.footerState.isSubmitting}
+						submitLabel={setupForm.footerState.submitLabel}
+						actionError={setupForm.footerState.actionError}
+						onCancel={onClose}
+						onOpenMapping={showMappingView}
+					/>
+				)
 			}
 			onOpenChange={(open) => !open && onClose()}
 			onEscapeKeyDown={handleEscapeKeyDown}

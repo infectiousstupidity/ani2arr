@@ -1,8 +1,8 @@
 /** Seerr target search pane with expected-type filtering and result rows. */
 // src/features/media-modal/seerr/seerr-change-target-main-pane.tsx
 
-import type { FormEvent } from "react";
 import { Search } from "lucide-react";
+import type { SubmitEvent } from "react";
 import type { SeerrSearchResult } from "@/providers/seerr/types";
 import type { SeerrRequestTarget } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
@@ -52,7 +52,7 @@ export function SeerrChangeTargetMainPane(props: {
 		results: searchResults,
 		expectedMediaType,
 	});
-	const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
+	const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
 		event.preventDefault();
 		if (!event.isTrusted) return;
 		onSearch(searchQuery);

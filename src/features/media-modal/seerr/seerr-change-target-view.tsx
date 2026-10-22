@@ -2,14 +2,13 @@
 // src/features/media-modal/seerr/seerr-change-target-view.tsx
 
 import {
-	useMemo,
-	useState,
 	type Dispatch,
 	type ReactNode,
 	type SetStateAction,
+	useMemo,
+	useState,
 } from "react";
 import type { AniListId } from "@/anilist/types";
-import type { GetSeerrMediaDetailsInput, SetManualSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
 import type {
 	SeerrMediaDetails,
 	SeerrSearchResult,
@@ -20,18 +19,25 @@ import {
 	useSeerrSearch,
 	useSetManualSeerrTarget,
 } from "@/queries/seerr";
-import type { AniListHeaderData, MediaModalContainer } from "../types";
+import type {
+	GetSeerrMediaDetailsInput,
+	SeerrRequestTarget,
+	SetManualSeerrTargetInput,
+	SourceRpcInput,
+} from "@/rpc/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ModalShell } from "../chrome/modal-shell";
+import type { AniListHeaderData, MediaModalContainer } from "../types";
 import { SeerrChangeTargetInfoPane } from "./seerr-change-target-info-pane";
 import { SeerrChangeTargetMainPane } from "./seerr-change-target-main-pane";
 import { SeerrFooter } from "./seerr-footer";
 import {
 	getDefaultSelectedSeasons,
+	getRequestableSeasonNumbers,
 	getSeerrDetailsSeasonKey,
 	getSeerrTargetSeasonKey,
-	getRequestableSeasonNumbers,
-	toggleSeasonSelection,
 	type SeerrSeasonDraft,
+	toggleSeasonSelection,
 } from "./seerr-selection";
 
 function currentTargetDefaultSeasons(input: {
@@ -63,17 +69,20 @@ function canSaveTvTarget(
 }
 
 function buildTvManualTargetInput(input: {
-	anilistId: AniListId;
+	targetInput: SourceRpcInput;
 	selectedDetails: SeerrMediaDetails | null;
 	selectedResult: SeerrSearchResult | null;
 	draftSeasons: readonly number[];
 }): SetManualSeerrTargetInput | null {
-	if (input.selectedResult?.mediaType !== "tv" || input.draftSeasons.length === 0) {
+	if (
+		input.selectedResult?.mediaType !== "tv" ||
+		input.draftSeasons.length === 0
+	) {
 		return null;
 	}
 
 	return {
-		anilistId: input.anilistId,
+		...input.targetInput,
 		mediaType: "tv",
 		tmdbId: input.selectedResult.tmdbId,
 		...(input.selectedDetails?.tvdbId === undefined
@@ -83,13 +92,9 @@ function buildTvManualTargetInput(input: {
 	};
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
-}
-
 export function SeerrChangeTargetView(props: {
-	anilistId: AniListId;
+	targetInput: SourceRpcInput;
+	anilistId?: AniListId | undefined;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	defaultQuery: string;
@@ -103,6 +108,7 @@ export function SeerrChangeTargetView(props: {
 	target: SeerrRequestTarget | null;
 }): React.JSX.Element {
 	const {
+		targetInput,
 		anilistId,
 		container,
 		contentContainer,
@@ -160,10 +166,10 @@ export function SeerrChangeTargetView(props: {
 			: defaultManualTargetSeasons;
 	const searchQuery = searchQueryDraft ?? defaultQuery;
 	const searchError = search.error
-		? getErrorMessage(search.error, "Failed to search Seerr.")
+		? getUserErrorMessage(search.error, "Failed to search Seerr.")
 		: null;
 	const saveError = setManualTarget.error
-		? getErrorMessage(setManualTarget.error, "Failed to save Seerr target.")
+		? getUserErrorMessage(setManualTarget.error, "Failed to save Seerr target.")
 		: null;
 	const saveTvTargetEnabled = canSaveTvTarget(selectedResult, draftSeasons);
 
@@ -175,7 +181,7 @@ export function SeerrChangeTargetView(props: {
 	const saveMovieTarget = (result: SeerrSearchResult): void => {
 		setManualTarget.mutate(
 			{
-				anilistId,
+				...targetInput,
 				mediaType: "movie",
 				tmdbId: result.tmdbId,
 			},
@@ -192,17 +198,14 @@ export function SeerrChangeTargetView(props: {
 	};
 	const saveTvTarget = (): void => {
 		const input = buildTvManualTargetInput({
-			anilistId,
+			targetInput,
 			selectedDetails,
 			selectedResult,
 			draftSeasons,
 		});
 		if (!input) return;
 
-		setManualTarget.mutate(
-			input,
-			{ onSuccess: onBackToRequest },
-		);
+		setManualTarget.mutate(input, { onSuccess: onBackToRequest });
 	};
 	const handleEscapeKeyDown = (event: KeyboardEvent): void => {
 		event.preventDefault();
@@ -256,18 +259,10 @@ export function SeerrChangeTargetView(props: {
 			footer={
 				<SeerrFooter
 					view="change-target"
-					isManualTarget={false}
 					canSaveTvTarget={saveTvTargetEnabled}
-					canRequest={false}
 					isBusy={setManualTarget.isPending}
-					isRequesting={false}
-					requestLabel="Request selected"
-					onClose={onClose}
-					onChangeTarget={() => {}}
 					onBackToRequest={onBackToRequest}
-					onClearManualTarget={() => {}}
 					onSaveTvTarget={saveTvTarget}
-					onRequest={() => {}}
 				/>
 			}
 			onOpenChange={(open) => !open && onClose()}

@@ -161,6 +161,12 @@ export type TitleMatch = {
 	matchedTitle: string;
 };
 
+export type SearchMedia = Pick<
+	AniListMedia,
+	"title" | "synonyms" | "startDate"
+> &
+	Partial<Pick<AniListMedia, "format" | "id">>;
+
 const DEFAULT_NORMALIZE_OPTIONS: Required<NormalizeTitleTokensOptions> = {
 	stripDiacritics: false,
 	filterStopwords: false,
@@ -437,7 +443,7 @@ function makeTitleSearchTerm(
 
 export function getSearchTerms(
 	provider: Provider,
-	media: AniListMedia,
+	media: SearchMedia,
 ): TitleSearchTerm[] {
 	return makeTitleSearchTerms(provider, media.title, media.synonyms);
 }
@@ -465,6 +471,13 @@ function makeTitleSearchTerms(
 		const stripped = stripParenContent(value);
 		if (stripped !== value) {
 			register(stripped, priority + 0.5);
+		}
+
+		if (provider === "sonarr") {
+			const baseTitle = /^(.*)\s+[-–—]\s+\S.*$/.exec(value)?.[1]?.trim();
+			if (baseTitle) {
+				register(baseTitle, priority + 1);
+			}
 		}
 	};
 

@@ -1,12 +1,6 @@
 /** Seerr browse-card request action backed by mapped movie and TV IDs. */
 // src/features/media-overlay/seerr-card-overlay.tsx
 
-import type {
-	MouseEvent,
-	ReactElement,
-	ReactNode,
-	SyntheticEvent,
-} from "react";
 import {
 	Check,
 	CircleDashed,
@@ -14,55 +8,60 @@ import {
 	Send,
 	TriangleAlert,
 } from "lucide-react";
-import type { AniListId } from "@/anilist/types";
-import { resolveSeerrRequestInput } from "@/content/anilist/target-provider";
+import type {
+	MouseEvent,
+	ReactElement,
+	ReactNode,
+	SyntheticEvent,
+} from "react";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import {
+	type SeerrMediaAction,
+	useSeerrMediaAction,
+} from "@/features/media-action/use-seerr-media-action";
 import type { MediaActionState } from "@/features/media-action/state";
-import { getSeerrActionState } from "@/features/seerr-request/seerr-action-state";
-import type { SeerrMediaStatus } from "@/providers/seerr/types";
-import { useSeerrMediaStatus, useSeerrTarget } from "@/queries/seerr";
-import { openSeerrPage } from "@/rpc/provider-page";
-import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { MappingIdentity, RequestInSeerrInput } from "@/rpc/types";
+import { SeerrIcon } from "@/features/provider-ui/provider-icons";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { SeerrMediaStatus, SeerrMediaType } from "@/providers/seerr/types";
 import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import { SeerrIcon } from "@/options-page/components/icons";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SeerrCardActionProps {
-	anilistId: AniListId;
-	mappedIdentities: readonly MappingIdentity[];
+	source: SourceIdentity;
+	anilistId?: AniListId | undefined;
+	title: string;
+	metadata: AniListMediaHint | null;
+	mediaType: SeerrMediaType | null;
 	isConfigured: boolean;
 	observeTarget?: Element | null | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
-	statusEnabled?: boolean;
 	onOpenModal: () => void;
 }
 
 interface SeerrCardStackActionsProps extends SeerrCardActionProps {
 	stackDirection?: "up" | "down" | undefined;
+	presentation?: "status-column" | "action-row" | undefined;
 }
 
 interface SeerrStandaloneCardOverlayProps extends SeerrCardActionProps {
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
 	extraAction?: ReactNode;
+	presentation?: "status-column" | "action-row" | undefined;
 }
 
 type SeerrCardState = Extract<
 	MediaActionState,
-	"unconfigured" | "checking" | "adding" | "in-library" | "error" | "can-add"
+	"unconfigured" | "checking" | "in-library" | "error" | "can-add"
 >;
 
-type SeerrCardAction = ReturnType<typeof useSeerrCardAction>;
+type SeerrCardAction = SeerrMediaAction;
 
 function swallowEvent(event: SyntheticEvent): void {
 	event.preventDefault();
-	event.stopPropagation();
-}
-
-function stopOverlayEvent(event: SyntheticEvent): void {
 	event.stopPropagation();
 }
 
@@ -79,14 +78,8 @@ function getSeerrCardIcon(input: {
 	}
 
 	switch (input.state) {
-		case "checking":
-		case "adding": {
-			return (
-				<RotateCcw
-					className="h-4 w-4 a2a-rotate"
-					aria-hidden="true"
-				/>
-			);
+		case "checking": {
+			return <RotateCcw className="h-4 w-4 a2a-rotate" aria-hidden="true" />;
 		}
 		case "in-library": {
 			return <Check className="h-4 w-4" aria-hidden="true" />;
@@ -100,77 +93,6 @@ function getSeerrCardIcon(input: {
 	}
 }
 
-function useSeerrCardAction(input: SeerrCardActionProps) {
-	const seerrTargetQuery = useSeerrTarget(input.anilistId, {
-		enabled: input.isConfigured && input.statusEnabled === true,
-	});
-
-	const seerrRequestTarget = seerrTargetQuery.data ?? null;
-
-	const requestInput: RequestInSeerrInput | null = resolveSeerrRequestInput({
-		anilistId: input.anilistId,
-		mappedIdentities: input.mappedIdentities,
-		seerrRequestTarget,
-	});
-
-	const status = useSeerrMediaStatus({
-		requestInput,
-		enabled:
-			input.isConfigured &&
-			input.statusEnabled === true &&
-			requestInput !== null,
-	});
-
-	const seerrStatus = status.data?.status;
-
-	const actionState =
-		input.isConfigured && requestInput === null
-			? {
-					state: "can-add" as const,
-					label: "Choose Seerr target",
-					disabled: false,
-					settled: false,
-				}
-			: getSeerrActionState({
-					isConfigured: input.isConfigured,
-					isRequesting: false,
-					isChecking: status.isEnabled && !status.data && !status.isError,
-					requestSucceeded: false,
-					requestFailed: false,
-					status: seerrStatus,
-				});
-
-	const openSeerr =
-		input.isConfigured && requestInput !== null
-			? () =>
-					openSeerrPage({
-						mediaType: requestInput.mediaType,
-						tmdbId: requestInput.tmdbId,
-					})
-			: null;
-
-	const run = (): void => {
-		if (!input.isConfigured) {
-			openOptionsPage({ sectionId: "seerr" });
-			return;
-		}
-
-		if (actionState.disabled) return;
-
-		input.onOpenModal();
-	};
-
-	return {
-		state: actionState.state,
-		title: actionState.label,
-		disabled: actionState.disabled,
-		status: seerrStatus,
-		run,
-		requestInput,
-		openSeerr,
-	};
-}
-
 function SeerrStackRequestButton(props: {
 	action: SeerrCardAction;
 	tooltipContainer?: FloatingPortalContainer | undefined;
@@ -182,12 +104,12 @@ function SeerrStackRequestButton(props: {
 		event.stopPropagation();
 		if (!isTrustedClick(event)) return;
 
-		action.run();
+		action.runPrimaryAction();
 	};
 
 	return (
 		<TooltipWrapper
-			content={action.title}
+			content={action.visualTitle}
 			side="right"
 			align="center"
 			sideOffset={6}
@@ -197,15 +119,15 @@ function SeerrStackRequestButton(props: {
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--seerr"
-				aria-label={action.title}
+				aria-label={action.visualTitle}
 				onClick={handleClick}
 				onMouseDown={swallowEvent}
-				disabled={action.disabled}
-				aria-disabled={action.disabled || undefined}
+				disabled={action.status.disabled}
+				aria-disabled={action.status.disabled || undefined}
 			>
 				{getSeerrCardIcon({
-					state: action.state,
-					status: action.status,
+					state: action.status.state,
+					status: action.visualStatus,
 				})}
 			</button>
 		</TooltipWrapper>
@@ -217,14 +139,14 @@ function SeerrStackOpenButton(props: {
 	tooltipContainer?: FloatingPortalContainer | undefined;
 }): ReactElement | null {
 	const { action, tooltipContainer } = props;
-	if (!action.openSeerr) return null;
+	if (!action.openProvider) return null;
 
 	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
 		event.preventDefault();
 		event.stopPropagation();
 		if (!isTrustedClick(event)) return;
 
-		action.openSeerr?.();
+		action.openProvider?.();
 	};
 
 	return (
@@ -249,54 +171,69 @@ function SeerrStackOpenButton(props: {
 	);
 }
 
-export function SeerrCardStackAction({
-	anilistId,
-	mappedIdentities,
-	isConfigured,
-	observeTarget,
-	tooltipContainer,
-	onOpenModal,
-}: SeerrCardActionProps): ReactElement | null {
-	const isInViewport = useCardOverlayInViewport(observeTarget);
-	const action = useSeerrCardAction({
-		anilistId,
-		mappedIdentities,
-		isConfigured,
-		statusEnabled: isInViewport,
-		onOpenModal,
-		observeTarget,
-	});
-
-	if (!isInViewport) return null;
-
-	return (
-		<SeerrStackRequestButton
-			action={action}
-			tooltipContainer={tooltipContainer}
-		/>
-	);
-}
-
 export function SeerrCardStackActions({
+	source,
 	anilistId,
-	mappedIdentities,
+	title,
+	metadata,
+	mediaType,
 	isConfigured,
 	observeTarget,
 	tooltipContainer,
 	onOpenModal,
 	stackDirection = "up",
+	presentation,
 }: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
-	const action = useSeerrCardAction({
+	const action = useSeerrMediaAction({
+		source,
 		anilistId,
-		mappedIdentities,
+		title,
+		metadata,
+		mediaType,
 		isConfigured,
-		statusEnabled: isInViewport,
+		enabled: isInViewport,
 		onOpenModal,
-		observeTarget,
 	});
 
-	if (!isInViewport) return null;
+	if (
+		!isInViewport &&
+		presentation !== "status-column" &&
+		presentation !== "action-row"
+	) {
+		return null;
+	}
+
+	if (presentation === "status-column" || presentation === "action-row") {
+		return (
+			<CardOverlay
+				providerLabel="Seerr"
+				primaryState={action.status.state}
+				primaryTitle={action.visualTitle}
+				primaryLabel={action.status.label}
+				primaryIcon={
+					action.visualStatus === "partial" ? (
+						<CircleDashed
+							className="a2a-card-overlay__symbol"
+							aria-hidden="true"
+						/>
+					) : undefined
+				}
+				{...(action.visualStatus === "partial"
+					? { primaryTone: "partial" as const }
+					: {})}
+				primaryDisabled={action.status.disabled}
+				onPrimaryAction={action.runPrimaryAction}
+				hasMapping={true}
+				openProvider={
+					presentation === "status-column" ? action.openProvider : null
+				}
+				openProviderIcon={SeerrIcon}
+				tooltipContainer={tooltipContainer}
+				presentation={presentation}
+			/>
+		);
+	}
 
 	const requestButton = (
 		<SeerrStackRequestButton
@@ -305,22 +242,28 @@ export function SeerrCardStackActions({
 		/>
 	);
 	const openButton = (
-		<SeerrStackOpenButton
-			action={action}
-			tooltipContainer={tooltipContainer}
-		/>
+		<SeerrStackOpenButton action={action} tooltipContainer={tooltipContainer} />
 	);
 
 	return stackDirection === "down" ? (
-		<>{requestButton}{openButton}</>
+		<>
+			{requestButton}
+			{openButton}
+		</>
 	) : (
-		<>{openButton}{requestButton}</>
+		<>
+			{openButton}
+			{requestButton}
+		</>
 	);
 }
 
 export function SeerrStandaloneCardOverlay({
+	source,
 	anilistId,
-	mappedIdentities,
+	title,
+	metadata,
+	mediaType,
 	isConfigured,
 	observeTarget,
 	badgeVisibility,
@@ -328,49 +271,55 @@ export function SeerrStandaloneCardOverlay({
 	tooltipContainer,
 	onOpenModal,
 	extraAction,
+	presentation,
 }: SeerrStandaloneCardOverlayProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
-	const action = useSeerrCardAction({
+	const action = useSeerrMediaAction({
+		source,
 		anilistId,
-		mappedIdentities,
+		title,
+		metadata,
+		mediaType,
 		isConfigured,
-		statusEnabled: isInViewport,
+		enabled: isInViewport,
 		onOpenModal,
-		observeTarget,
 	});
 
-	if (!isInViewport) return null;
+	if (
+		!isInViewport &&
+		presentation !== "status-column" &&
+		presentation !== "action-row"
+	) {
+		return null;
+	}
 
 	return (
-		<div
-			onClick={stopOverlayEvent}
-			onDoubleClick={stopOverlayEvent}
-			onKeyDown={stopOverlayEvent}
-			onKeyUp={stopOverlayEvent}
-			onMouseDown={stopOverlayEvent}
-			onMouseUp={stopOverlayEvent}
-			onPointerDown={stopOverlayEvent}
-			onPointerUp={stopOverlayEvent}
-		>
-			<CardOverlay
-				providerLabel="Seerr"
-				primaryState={action.state}
-				primaryTitle={action.title}
-				primaryAriaLabel={action.title}
-				primaryDisabled={action.disabled}
-				onPrimaryAction={action.run}
-				hasMapping={true}
-				showSetupAction={false}
-				onOpenSetup={() => {}}
-				showMappingAction={false}
-				onOpenMapping={() => {}}
-				openProvider={action.openSeerr}
-				openProviderIcon={SeerrIcon}
-				extraAction={extraAction}
-				badgeVisibility={badgeVisibility}
-				stackDirection={stackDirection}
-				tooltipContainer={tooltipContainer}
-			/>
-		</div>
+		<CardOverlay
+			providerLabel="Seerr"
+			primaryState={action.status.state}
+			primaryTitle={action.visualTitle}
+			primaryLabel={action.status.label}
+			primaryIcon={
+				action.visualStatus === "partial" ? (
+					<CircleDashed
+						className="a2a-card-overlay__symbol"
+						aria-hidden="true"
+					/>
+				) : undefined
+			}
+			{...(action.visualStatus === "partial"
+				? { primaryTone: "partial" as const }
+				: {})}
+			primaryDisabled={action.status.disabled}
+			onPrimaryAction={action.runPrimaryAction}
+			hasMapping={true}
+			openProvider={presentation === "action-row" ? null : action.openProvider}
+			openProviderIcon={SeerrIcon}
+			extraAction={extraAction}
+			badgeVisibility={badgeVisibility}
+			stackDirection={stackDirection}
+			tooltipContainer={tooltipContainer}
+			presentation={presentation}
+		/>
 	);
 }

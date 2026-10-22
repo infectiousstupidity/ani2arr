@@ -9,14 +9,15 @@ import {
 	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
-import "@/shared/styles/content-base.css";
 import { createExtensionQueryClient } from "@/queries/query-client";
+import { queryKeys } from "@/queries/query-keys";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
 import {
 	createShadowRootUi,
 	type ShadowRootContentScriptUi,
 } from "wxt/utils/content-script-ui/shadow-root";
+import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
 import {
 	ACTIONS_SELECTOR,
 	ANCHOR_ID,
@@ -31,8 +32,6 @@ import {
 	startAnchorKeeper,
 	waitForElement,
 } from "./layout";
-import { ContentRoot, type AnimePageTarget } from "./root";
-import "./style.css";
 
 const log = logger.create("AniList Content");
 
@@ -90,7 +89,9 @@ async function mountAnimePageUI({
 	ctx,
 	url,
 	isCurrent,
+	publicOptions,
 }: ContentEntrypointShellContext): Promise<void> {
+	queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
 	const idMatch = new URL(url).pathname.match(/\/anime\/(\d+)/);
 	const anilistId = parseAniListIdOrNull(
 		idMatch?.[1] ? Number.parseInt(idMatch[1], 10) : null,
@@ -103,6 +104,7 @@ async function mountAnimePageUI({
 	if (!mountTarget) return;
 
 	const target: AnimePageTarget = {
+		source: { source: "anilist", id: anilistId },
 		anilistId,
 		format: readFormatFromSidebar(document),
 		title: readTitleFromHeader(document),

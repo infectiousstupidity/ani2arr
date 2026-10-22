@@ -3,11 +3,13 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import {
+	BROWSE_CREATED_ATTRIBUTE,
 	BROWSE_OVERLAY_CONTAINER_CLASS,
 	BROWSE_PROCESSED_ATTRIBUTE,
 	type BrowseAdapter,
 	type HostMediaTarget,
 } from "./types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 
 export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
 	childList: true,
@@ -16,6 +18,8 @@ export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
 	attributeFilter: ["href"],
 	characterData: true,
 };
+
+const ACTION_ROW_HOST_HEIGHT_PROPERTY = "--a2a-action-row-host-height";
 
 export interface BrowseCardTarget {
 	key: string;
@@ -48,7 +52,7 @@ function getCardInstanceId(mountTarget: HTMLElement): number {
 
 function getCardSignature(parsed: HostMediaTarget): string {
 	return [
-		parsed.anilistId,
+		sourceIdentityKey(parsed.source),
 		parsed.format ?? "",
 		parsed.title,
 		parsed.mountTarget.getAttribute("href") ?? "",
@@ -57,7 +61,9 @@ function getCardSignature(parsed: HostMediaTarget): string {
 }
 
 function getObserverRoot(adapter: BrowseAdapter): Node | null {
-	return adapter.getObserverRoot?.() ?? document.body ?? document.documentElement;
+	return (
+		adapter.getObserverRoot?.() ?? document.body ?? document.documentElement
+	);
 }
 
 function getScanRoot(adapter: BrowseAdapter): Element | null {
@@ -69,9 +75,30 @@ function getScanRoot(adapter: BrowseAdapter): Element | null {
 	);
 }
 
-function findPlacementContainer(
-	mountTarget: HTMLElement,
-): HTMLElement | null {
+function captureActionRowHostHeight(mountTarget: HTMLElement): void {
+	if (
+		mountTarget.style.getPropertyValue(ACTION_ROW_HOST_HEIGHT_PROPERTY) !== ""
+	) {
+		return;
+	}
+
+	const view = mountTarget.ownerDocument.defaultView;
+	const computedHeight = view?.getComputedStyle(mountTarget).height ?? "";
+	const parsedHeight = Number.parseFloat(computedHeight);
+	const measuredHeight =
+		Number.isFinite(parsedHeight) && parsedHeight > 0
+			? parsedHeight
+			: mountTarget.getBoundingClientRect().height;
+
+	if (measuredHeight <= 0) return;
+
+	mountTarget.style.setProperty(
+		ACTION_ROW_HOST_HEIGHT_PROPERTY,
+		`${measuredHeight}px`,
+	);
+}
+
+function findPlacementContainer(mountTarget: HTMLElement): HTMLElement | null {
 	for (const child of mountTarget.children) {
 		if (
 			child instanceof HTMLElement &&
@@ -80,32 +107,52 @@ function findPlacementContainer(
 			return child;
 		}
 	}
+
 	return null;
 }
 
 function ensurePlacementContainer(input: {
-	mountTarget: HTMLElement;
+	parsed: HostMediaTarget;
 	adapter: BrowseAdapter;
 }): HTMLElement {
-	const existing = findPlacementContainer(input.mountTarget);
+	if (input.parsed.presentation === "action-row") {
+		captureActionRowHostHeight(input.parsed.mountTarget);
+	}
+
+	const existing = findPlacementContainer(input.parsed.mountTarget);
 	const container =
-		existing ?? input.mountTarget.ownerDocument.createElement("div");
+		existing ?? input.parsed.mountTarget.ownerDocument.createElement("div");
 
 	container.className = BROWSE_OVERLAY_CONTAINER_CLASS;
 	container.dataset.corner = input.adapter.anchorCorner ?? "bottom-left";
+	container.dataset.presentation =
+		input.parsed.presentation ?? "poster-overlay";
 
 	if (!existing) {
-		input.mountTarget.append(container);
+		if (input.parsed.presentation === "status-column") {
+			input.parsed.mountTarget.prepend(container);
+		} else {
+			input.parsed.mountTarget.append(container);
+		}
 	}
 
 	return container;
 }
 
-function removeTarget(
-	target: BrowseCardTarget,
-): void {
+function removeTarget(target: BrowseCardTarget): void {
+	const removeMountTarget =
+		target.parsed.mountTarget.getAttribute(BROWSE_CREATED_ATTRIBUTE) !== null;
+
 	target.parsed.mountTarget.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
 	target.container.remove();
+
+	if (target.parsed.presentation === "action-row") {
+		target.parsed.mountTarget.style.removeProperty(
+			ACTION_ROW_HOST_HEIGHT_PROPERTY,
+		);
+	}
+
+	if (removeMountTarget) target.parsed.mountTarget.remove();
 }
 
 export function cleanupBrowseCardTargets(
@@ -121,8 +168,9 @@ function cleanupMissingTargets(input: {
 	nextTargets: readonly BrowseCardTarget[];
 }): void {
 	const nextMountTargets = new Set(
-		input.nextTargets.map(target => target.parsed.mountTarget),
+		input.nextTargets.map((target) => target.parsed.mountTarget),
 	);
+
 	for (const target of input.previousTargets) {
 		if (!nextMountTargets.has(target.parsed.mountTarget)) {
 			removeTarget(target);
@@ -135,8 +183,10 @@ function targetsEqual(
 	b: readonly BrowseCardTarget[],
 ): boolean {
 	if (a.length !== b.length) return false;
+
 	for (const [index, target] of a.entries()) {
 		const other = b[index];
+
 		if (
 			!other ||
 			target.key !== other.key ||
@@ -145,6 +195,7 @@ function targetsEqual(
 			return false;
 		}
 	}
+
 	return true;
 }
 
@@ -155,23 +206,25 @@ export function scanBrowseCardTargets(
 	if (!root) return [];
 
 	const targetsByMountTarget = new Map<HTMLElement, BrowseCardTarget>();
+
 	for (const card of root.querySelectorAll(options.adapter.cardSelector)) {
 		const parsed = options.adapter.parseCard(card);
-		if (!parsed) {
-			continue;
-		}
+		if (!parsed) continue;
+
 		if (targetsByMountTarget.has(parsed.mountTarget)) {
 			continue;
 		}
 
 		const container = ensurePlacementContainer({
-			mountTarget: parsed.mountTarget,
+			parsed,
 			adapter: options.adapter,
 		});
+
 		parsed.mountTarget.setAttribute(
 			BROWSE_PROCESSED_ATTRIBUTE,
-			String(parsed.anilistId),
+			sourceIdentityKey(parsed.source),
 		);
+
 		targetsByMountTarget.set(parsed.mountTarget, {
 			key: getCardSignature(parsed),
 			parsed,
@@ -189,6 +242,7 @@ function createBrowseCardTargetStore(
 
 	return {
 		getSnapshot: () => currentTargets,
+
 		subscribe: (onStoreChange) => {
 			let frameId: number | null = null;
 			let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -198,6 +252,7 @@ function createBrowseCardTargetStore(
 					globalThis.cancelAnimationFrame(frameId);
 					frameId = null;
 				}
+
 				if (timeoutId !== null) {
 					globalThis.clearTimeout(timeoutId);
 					timeoutId = null;
@@ -207,11 +262,14 @@ function createBrowseCardTargetStore(
 			const scan = () => {
 				frameId = null;
 				timeoutId = null;
+
 				const nextTargets = scanBrowseCardTargets(options);
+
 				cleanupMissingTargets({
 					previousTargets: currentTargets,
 					nextTargets,
 				});
+
 				if (targetsEqual(currentTargets, nextTargets)) {
 					currentTargets = nextTargets;
 					return;
@@ -223,10 +281,12 @@ function createBrowseCardTargetStore(
 
 			const scheduleScan = () => {
 				if (frameId !== null || timeoutId !== null) return;
+
 				if (typeof globalThis.requestAnimationFrame === "function") {
 					frameId = globalThis.requestAnimationFrame(scan);
 					return;
 				}
+
 				timeoutId = globalThis.setTimeout(scan, 0);
 			};
 
@@ -235,9 +295,8 @@ function createBrowseCardTargetStore(
 			}
 
 			const observerRoot = getObserverRoot(options.adapter);
-			const observer = observerRoot
-				? new MutationObserver(scheduleScan)
-				: null;
+			const observer = observerRoot ? new MutationObserver(scheduleScan) : null;
+
 			observer?.observe(observerRoot as Node, BROWSE_MUTATION_OBSERVER_INIT);
 			scan();
 
@@ -252,8 +311,13 @@ function createBrowseCardTargetStore(
 }
 
 export function useBrowseCardTargets(
-	options: BrowseCardTargetOptions,
+	adapter: BrowseAdapter,
+	enabled: boolean,
 ): BrowseCardTarget[] {
-	const store = useMemo(() => createBrowseCardTargetStore(options), [options]);
+	const store = useMemo(
+		() => createBrowseCardTargetStore({ adapter, enabled }),
+		[adapter, enabled],
+	);
+
 	return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }

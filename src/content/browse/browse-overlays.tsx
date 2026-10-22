@@ -4,15 +4,16 @@
 import React, { useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { metadataHintFromAniListMetadata } from "@/anilist/title";
-import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
+import type { AniListId } from "@/anilist/types";
 import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { useAniListMetadataBatch } from "@/queries/anilist";
-import { useMappingIdentities } from "@/queries/mapping";
-import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
+import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
+import { usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
-import type { PublicOptions } from "@/settings/types";
 import { useTheme } from "@/shared/hooks/use-theme";
+import type { MappingIdentity } from "@/rpc/types";
 import { BrowseCardOverlay } from "./browse-card-overlay";
 import { useBrowseCardTargets } from "./use-browse-card-targets";
 import type { BrowseAdapter } from "./types";
@@ -22,19 +23,22 @@ export interface BrowseOverlaysProps {
 	portalContainer: HTMLElement;
 }
 
-function getBrowseFlags(publicOptions: PublicOptions | undefined): {
-	overlaysEnabled: boolean;
-} {
-	const sonarrBrowseEnabled =
-		publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
-	const radarrBrowseEnabled =
-		publicOptions?.ui?.browseCards.radarr.enabled ?? true;
-	const seerrBrowseEnabled =
-		publicOptions?.ui?.browseCards.seerr.enabled ?? true;
+function getMappedIdentitiesByAniListId(
+	identities: readonly MappingIdentity[],
+): Map<AniListId, MappingIdentity[]> {
+	const identitiesById = new Map<AniListId, MappingIdentity[]>();
+	for (const identity of identities) {
+		if (identity.result.kind !== "mapped") continue;
 
-	return {
-		overlaysEnabled: sonarrBrowseEnabled || radarrBrowseEnabled || seerrBrowseEnabled,
-	};
+		const existing = identitiesById.get(identity.anilistId);
+		if (existing) {
+			existing.push(identity);
+		} else {
+			identitiesById.set(identity.anilistId, [identity]);
+		}
+	}
+
+	return identitiesById;
 }
 
 export function BrowseOverlays({
@@ -44,35 +48,64 @@ export function BrowseOverlays({
 	const hostRef = useRef<HTMLDivElement>(null);
 	const mediaModal = useMediaModalState();
 	useTheme(hostRef);
-	useOptionsQuerySync();
 	useA2aBroadcasts();
 
 	const { data: publicOptions } = usePublicOptions();
-	const browseFlags = getBrowseFlags(publicOptions);
-	const targetOptions = useMemo(
-		() => ({
-			adapter,
-			enabled: browseFlags.overlaysEnabled,
-		}),
-		[adapter, browseFlags.overlaysEnabled],
-	);
-	const targets = useBrowseCardTargets(targetOptions);
-	const targetIds = useMemo(
-		() => targets.map(target => target.parsed.anilistId),
+	const overlaysEnabled =
+		(publicOptions?.ui.browseCards.sonarr.enabled ?? true) ||
+		(publicOptions?.ui.browseCards.radarr.enabled ?? true) ||
+		(publicOptions?.ui.browseCards.seerr.enabled ?? true);
+	const targets = useBrowseCardTargets(adapter, overlaysEnabled);
+	const sourcesMissingAniListIds = useMemo(
+		() =>
+			targets.flatMap((target) =>
+				target.parsed.anilistId === undefined ? [target.parsed.source] : [],
+			),
 		[targets],
+	);
+	const sourceAniListIds = useSourceAniListIdMap(sourcesMissingAniListIds, {
+		enabled: overlaysEnabled && sourcesMissingAniListIds.length > 0,
+	});
+	const resolvedTargets = useMemo(
+		() =>
+			targets.map((target) => {
+				if (target.parsed.anilistId !== undefined) return target;
+
+				const anilistId =
+					sourceAniListIds.data?.[sourceIdentityKey(target.parsed.source)];
+				return anilistId === undefined || anilistId === null
+					? target
+					: {
+							...target,
+							parsed: {
+								...target.parsed,
+								anilistId,
+							},
+						};
+			}),
+		[targets, sourceAniListIds.data],
+	);
+	const targetIds = useMemo(
+		() =>
+			resolvedTargets.flatMap((target) =>
+				target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+			),
+		[resolvedTargets],
 	);
 	const targetIdsMissingFormat = useMemo(
 		() =>
-			targets
+			resolvedTargets
 				.filter((target) => target.parsed.format === null)
-				.map((target) => target.parsed.anilistId),
-		[targets],
+				.flatMap((target) =>
+					target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+				),
+		[resolvedTargets],
 	);
 	const metadataBatch = useAniListMetadataBatch(targetIdsMissingFormat, {
-		enabled: browseFlags.overlaysEnabled && targetIdsMissingFormat.length > 0,
+		enabled: overlaysEnabled && targetIdsMissingFormat.length > 0,
 	});
 	const mappingIdentities = useMappingIdentities(targetIds, {
-		enabled: browseFlags.overlaysEnabled,
+		enabled: overlaysEnabled,
 	});
 	const mappedIdentitiesById = useMemo(
 		() => getMappedIdentitiesByAniListId(mappingIdentities.data ?? []),
@@ -92,17 +125,23 @@ export function BrowseOverlays({
 	return (
 		<>
 			<div ref={hostRef} />
-			{targets.map(target =>
+			{resolvedTargets.map(target =>
 				createPortal(
 					<BrowseCardOverlay
 						parsed={target.parsed}
 						adapter={adapter}
 						publicOptions={publicOptions}
 						mappedIdentities={
-							mappedIdentitiesById.get(target.parsed.anilistId) ?? []
+							target.parsed.anilistId === undefined
+								? []
+								: (mappedIdentitiesById.get(target.parsed.anilistId) ?? [])
 						}
 
-						metadata={metadataById.get(target.parsed.anilistId) ?? null}
+						metadata={
+							target.parsed.anilistId === undefined
+								? null
+								: (metadataById.get(target.parsed.anilistId) ?? null)
+						}
 						onOpenMediaModal={mediaModal.open}
 						tooltipContainer={null}
 					/>,

@@ -3,42 +3,52 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { TmdbId } from "@/providers/schemas";
+import type { SeerrMediaType } from "@/providers/seerr/types";
 import { PROVIDERS, type Provider } from "@/providers/types";
 import { queryKeys } from "@/queries/query-keys";
 
 export function invalidateAfterMappingChange(
 	queryClient: QueryClient,
-	input: { provider: Provider; anilistId: AniListId },
+	input: { provider: Provider; source?: SourceIdentity; anilistId?: AniListId },
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.providerMediaStatusItem(input.provider, input.anilistId),
+		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input.anilistId),
+		queryKey: queryKeys.mappingInspectionItem(input.provider, input),
 	});
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(input.provider),
 	});
+
+	if (input.provider === "radarr") {
+		queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+		queryClient.invalidateQueries({
+			queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
+		});
+	}
 }
 
 export function invalidateAfterMappingsRevision(
 	queryClient: QueryClient,
 ): void {
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspectionRoot(),
-	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingIdentitiesRoot(),
-	});
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappingRoot() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
+	});
 	for (const provider of PROVIDERS) {
 		queryClient.invalidateQueries({
 			queryKey: queryKeys.providerMediaStatusRoot(provider),
+		});
+		queryClient.invalidateQueries({
+			queryKey: queryKeys.providerLookupRoot(provider),
 		});
 	}
 }
@@ -53,18 +63,30 @@ export function invalidateAfterProviderLibraryChange(
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(provider),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
+}
+
+export function invalidateAfterSeerrRequest(
+	queryClient: QueryClient,
+	input: { mediaType: SeerrMediaType; tmdbId: TmdbId },
+): void {
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seerrMediaStatusItem(input.mediaType, input.tmdbId),
+	});
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seerrMediaDetails(input),
+	});
 }
 
 export function invalidateAfterProviderMediaChange(
 	queryClient: QueryClient,
-	input: { provider: Provider; anilistId: AniListId },
+	input: { provider: Provider; source?: SourceIdentity; anilistId?: AniListId },
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.providerMediaStatusItem(input.provider, input.anilistId),
+		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input.anilistId),
+		queryKey: queryKeys.mappingInspectionItem(input.provider, input),
 	});
 }
 
@@ -75,5 +97,5 @@ export function resetAfterProviderConnectionChange(
 	queryClient.removeQueries({
 		queryKey: queryKeys.providerRoot(provider),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 }

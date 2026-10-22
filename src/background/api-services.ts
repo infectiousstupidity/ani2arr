@@ -1,21 +1,28 @@
 /** Background-owned singleton services used by the Ani2arr RPC implementation. */
 // src/background/api-services.ts
 
-import { anilistMediaCache, AniListMediaService } from "@/anilist/media.service";
+import {
+	anilistMediaCache,
+	AniListMediaService,
+} from "@/anilist/media.service";
 import { AniListMetadataStore } from "@/anilist/metadata.store";
-import { clearAutoResults } from "@/mapping/auto.store";
+import {
+	clearAutoResults,
+	getSeerrAutoResult,
+	setSeerrAutoResult,
+} from "@/mapping/auto.store";
 import { clearManualFacts } from "@/mapping/manual.store";
-import { clearManualSeerrTargets } from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
-import {
-	clearUpstreamMappings,
-	refreshUpstreamMappings,
-} from "@/mapping/upstream.store";
+import { createSeerrAutoResolver } from "@/mapping/resolve/seerr-auto-resolver";
+import { clearUpstreamMappings } from "@/mapping/upstream.store";
+import { MyAnimeListMediaService } from "@/myanimelist/media.service";
+import { metadataHintFromMyAnimeListMetadata } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
 import { SeerrClient } from "@/providers/seerr/client";
+import { getSeerrXsrfToken } from "@/providers/seerr/csrf-token";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
@@ -27,24 +34,24 @@ import {
 	getExtensionOptionsSnapshot,
 	resetAllSettingsSnapshot,
 } from "@/settings/store";
+import { removeSeerrCsrfCookiePermission } from "@/settings/provider-permissions";
 import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
 } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
 import {
-	logError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
-import {
-	bumpMappingsRevision as bumpMappingsRevisionSignal,
+	bumpMappingsRevision,
 	bumpProviderLibraryRevision,
 	resetAllRevisions,
-} from "@/shared/sync/revisions";
-import { logger } from "@/shared/utils/logger";
-import { requireProviderCredentials } from "./provider-config";
+} from "@/rpc/revision-signals";
+import { fetchProviderCandidates } from "./provider-candidate-search";
+import {
+	requireProviderCredentials,
+	requireSeerrConnection,
+} from "./provider-config";
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 15 * 1000;
 
@@ -83,36 +90,77 @@ export const radarrClient = new RadarrClient({
 });
 export const seerrClient = new SeerrClient({
 	hasUrlPermission: createHasUrlPermission("seerr"),
+	getCsrfToken: getSeerrXsrfToken,
 });
 
-export const sonarrLibrary = new SonarrLibrary(sonarrClient);
-export const radarrLibrary = new RadarrLibrary(radarrClient);
+export const sonarrLibrary = new SonarrLibrary(
+	sonarrClient,
+	undefined,
+	async () => {
+		await bumpProviderLibraryRevision("sonarr");
+	},
+);
+export const radarrLibrary = new RadarrLibrary(
+	radarrClient,
+	undefined,
+	async () => {
+		await bumpProviderLibraryRevision("radarr");
+	},
+);
 
 export const anilistMediaService = new AniListMediaService({
 	media: anilistMediaCache,
 });
 export const anilistMetadataStore = new AniListMetadataStore();
+export const myAnimeListMediaService = new MyAnimeListMediaService();
 
-export const bumpMappingsRevision = async (): Promise<void> => {
-	await bumpMappingsRevisionSignal();
-};
-
-export const mappingService = new MappingService(
-	createAutomaticResolver({
-		anilistMedia: anilistMediaService,
+const searchProviderCandidates = (provider: Provider, title: string) =>
+	fetchProviderCandidates(provider, title, {
+		getCredentials: requireProviderCredentials,
 		sonarr: sonarrClient,
 		radarr: radarrClient,
-		getCredentials: requireProviderCredentials,
-	}),
-);
+	});
 
-export const bumpLibraryRevision = async (
-	provider: Provider,
-): Promise<void> => {
-	await bumpProviderLibraryRevision(provider);
-};
+const resolveAutomaticMapping = createAutomaticResolver({
+	anilistMedia: anilistMediaService,
+	loadMyAnimeListMetadata: async (malId) =>
+		metadataHintFromMyAnimeListMetadata(
+			await myAnimeListMediaService.getMetadata(malId),
+		),
+	searchProviderCandidates,
+});
 
-const refreshProviderLibrary = async (
+export const mappingService = new MappingService(async (...args) => {
+	const stored = await resolveAutomaticMapping(...args);
+	if (stored) await bumpMappingsRevision();
+	return stored;
+});
+
+export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
+	getEffectiveTarget: ({ identity, mediaType }) =>
+		mappingService.getSeerrTarget(identity, mediaType),
+	getAutoResult: getSeerrAutoResult,
+	setAutoResult: async (...args) => {
+		const stored = await setSeerrAutoResult(...args);
+		if (stored) await bumpMappingsRevision();
+		return stored;
+	},
+	loadAniListMedia: (anilistId) =>
+		anilistMediaService.fetchMediaWithRelations(anilistId),
+	loadMyAnimeListMetadata: async (malId) =>
+		metadataHintFromMyAnimeListMetadata(
+			await myAnimeListMediaService.getMetadata(malId),
+		),
+	searchMedia: async (query) =>
+		seerrClient.searchMedia(query, await requireSeerrConnection()),
+	getTvDetails: async (tmdbId) =>
+		seerrClient.getMediaDetails(
+			{ mediaType: "tv", tmdbId },
+			await requireSeerrConnection(),
+		),
+});
+
+export const refreshProviderLibrary = async (
 	provider: Provider,
 	options: ExtensionOptions,
 ): Promise<void> => {
@@ -146,48 +194,12 @@ export const scheduleLibraryRefresh = (provider: Provider): void => {
 	});
 };
 
-export const handleProviderConnectionChanged = async (
-	optionsHint?: ExtensionOptions,
-	input?: {
-		changedProviders?: Provider[];
-		disconnectedProviders?: Provider[];
-	},
-): Promise<void> => {
-	const options = optionsHint ?? (await getExtensionOptionsSnapshot());
-	logger.configure({ enabled: options.debugLogging || import.meta.env.DEV });
-
-	const affectedProviders = [
-		...new Set([
-			...(input?.changedProviders ?? []),
-			...(input?.disconnectedProviders ?? []),
-		]),
-	];
-	if (affectedProviders.length === 0) return;
-
-	await bumpMappingsRevision();
-
-	if (
-		hasConfiguredProviderCredentials(options, "sonarr") ||
-		hasConfiguredProviderCredentials(options, "radarr") ||
-		hasConfiguredSeerrCredentials(options)
-	) {
-		await refreshUpstreamMappings();
-	}
-
-	await Promise.all(
-		affectedProviders.map((provider) =>
-			refreshProviderLibrary(provider, options),
-		),
-	);
-	await Promise.all(
-		affectedProviders.map((provider) => bumpLibraryRevision(provider)),
-	);
-};
-
 export const clearPersistentCaches = async (): Promise<void> => {
 	await Promise.all([
 		anilistMetadataStore.clearLocalCache(),
 		clearUpstreamMappings(),
+		sonarrLibrary.clearSeriesSnapshotCache(),
+		radarrLibrary.clearMovieSnapshotCache(),
 	]);
 	await clearAllTtlCaches();
 	await resetAllRevisions();
@@ -238,9 +250,9 @@ export const resetExtensionState = async (): Promise<void> => {
 	const previousOptions = await getExtensionOptionsSnapshot();
 
 	await clearManualFacts();
-	await clearManualSeerrTargets();
-	await Promise.all([clearAutoResults("sonarr"), clearAutoResults("radarr")]);
+	await clearAutoResults();
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);
+	await removeSeerrCsrfCookiePermission();
 };

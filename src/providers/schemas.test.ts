@@ -1,21 +1,20 @@
 /** Focused tests for provider ID schema boundaries. */
-// src/providers/schemas.test.ts
 
-import { describe, expect, it } from "vitest";
 import * as v from "valibot";
+import { describe, expect, it } from "vitest";
 import {
 	ProviderQualityProfileIdSchema,
 	ProviderTagIdSchema,
-	RadarrMovieIdSchema,
-	SonarrSeriesIdSchema,
-	TmdbIdSchema,
 	parseTmdbId,
 	parseTmdbIdOrNull,
 	parseTvdbId,
 	parseTvdbIdOrNull,
-	TvdbIdSchema,
+	RadarrMovieIdSchema,
+	SonarrSeriesIdSchema,
 	type TmdbId,
+	TmdbIdSchema,
 	type TvdbId,
+	TvdbIdSchema,
 } from "./schemas";
 
 describe("provider ID helpers", () => {

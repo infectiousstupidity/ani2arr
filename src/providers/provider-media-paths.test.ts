@@ -1,6 +1,4 @@
 /** Tests for low-level provider path math helpers. */
-// src/providers/provider-media-paths.test.ts
-
 import { describe, expect, it } from "vitest";
 import {
 	extractPathLeaf,

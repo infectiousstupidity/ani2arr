@@ -23,19 +23,31 @@ describe("Seerr request helpers", () => {
 		});
 	});
 
-	it("builds TV request payloads with explicit seasons", () => {
+	it("builds TV request payloads with numeric seasons or all seasons", () => {
 		expect(
 			buildSeerrRequestPayload({
 				mediaType: "tv",
 				tmdbId: parseTmdbId(456),
 				tvdbId: parseTvdbId(789),
-				seasons: [1, 2],
+				seasons: [2, -1, 1.5, 1, 2, 0],
 			}),
 		).toEqual({
 			mediaType: "tv",
 			mediaId: parseTmdbId(456),
 			tvdbId: parseTvdbId(789),
-			seasons: [1, 2],
+			seasons: [0, 1, 2],
+		});
+
+		expect(
+			buildSeerrRequestPayload({
+				mediaType: "tv",
+				tmdbId: parseTmdbId(456),
+				seasons: "all",
+			}),
+		).toEqual({
+			mediaType: "tv",
+			mediaId: parseTmdbId(456),
+			seasons: "all",
 		});
 	});
 
@@ -54,6 +66,14 @@ describe("Seerr request helpers", () => {
 				seasons: [],
 			}),
 		).toThrow("TV Seerr requests require explicit seasons.");
+
+		expect(() =>
+			buildSeerrRequestPayload({
+				mediaType: "tv",
+				tmdbId: parseTmdbId(456),
+				seasons: [-1, 1.5],
+			}),
+		).toThrow("TV Seerr requests require explicit seasons.");
 	});
 
 	it("rejects missing TMDB IDs", () => {
@@ -66,20 +86,38 @@ describe("Seerr request helpers", () => {
 	});
 
 	it("reads Seerr media status from details responses", () => {
-		expect(readSeerrMediaStatus({})).toBe("not-requested");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 1 } })).toBe("unknown");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 2 } })).toBe("pending");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 3 } })).toBe(
-			"processing",
-		);
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 4 } })).toBe("partial");
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 5 } })).toBe(
-			"available",
-		);
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 6 } })).toBe(
-			"deleted-or-blocked",
-		);
-		expect(readSeerrMediaStatus({ mediaInfo: { status: 7 } })).toBe("deleted");
+		expect(readSeerrMediaStatus({})).toEqual({
+			target: "not-requested",
+			overall: "not-requested",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 1 } })).toEqual({
+			target: "unknown",
+			overall: "unknown",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 2 } })).toEqual({
+			target: "pending",
+			overall: "pending",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 3 } })).toEqual({
+			target: "processing",
+			overall: "processing",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 4 } })).toEqual({
+			target: "partial",
+			overall: "partial",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 5 } })).toEqual({
+			target: "available",
+			overall: "available",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 6 } })).toEqual({
+			target: "deleted-or-blocked",
+			overall: "deleted-or-blocked",
+		});
+		expect(readSeerrMediaStatus({ mediaInfo: { status: 7 } })).toEqual({
+			target: "deleted",
+			overall: "deleted",
+		});
 	});
 
 	it("reads TV season status when all target seasons are available", () => {
@@ -96,7 +134,7 @@ describe("Seerr request helpers", () => {
 				},
 				{ mediaType: "tv", seasons: [1, 2] },
 			),
-		).toBe("available");
+		).toEqual({ target: "available", overall: "partial" });
 	});
 
 	it("lets top-level available win for explicit TV season targets", () => {
@@ -115,10 +153,10 @@ describe("Seerr request helpers", () => {
 				},
 				{ mediaType: "tv", seasons: [1] },
 			),
-		).toBe("available");
+		).toEqual({ target: "available", overall: "available" });
 	});
 
-	it("falls back to top-level TV status when season rows are absent", () => {
+	it("keeps overall partial when the mapped season is missing", () => {
 		expect(
 			readSeerrMediaStatus(
 				{
@@ -134,10 +172,29 @@ describe("Seerr request helpers", () => {
 				},
 				{ mediaType: "tv", seasons: [1] },
 			),
-		).toBe("partial");
+		).toEqual({ target: "not-requested", overall: "partial" });
 	});
 
-	it("reads TV season status from active requests", () => {
+	it("derives overall partial when only another season row is available", () => {
+		expect(
+			readSeerrMediaStatus(
+				{
+					mediaInfo: {
+						status: 1,
+						seasons: [{ seasonNumber: 3, status: 5 }],
+					},
+					seasons: [
+						{ seasonNumber: 1 },
+						{ seasonNumber: 2 },
+						{ seasonNumber: 3 },
+					],
+				},
+				{ mediaType: "tv", seasons: [1] },
+			),
+		).toEqual({ target: "not-requested", overall: "partial" });
+	});
+
+	it("keeps overall pending separate when mapped season rows are absent", () => {
 		expect(
 			readSeerrMediaStatus(
 				{
@@ -153,45 +210,78 @@ describe("Seerr request helpers", () => {
 				},
 				{ mediaType: "tv", seasons: [1, 2] },
 			),
-		).toBe("pending");
+		).toEqual({ target: "not-requested", overall: "pending" });
 	});
 
-	it("keeps TV requestable when any target season is uncovered", () => {
+	it("treats one explicitly mapped partial season as available", () => {
 		expect(
 			readSeerrMediaStatus(
 				{
 					mediaInfo: {
 						status: 4,
-						seasons: [{ seasonNumber: 1, status: 5 }],
-						requests: [
-							{
-								status: 2,
-								seasons: [{ seasonNumber: 1 }],
-							},
-						],
+						seasons: [{ seasonNumber: 3, status: 4 }],
 					},
 				},
-				{ mediaType: "tv", seasons: [1, 2] },
+				{ mediaType: "tv", seasons: [3] },
 			),
-		).toBe("not-requested");
+		).toEqual({ target: "available", overall: "partial" });
 	});
 
-	it("keeps TV requestable when a target season is unknown in Seerr", () => {
+	it("keeps a multi-season target partial", () => {
 		expect(
 			readSeerrMediaStatus(
 				{
 					mediaInfo: {
 						status: 4,
 						seasons: [
-							{ seasonNumber: 1, status: 4 },
-							{ seasonNumber: 23, status: 1 },
+							{ seasonNumber: 1, status: 5 },
+							{ seasonNumber: 2, status: 4 },
 						],
 					},
 				},
-				{ mediaType: "tv", seasons: [23] },
+				{ mediaType: "tv", seasons: [1, 2] },
 			),
-		).toBe("not-requested");
+		).toEqual({ target: "partial", overall: "partial" });
 	});
+
+	it.each([
+		{
+			caseName: "one mapped season is missing",
+			seasons: [{ seasonNumber: 1, status: 5 }],
+			targetSeasons: [1, 2],
+		},
+		{
+			caseName: "the mapped season is unknown",
+			seasons: [
+				{ seasonNumber: 1, status: 4 },
+				{ seasonNumber: 23, status: 1 },
+			],
+			targetSeasons: [23],
+		},
+		{
+			caseName: "the mapped season was deleted",
+			seasons: [{ seasonNumber: 1, status: 7 }],
+			targetSeasons: [1],
+		},
+	])(
+		"keeps $caseName requestable while the overall title is partial",
+		({ seasons, targetSeasons }) => {
+			expect(
+				readSeerrMediaStatus(
+					{
+						mediaInfo: {
+							status: 4,
+							seasons,
+						},
+					},
+					{
+						mediaType: "tv",
+						seasons: targetSeasons,
+					},
+				),
+			).toEqual({ target: "not-requested", overall: "partial" });
+		},
+	);
 
 	it("blocks TV requests when a target season is blocked or deleted in older Seerr responses", () => {
 		expect(
@@ -204,21 +294,7 @@ describe("Seerr request helpers", () => {
 				},
 				{ mediaType: "tv", seasons: [1] },
 			),
-		).toBe("deleted-or-blocked");
-	});
-
-	it("allows TV requests again when a target season is deleted in current Seerr responses", () => {
-		expect(
-			readSeerrMediaStatus(
-				{
-					mediaInfo: {
-						status: 4,
-						seasons: [{ seasonNumber: 1, status: 7 }],
-					},
-				},
-				{ mediaType: "tv", seasons: [1] },
-			),
-		).toBe("not-requested");
+		).toEqual({ target: "deleted-or-blocked", overall: "partial" });
 	});
 
 	it("maps Seerr search responses to small DTOs", () => {
@@ -229,6 +305,7 @@ describe("Seerr request helpers", () => {
 						id: 123,
 						mediaType: "movie",
 						title: "Movie",
+						originalTitle: " Original Movie ",
 						releaseDate: "2024-01-01",
 						posterPath: "/poster.jpg",
 						overview: "Overview",
@@ -237,6 +314,7 @@ describe("Seerr request helpers", () => {
 						id: 456,
 						mediaType: "tv",
 						name: "Show",
+						originalName: "Original Show",
 						firstAirDate: "2023-05-01",
 					},
 					{
@@ -251,6 +329,7 @@ describe("Seerr request helpers", () => {
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 				title: "Movie",
+				alternateTitles: ["Original Movie"],
 				year: 2024,
 				posterPath: "/poster.jpg",
 				overview: "Overview",
@@ -259,6 +338,7 @@ describe("Seerr request helpers", () => {
 				mediaType: "tv",
 				tmdbId: parseTmdbId(456),
 				title: "Show",
+				alternateTitles: ["Original Show"],
 				year: 2023,
 			},
 		]);
@@ -269,12 +349,18 @@ describe("Seerr request helpers", () => {
 			readSeerrMediaDetails(
 				{
 					id: 456,
-					tvdbId: 789,
+					externalIds: { tvdbId: 789 },
 					name: "Show",
+					originalName: "Original Show",
 					firstAirDate: "2020-01-01",
 					mediaInfo: { status: 4 },
 					seasons: [
-						{ seasonNumber: 1, name: "Season 1", episodeCount: 12, status: 5 },
+						{
+							seasonNumber: 1,
+							name: "Season 1",
+							episodeCount: 12,
+							status: 5,
+						},
 						{ seasonNumber: 2, status: 1 },
 						{ seasonNumber: 3, status: 7 },
 						{ seasonNumber: 4, status: 6 },
@@ -287,6 +373,7 @@ describe("Seerr request helpers", () => {
 			tmdbId: parseTmdbId(456),
 			tvdbId: parseTvdbId(789),
 			title: "Show",
+			alternateTitles: ["Original Show"],
 			year: 2020,
 			status: "partial",
 			seasons: [
@@ -333,8 +420,16 @@ describe("Seerr request helpers", () => {
 						],
 					},
 					seasons: [
-						{ seasonNumber: 0, name: "Specials", episodeCount: 39 },
-						{ seasonNumber: 1, name: "East Blue", episodeCount: 61 },
+						{
+							seasonNumber: 0,
+							name: "Specials",
+							episodeCount: 39,
+						},
+						{
+							seasonNumber: 1,
+							name: "East Blue",
+							episodeCount: 61,
+						},
 						{
 							seasonNumber: 2,
 							name: "Whiskey Peak & Little Garden",
@@ -392,8 +487,17 @@ it("ignores zero-episode Seerr seasons", () => {
 				firstAirDate: "2026-01-01",
 				mediaInfo: { status: 4 },
 				seasons: [
-					{ seasonNumber: 0, name: "0", episodeCount: 0 },
-					{ seasonNumber: 1, name: "1", episodeCount: 13, status: 4 },
+					{
+						seasonNumber: 0,
+						name: "0",
+						episodeCount: 0,
+					},
+					{
+						seasonNumber: 1,
+						name: "1",
+						episodeCount: 13,
+						status: 4,
+					},
 				],
 			},
 			"tv",

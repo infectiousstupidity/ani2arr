@@ -1,9 +1,9 @@
-/** Tests for Seerr modal season selection and search filtering helpers. */
-// src/features/media-modal/seerr/seerr-selection.test.ts
-
 import { describe, expect, it } from "vitest";
 import { parseTmdbId } from "@/providers/schemas";
-import type { SeerrSearchResult, SeerrSeasonStatus } from "@/providers/seerr/types";
+import type {
+	SeerrSearchResult,
+	SeerrSeasonStatus,
+} from "@/providers/seerr/types";
 import {
 	filterSeerrSearchResults,
 	getDefaultSelectedSeasons,
@@ -25,40 +25,29 @@ function season(
 }
 
 describe("Seerr season selection helpers", () => {
-	it("defaults One Piece mapped seasons to requestable mapped seasons only", () => {
-		const mappedSeasons = Array.from({ length: 22 }, (_value, index) => index + 1);
-		const seasons = [
-			...Array.from({ length: 10 }, (_value, index) =>
-				season(index + 1, "partial"),
-			),
-			...Array.from({ length: 13 }, (_value, index) =>
-				season(index + 11, "unknown"),
-			),
-		];
-
-		expect(getDefaultSelectedSeasons({ mappedSeasons, seasons })).toEqual(
-			Array.from({ length: 12 }, (_value, index) => index + 11),
-		);
-	});
-
-	it("selects all requestable seasons only", () => {
-		expect(
-			getRequestableSeasonNumbers([
-				season(1, "available"),
-				season(2, "unknown"),
-				season(3, "deleted"),
-				season(4, "deleted-or-blocked"),
-			]),
-		).toEqual([2, 3]);
-	});
-
-	it("leaves no default selection when no mapped seasons are requestable", () => {
+	it("defaults to selectable mapped seasons only", () => {
 		expect(
 			getDefaultSelectedSeasons({
 				mappedSeasons: [1, 2],
-				seasons: [season(1, "available"), season(2, "pending")],
+				seasons: [
+					season(1, "partial"),
+					season(2, "unknown"),
+					season(3, "unknown"),
+				],
 			}),
-		).toEqual([]);
+		).toEqual([1, 2]);
+	});
+
+	it("selects all selectable seasons only", () => {
+		expect(
+			getRequestableSeasonNumbers([
+				season(0, "unknown"),
+				season(1, "partial"),
+				season(2, "unknown"),
+				season(2, "deleted"),
+				season(3, "available"),
+			]),
+		).toEqual([0, 1, 2]);
 	});
 
 	it("summarizes availability counts from Seerr season rows", () => {
@@ -124,10 +113,8 @@ describe("Seerr poster helpers", () => {
 		);
 	});
 
-	it("ignores empty and non-relative poster paths", () => {
+	it("ignores missing and external poster paths", () => {
 		expect(getTmdbPosterUrl(null)).toBeNull();
-		expect(getTmdbPosterUrl("")).toBeNull();
-		expect(getTmdbPosterUrl("poster.jpg")).toBeNull();
 		expect(getTmdbPosterUrl("https://image.example/poster.jpg")).toBeNull();
 	});
 });

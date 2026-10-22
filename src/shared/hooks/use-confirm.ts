@@ -14,5 +14,3 @@ export function useConfirm() {
 
 	return context.confirm;
 }
-
-export default useConfirm;

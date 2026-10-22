@@ -3,8 +3,29 @@
 
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 
+export type SeerrAuth =
+	| {
+			mode: "session";
+	  }
+	| {
+			mode: "apiKey";
+			apiKey: string;
+	  };
+
+export interface SeerrAccountSummary {
+	id: number;
+	displayName: string;
+	avatar?: string;
+}
+
+export interface SeerrConnection {
+	url: string;
+	auth: SeerrAuth;
+	account?: SeerrAccountSummary;
+}
+
 export type SeerrMediaType = "movie" | "tv";
-export type SeerrTargetSource = "manual" | "anibridge";
+export type SeerrTargetSource = "manual" | "anibridge" | "automatic";
 
 export type SeerrTvSeasons = "all" | number[];
 
@@ -38,10 +59,16 @@ export type SeerrMediaStatus =
 	| "deleted"
 	| "unknown";
 
+export type SeerrStatusSummary = {
+	target: SeerrMediaStatus;
+	overall: SeerrMediaStatus;
+};
+
 export interface SeerrSearchResult {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
 	title: string;
+	alternateTitles?: string[];
 	year?: number;
 	posterPath?: string | null;
 	overview?: string | null;
@@ -60,6 +87,7 @@ export type SeerrMediaDetails = {
 	tmdbId: TmdbId;
 	tvdbId?: TvdbId;
 	title: string;
+	alternateTitles?: string[];
 	year?: number;
 	posterPath?: string | null;
 	backdropPath?: string | null;
@@ -67,6 +95,11 @@ export type SeerrMediaDetails = {
 	status: SeerrMediaStatus;
 	seasons?: SeerrSeasonStatus[];
 };
+
+export interface SeerrPublicSettings {
+	partialRequestsEnabled: boolean;
+	enableSpecialEpisodes: boolean;
+}
 
 export interface SeerrMediaRequest {
 	id: number;

@@ -1,6 +1,7 @@
 /** Radarr provider-domain library snapshot cache and TMDB lookup helpers. */
 // src/providers/radarr/library.ts
 
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import {
 	createTtlCache,
 	type CacheHit,
@@ -11,13 +12,13 @@ import {
 	logError,
 	normalizeError,
 } from "@/shared/errors/error-utils";
+import type { TmdbId } from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
 import type {
 	RadarrLookupMovie,
 	RadarrMovie,
 	RadarrMovieSnapshot,
-	TmdbId,
 } from "./types";
 
 const CACHE_KEY = "movies";
@@ -41,18 +42,32 @@ export interface RadarrMovieLibraryStatus {
 }
 
 export class RadarrLibrary {
-	private memoryCache: CacheHit<RadarrMovieSnapshot[]> | null = null;
-	private refreshPromise: Promise<RadarrMovieSnapshot[]> | null = null;
+	private readonly memoryCache = new Map<
+		string,
+		CacheHit<RadarrMovieSnapshot[]>
+	>();
+	private readonly refreshPromises = new Map<
+		string,
+		Promise<RadarrMovieSnapshot[]>
+	>();
+	private cacheGeneration = 0;
+	private clearPromise: Promise<void> | null = null;
 
 	public constructor(
 		private readonly client: RadarrClient,
 		private readonly cache: TtlCache<RadarrMovieSnapshot[]> = defaultCache,
+		private readonly onSnapshotsChanged?: () => Promise<void> | void,
 	) {}
 
 	public async getMovieSnapshots(
 		credentials: ProviderCredentials,
 	): Promise<RadarrMovieSnapshot[]> {
-		const memoryCache = this.memoryCache;
+		if (this.clearPromise) await this.clearPromise;
+
+		const scope = getProviderConnectionScope(credentials);
+		const cacheKey = `${CACHE_KEY}:${scope}`;
+		const generation = this.cacheGeneration;
+		const memoryCache = this.memoryCache.get(scope);
 		const now = Date.now();
 
 		if (memoryCache && now < memoryCache.expiresAt) {
@@ -64,11 +79,14 @@ export class RadarrLibrary {
 			return memoryCache.value;
 		}
 
-		this.memoryCache = null;
-		const cached = await this.cache.read(CACHE_KEY);
+		this.memoryCache.delete(scope);
+		const cached = await this.cache.read(cacheKey);
+		if (generation !== this.cacheGeneration) {
+			return this.getMovieSnapshots(credentials);
+		}
 		if (!cached) return this.refreshMovieSnapshots(credentials);
 
-		this.memoryCache = cached;
+		this.memoryCache.set(scope, cached);
 		if (cached.stale) {
 			// Stale cache is good enough for status; refresh quietly for the next read.
 			void this.refreshMovieSnapshots(credentials).catch(() => {});
@@ -80,10 +98,16 @@ export class RadarrLibrary {
 	public async refreshMovieSnapshots(
 		credentials: ProviderCredentials,
 	): Promise<RadarrMovieSnapshot[]> {
-		if (this.refreshPromise) return this.refreshPromise;
+		if (this.clearPromise) await this.clearPromise;
 
-		this.refreshPromise = (async () => {
-			const cached = await this.cache.read(CACHE_KEY);
+		const scope = getProviderConnectionScope(credentials);
+		const existingRefresh = this.refreshPromises.get(scope);
+		if (existingRefresh) return existingRefresh;
+
+		const cacheKey = `${CACHE_KEY}:${scope}`;
+		const generation = this.cacheGeneration;
+		const refreshPromise = (async () => {
+			const cached = await this.cache.read(cacheKey);
 			const fallback = cached?.value ?? [];
 
 			try {
@@ -95,8 +119,21 @@ export class RadarrLibrary {
 					)
 					.map((movie) => toRadarrMovieSnapshot(movie));
 
-				await this.cache.write(CACHE_KEY, snapshots, CACHE_TTL.normal);
-				this.setMemoryCache(snapshots, CACHE_TTL.normal);
+				if (generation !== this.cacheGeneration) return snapshots;
+				await this.cache.write(cacheKey, snapshots, CACHE_TTL.normal);
+				if (generation !== this.cacheGeneration) return snapshots;
+
+				this.setMemoryCache(scope, snapshots, CACHE_TTL.normal);
+				if (JSON.stringify(fallback) !== JSON.stringify(snapshots)) {
+					try {
+						await this.onSnapshotsChanged?.();
+					} catch (error) {
+						logError(
+							normalizeError(error),
+							"RadarrLibrary:snapshotChanged",
+						);
+					}
+				}
 
 				return snapshots;
 			} catch (error) {
@@ -106,15 +143,24 @@ export class RadarrLibrary {
 					...CACHE_TTL.error,
 					meta: { lastErrorCode: normalized.code },
 				};
-				await this.cache.write(CACHE_KEY, fallback, ttl);
-				this.setMemoryCache(fallback, ttl);
+				if (generation === this.cacheGeneration) {
+					await this.cache.write(cacheKey, fallback, ttl);
+					if (generation === this.cacheGeneration) {
+						this.setMemoryCache(scope, fallback, ttl);
+					}
+				}
 				return fallback;
-			} finally {
-				this.refreshPromise = null;
 			}
 		})();
+		this.refreshPromises.set(scope, refreshPromise);
 
-		return this.refreshPromise;
+		try {
+			return await refreshPromise;
+		} finally {
+			if (this.refreshPromises.get(scope) === refreshPromise) {
+				this.refreshPromises.delete(scope);
+			}
+		}
 	}
 
 	public async getMovieLibraryStatusByTmdbId(input: {
@@ -147,8 +193,8 @@ export class RadarrLibrary {
 			if (liveMovie) {
 				const snapshot = toRadarrMovieSnapshot(liveMovie);
 				if (!existsInCache) {
-					await this.upsertMovieSnapshot(snapshot);
-					await input.onCacheChanged?.();
+					const changed = await this.upsertMovieSnapshot(snapshot, credentials);
+					if (changed) await input.onCacheChanged?.();
 				}
 
 				return {
@@ -176,8 +222,8 @@ export class RadarrLibrary {
 		}
 
 		if (existsInCache) {
-			await this.removeMovieSnapshot(tmdbId);
-			await input.onCacheChanged?.();
+			const changed = await this.removeMovieSnapshot(tmdbId, credentials);
+			if (changed) await input.onCacheChanged?.();
 		}
 
 		return {
@@ -190,16 +236,30 @@ export class RadarrLibrary {
 
 	public async upsertMovieSnapshot(
 		snapshot: RadarrMovieSnapshot,
-	): Promise<void> {
-		const memoryCache = this.memoryCache;
+		credentials: ProviderCredentials,
+	): Promise<boolean> {
+		if (this.clearPromise) await this.clearPromise;
+
+		const scope = getProviderConnectionScope(credentials);
+		const cacheKey = `${CACHE_KEY}:${scope}`;
+		const generation = this.cacheGeneration;
+		const memoryCache = this.memoryCache.get(scope);
 		const cached =
 			memoryCache && Date.now() < memoryCache.expiresAt
 				? memoryCache
-				: await this.cache.read(CACHE_KEY);
+				: await this.cache.read(cacheKey);
+		if (generation !== this.cacheGeneration) return false;
 		const current = cached?.value ?? [];
 		const existingIndex = current.findIndex(
 			(item) => item.tmdbId === snapshot.tmdbId,
 		);
+		const existingSnapshot = current[existingIndex];
+		if (
+			existingSnapshot !== undefined &&
+			JSON.stringify(existingSnapshot) === JSON.stringify(snapshot)
+		) {
+			return false;
+		}
 		const next =
 			existingIndex === -1
 				? [...current, snapshot]
@@ -209,42 +269,68 @@ export class RadarrLibrary {
 						...current.slice(existingIndex + 1),
 					];
 
-		await this.cache.write(CACHE_KEY, next, CACHE_TTL.normal);
-		this.setMemoryCache(next, CACHE_TTL.normal);
+		await this.cache.write(cacheKey, next, CACHE_TTL.normal);
+		if (generation !== this.cacheGeneration) return false;
+		this.setMemoryCache(scope, next, CACHE_TTL.normal);
+		return true;
 	}
 
-	public async removeMovieSnapshot(tmdbId: TmdbId): Promise<void> {
-		const memoryCache = this.memoryCache;
+	public async removeMovieSnapshot(
+		tmdbId: TmdbId,
+		credentials: ProviderCredentials,
+	): Promise<boolean> {
+		if (this.clearPromise) await this.clearPromise;
+
+		const scope = getProviderConnectionScope(credentials);
+		const cacheKey = `${CACHE_KEY}:${scope}`;
+		const generation = this.cacheGeneration;
+		const memoryCache = this.memoryCache.get(scope);
 		const cached =
 			memoryCache && Date.now() < memoryCache.expiresAt
 				? memoryCache
-				: await this.cache.read(CACHE_KEY);
-		if (!cached) return;
+				: await this.cache.read(cacheKey);
+		if (generation !== this.cacheGeneration) return false;
+		if (!cached) return false;
 
 		const next = cached.value.filter((movie) => movie.tmdbId !== tmdbId);
-		if (next.length === cached.value.length) return;
+		if (next.length === cached.value.length) return false;
 
-		await this.cache.write(CACHE_KEY, next, CACHE_TTL.normal);
-		this.setMemoryCache(next, CACHE_TTL.normal);
+		await this.cache.write(cacheKey, next, CACHE_TTL.normal);
+		if (generation !== this.cacheGeneration) return false;
+		this.setMemoryCache(scope, next, CACHE_TTL.normal);
+		return true;
 	}
 
 	public async clearMovieSnapshotCache(): Promise<void> {
-		await this.cache.remove(CACHE_KEY);
-		this.memoryCache = null;
+		if (this.clearPromise) return this.clearPromise;
+
+		this.cacheGeneration += 1;
+		this.memoryCache.clear();
+		this.refreshPromises.clear();
+
+		const clearPromise = this.cache.clear().finally(() => {
+			this.memoryCache.clear();
+			if (this.clearPromise === clearPromise) {
+				this.clearPromise = null;
+			}
+		});
+		this.clearPromise = clearPromise;
+		return clearPromise;
 	}
 
 	private setMemoryCache(
+		scope: string,
 		value: RadarrMovieSnapshot[],
 		options: CacheWriteOptions,
 	): void {
 		const now = Date.now();
-		this.memoryCache = {
+		this.memoryCache.set(scope, {
 			value,
 			stale: false,
 			staleAt: now + options.staleMs,
 			expiresAt: now + (options.hardMs ?? options.staleMs * 4),
 			...(options.meta ? { meta: options.meta } : {}),
-		};
+		});
 	}
 }
 
@@ -277,11 +363,4 @@ export function toRadarrMovieSnapshot(movie: RadarrMovie): RadarrMovieSnapshot {
 	if (movie.status !== undefined) snapshot.status = movie.status;
 
 	return snapshot;
-}
-
-export function findRadarrMovieInLibrary<TMovie extends { tmdbId: number }>(
-	library: readonly TMovie[],
-	tmdbId: number,
-): TMovie | null {
-	return library.find((movie) => Number(movie.tmdbId) === tmdbId) ?? null;
 }

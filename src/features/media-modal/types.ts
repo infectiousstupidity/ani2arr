@@ -4,6 +4,7 @@
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
+import type { SourceRpcInput } from "@/rpc/types";
 
 export type MediaModalView = "setup" | "mapping";
 export type MediaModalOpenSource = "content" | "options-page";
@@ -42,16 +43,16 @@ export type MediaModalTargetSummary = {
 };
 
 type MediaModalStateBase = {
-	anilistId: AniListId;
 	openSource: MediaModalOpenSource;
 	metadataHint?: MediaModalMetadataHint | null;
 };
 
-type ProviderMediaModalStateBase = MediaModalStateBase & {
-	kind: "provider";
-	provider: Provider;
-	initialView?: MediaModalView;
-};
+type ProviderMediaModalStateBase = MediaModalStateBase &
+	SourceRpcInput & {
+		kind: "provider";
+		provider: Provider;
+		initialView?: MediaModalView;
+	};
 
 export type SonarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "sonarr";
@@ -61,15 +62,13 @@ export type RadarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "radarr";
 };
 
-export type SeerrMediaModalState = MediaModalStateBase & {
-	kind: "seerr";
-};
+export type SeerrMediaModalState = MediaModalStateBase &
+	SourceRpcInput & {
+		kind: "seerr";
+	};
 
 export type MediaModalState =
-	| SonarrMediaModalState
-	| RadarrMediaModalState
-	| SeerrMediaModalState
-	| null;
+	SonarrMediaModalState | RadarrMediaModalState | SeerrMediaModalState | null;
 
 export type MediaModalOpenState = Exclude<MediaModalState, null>;
 
