@@ -251,6 +251,21 @@ describe("manual mapping store", () => {
 		]);
 	});
 
+	it("skips writes when migrating and consolidating unchanged manual data", async () => {
+		await setManualMapping("sonarr", aid(1), { providerId: tvdb(10) });
+		const setSpy = vi.spyOn(browser.storage.local, "set");
+		const localRemoveSpy = vi.spyOn(browser.storage.local, "remove");
+		const syncRemoveSpy = vi.spyOn(browser.storage.sync, "remove");
+
+		await migrateManualStore();
+		await migrateManualStore();
+		await consolidateManualAliases(new Map());
+
+		expect(setSpy).not.toHaveBeenCalled();
+		expect(localRemoveSpy).not.toHaveBeenCalled();
+		expect(syncRemoveSpy).not.toHaveBeenCalled();
+	});
+
 	it("migrates v1 mirrors by newest value while any ignore wins", async () => {
 		await browser.storage.local.remove(MANUAL_STORAGE_KEY);
 		await browser.storage.local.set({

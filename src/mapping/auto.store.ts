@@ -67,7 +67,7 @@ export async function getAutomaticLayerRecord(
 	anilistId?: AniListId,
 ): Promise<AutomaticMappingRecord | null> {
 	const source = normalizeSourceIdentity(identity);
-	const store = await readAutomaticStore();
+	const { store } = await readAutomaticStore();
 	const canonical =
 		store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
 	const alias = store.records[sourceIdentityKey(source)];
@@ -81,7 +81,7 @@ export async function getAutomaticLayerRecord(
 }
 
 export async function listAniListAutomaticLayers(): Promise<AutomaticRecord[]> {
-	const store = await readAutomaticStore();
+	const { store } = await readAutomaticStore();
 	const now = Date.now();
 	return Object.entries(store.records).flatMap(([rawKey, record]) => {
 		const identity = parseSourceIdentityKey(rawKey);
@@ -254,8 +254,13 @@ async function updateAutomaticStore(
 	update: (store: MappingStore<AutomaticMappingRecord>) => void,
 ): Promise<void> {
 	await enqueueAutomaticStoreUpdate(async () => {
-		const store = await readAutomaticStore();
+		const { store, hasLegacyData } = await readAutomaticStore();
+		const before = JSON.stringify(store);
 		update(store);
+		for (const [key, record] of Object.entries(store.records)) {
+			if (isEmptyRecord(record)) delete store.records[key];
+		}
+		if (!hasLegacyData && JSON.stringify(store) === before) return;
 		await persistAutomaticStore(store);
 	});
 }
@@ -265,10 +270,16 @@ async function updateAutomaticStoreGuarded(
 	update: (store: MappingStore<AutomaticMappingRecord>) => void,
 ): Promise<boolean> {
 	return enqueueAutomaticStoreUpdate(async () => {
-		const store = await readAutomaticStore();
+		const { store, hasLegacyData } = await readAutomaticStore();
+		const before = JSON.stringify(store);
 		if (token !== automaticWriteToken) return false;
 		update(store);
-		await persistAutomaticStore(store);
+		for (const [key, record] of Object.entries(store.records)) {
+			if (isEmptyRecord(record)) delete store.records[key];
+		}
+		if (hasLegacyData || JSON.stringify(store) !== before) {
+			await persistAutomaticStore(store);
+		}
 		return true;
 	});
 }
@@ -287,21 +298,24 @@ async function enqueueAutomaticStoreUpdate<Result>(
 async function persistAutomaticStore(
 	store: MappingStore<AutomaticMappingRecord>,
 ): Promise<void> {
-	for (const [key, record] of Object.entries(store.records)) {
-		if (isEmptyRecord(record)) delete store.records[key];
-	}
 	await autoMappings.setValue(store);
 	await browser.storage.local.remove(LEGACY_SEERR_AUTO_KEY);
 }
 
-async function readAutomaticStore(): Promise<
-	MappingStore<AutomaticMappingRecord>
-> {
+async function readAutomaticStore(): Promise<{
+	store: MappingStore<AutomaticMappingRecord>;
+	hasLegacyData: boolean;
+}> {
 	const stored = await browser.storage.local.get([
 		AUTO_KEY,
 		LEGACY_SEERR_AUTO_KEY,
 	]);
-	return decodeAutomaticStore(stored[AUTO_KEY], stored[LEGACY_SEERR_AUTO_KEY]);
+	return {
+		store: decodeAutomaticStore(stored[AUTO_KEY], stored[LEGACY_SEERR_AUTO_KEY]),
+		hasLegacyData:
+			!isMappingStore(stored[AUTO_KEY]) ||
+			stored[LEGACY_SEERR_AUTO_KEY] !== undefined,
+	};
 }
 
 /** LEGACY: direct-upgrade decoder for released Arr and pre-cutover Seerr caches. */

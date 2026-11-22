@@ -9,6 +9,7 @@ import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { createMappingRecord } from "./mapping-record";
+import { migrateMappingStorage } from "./migrate";
 import {
 	clearUpstreamMappings,
 	getSourceAliasesByAniListId,
@@ -113,6 +114,47 @@ describe("version-1 upstream lookups", () => {
 	const source = { source: "mal", id: mal(10) } as const;
 
 	afterEach(clearUpstreamMappings);
+
+	it("skips writes when migrating a version-1 upstream snapshot", async () => {
+		await seedLayerSnapshot({ "anilist:1": canonical });
+		const setSpy = vi.spyOn(browser.storage.local, "set");
+
+		await migrateUpstreamStore();
+
+		expect(setSpy).not.toHaveBeenCalled();
+	});
+
+	it("leaves all current mapping stores untouched on repeated migration", async () => {
+		await seedLayerSnapshot({
+			"anilist:1": canonical,
+			"mal:10": { ...direct, linkedAniListId: aid(1) },
+		});
+		await browser.storage.local.set({
+			"mapping:manual": {
+				version: 1,
+				records: { "anilist:1": { facts: { tvdbShow: tvdb(10) } } },
+			},
+			"mapping:auto": {
+				version: 1,
+				records: {
+					"anilist:1": {
+						facts: { tmdbMovie: tmdb(10) },
+						slotMeta: { tmdbMovie: { expiresAt: Date.now() + 10_000 } },
+					},
+				},
+			},
+		});
+		const setSpy = vi.spyOn(browser.storage.local, "set");
+		const localRemoveSpy = vi.spyOn(browser.storage.local, "remove");
+		const syncRemoveSpy = vi.spyOn(browser.storage.sync, "remove");
+
+		await migrateMappingStorage();
+		await migrateMappingStorage();
+
+		expect(setSpy).not.toHaveBeenCalled();
+		expect(localRemoveSpy).not.toHaveBeenCalled();
+		expect(syncRemoveSpy).not.toHaveBeenCalled();
+	});
 
 	it("returns the direct MAL and canonical AniList layers", async () => {
 		await seedLayerSnapshot(records);

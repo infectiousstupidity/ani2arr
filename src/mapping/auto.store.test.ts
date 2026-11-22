@@ -283,6 +283,20 @@ describe("auto mapping store", () => {
 		).resolves.toMatchObject({ facts: { tmdbMovie: tmdb(300) } });
 	});
 
+	it("skips writes when migrating unchanged automatic data", async () => {
+		const identity = { source: "anilist", id: aid(1) } as const;
+		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, {
+			kind: "mapped",
+			providerId: tmdb(10),
+		});
+		const setSpy = vi.spyOn(browser.storage.local, "set");
+
+		await migrateAutomaticStore();
+		await migrateAutomaticStore();
+
+		expect(setSpy).not.toHaveBeenCalled();
+	});
+
 	it("drops legacy provider-bucket ambiguity without recording an attempt", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: {

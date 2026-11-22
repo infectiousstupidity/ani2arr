@@ -138,7 +138,10 @@ export async function migrateUpstreamStore(): Promise<void> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const snapshot = await readSnapshot();
+			const { [UPSTREAM_KEY]: raw } =
+				await browser.storage.local.get(UPSTREAM_KEY);
+			if (isObject(raw) && raw.version === 1) return;
+			const snapshot = decodeSnapshot(raw);
 			if (snapshot) await upstreamMappings.setValue(snapshot);
 		});
 	writes = next.then(

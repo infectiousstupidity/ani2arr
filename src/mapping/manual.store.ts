@@ -61,7 +61,7 @@ export async function getManualLayerRecord(
 	anilistId?: AniListId,
 ): Promise<ManualMappingRecord | null> {
 	const source = normalizeSourceIdentity(identity);
-	const store = await readManualStore();
+	const { store } = await readManualStoreState();
 	const canonical =
 		store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
 	const alias = store.records[sourceIdentityKey(source)];
@@ -73,7 +73,7 @@ export async function getManualLayerRecord(
 }
 
 export async function listAniListManualLayers(): Promise<ManualRecord[]> {
-	const store = await readManualStore();
+	const { store } = await readManualStoreState();
 	return Object.entries(store.records).flatMap(([rawKey, record]) => {
 		const identity = parseSourceIdentityKey(rawKey);
 		return identity?.source === "anilist"
@@ -327,8 +327,10 @@ async function updateManualStore(
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const store = await readManualStore();
+			const { store, hasLegacyData } = await readManualStoreState();
+			const before = JSON.stringify(store);
 			update(store);
+			if (!hasLegacyData && JSON.stringify(store) === before) return;
 			await manualMappings.setValue(store);
 			await removeLegacyManualKeys();
 		});
@@ -339,7 +341,10 @@ async function updateManualStore(
 	await next;
 }
 
-async function readManualStore(): Promise<MappingStore<ManualMappingRecord>> {
+async function readManualStoreState(): Promise<{
+	store: MappingStore<ManualMappingRecord>;
+	hasLegacyData: boolean;
+}> {
 	const [local, sync] = await Promise.all([
 		browser.storage.local.get([
 			MANUAL_KEY,
@@ -349,7 +354,16 @@ async function readManualStore(): Promise<MappingStore<ManualMappingRecord>> {
 		]),
 		browser.storage.sync.get([V1_SYNC_OVERRIDE_KEY, V1_SYNC_IGNORE_KEY]),
 	]);
-	return decodeManualStore(local, sync);
+	return {
+		store: decodeManualStore(local, sync),
+		hasLegacyData:
+			!isMappingStore(local[MANUAL_KEY]) ||
+			local[LEGACY_SEERR_KEY] !== undefined ||
+			local[V1_LOCAL_OVERRIDE_KEY] !== undefined ||
+			local[V1_LOCAL_IGNORE_KEY] !== undefined ||
+			sync[V1_SYNC_OVERRIDE_KEY] !== undefined ||
+			sync[V1_SYNC_IGNORE_KEY] !== undefined,
+	};
 }
 
 /** LEGACY: direct-upgrade decoder for released v1/v2 and pre-cutover Seerr data. */
