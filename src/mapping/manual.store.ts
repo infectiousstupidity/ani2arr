@@ -417,7 +417,10 @@ function decodeLegacySeerrTargets(
 	for (const [rawKey, rawTarget] of Object.entries(value)) {
 		const key = legacySourceKey(rawKey);
 		if (!key || !isObject(rawTarget)) continue;
-		const normalized = normalizeLegacySeerrTarget(rawTarget as SeerrTarget);
+		const normalized =
+			rawTarget.tmdbSeasons === undefined || rawTarget.tmdbSeasons === null
+				? normalizeSeerrTarget(rawTarget)
+				: normalizeLegacySeerrTarget(rawTarget);
 		if (!normalized) continue;
 		const record = (records[key] ??= emptyRecord());
 		if (normalized.mediaType === "movie") {

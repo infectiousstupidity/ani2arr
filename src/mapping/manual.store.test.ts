@@ -335,6 +335,69 @@ describe("manual mapping store", () => {
 		).resolves.toEqual({});
 	});
 
+	it("migrates released Seerr TV seasons without promoting TVDB", async () => {
+		await browser.storage.local.remove(MANUAL_STORAGE_KEY);
+		await browser.storage.local.set({
+			"mapping:seerr-targets": {
+				1: { mediaType: "tv", tmdbId: 400, tvdbId: 500, seasons: [3, 1, 3] },
+			},
+		});
+
+		await migrateManualStore();
+
+		await expect(getManualLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tmdbShow: tmdb(400) },
+			scopes: { tmdbShow: { id: tmdb(400), seasons: [1, 3] } },
+		});
+		await expect(
+			browser.storage.local.get("mapping:seerr-targets"),
+		).resolves.toEqual({});
+	});
+
+	it("migrates released Seerr TV seasons without a TVDB ID", async () => {
+		await browser.storage.local.remove(MANUAL_STORAGE_KEY);
+		await browser.storage.local.set({
+			"mapping:seerr-targets": {
+				1: { mediaType: "tv", tmdbId: 400, seasons: [2] },
+			},
+		});
+
+		await migrateManualStore();
+
+		await expect(getManualLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tmdbShow: tmdb(400) },
+			scopes: { tmdbShow: { id: tmdb(400), seasons: [2] } },
+		});
+	});
+
+	it("prefers explicit empty TMDB seasons over released Seerr seasons", async () => {
+		await browser.storage.local.remove(MANUAL_STORAGE_KEY);
+		await browser.storage.local.set({
+			"mapping:seerr-targets": {
+				1: { mediaType: "tv", tmdbId: 400, seasons: [2], tmdbSeasons: [] },
+			},
+		});
+
+		await migrateManualStore();
+
+		await expect(getManualLayerRecord(aid(1))).resolves.toEqual({
+			facts: { tmdbShow: tmdb(400) },
+		});
+	});
+
+	it("skips released Seerr TV targets with invalid seasons", async () => {
+		await browser.storage.local.remove(MANUAL_STORAGE_KEY);
+		await browser.storage.local.set({
+			"mapping:seerr-targets": {
+				1: { mediaType: "tv", tmdbId: 400, seasons: [-1] },
+			},
+		});
+
+		await migrateManualStore();
+
+		await expect(getManualLayerRecord(aid(1))).resolves.toBeNull();
+	});
+
 	it.each([
 		{
 			name: "media discriminator",
