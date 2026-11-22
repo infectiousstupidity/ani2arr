@@ -8,6 +8,7 @@ import { sourceIdentityKey } from "@/mapping/source-identity";
 import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
+import { createMappingRecord } from "./mapping-record";
 import {
 	clearUpstreamMappings,
 	getSourceAliasesByAniListId,
@@ -17,6 +18,11 @@ import {
 	migrateUpstreamStore,
 	refreshUpstreamMappings,
 } from "./upstream.store";
+
+vi.mock("./mapping-record", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./mapping-record")>();
+	return { ...actual, createMappingRecord: vi.fn(actual.createMappingRecord) };
+});
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
@@ -92,6 +98,68 @@ async function seedLayerSnapshot(
 		},
 	});
 }
+
+describe("version-1 upstream lookups", () => {
+	const canonical = {
+		facts: { tvdbShow: tvdb(500) },
+		scopes: { tvdbShow: { id: tvdb(500), seasons: [2] } },
+	};
+	const direct = { facts: { tmdbMovie: tmdb(300) } };
+	const records = {
+		"anilist:1": canonical,
+		"mal:10": { ...direct, linkedAniListId: aid(1) },
+		"anilist:2": { facts: "bad" },
+	};
+	const source = { source: "mal", id: mal(10) } as const;
+
+	afterEach(clearUpstreamMappings);
+
+	it("returns the direct MAL and canonical AniList layers", async () => {
+		await seedLayerSnapshot(records);
+
+		await expect(getSourceUpstreamLayers(source)).resolves.toEqual({
+			anilistId: aid(1),
+			direct,
+			canonical,
+		});
+		await expect(getUniqueAniListIdForSource(source)).resolves.toBe(aid(1));
+		await expect(
+			getUniqueAniListIdForSource({ source: "mal", id: mal(999) }),
+		).resolves.toBeNull();
+	});
+
+	it("decodes at most two records for a single layer lookup", async () => {
+		await seedLayerSnapshot(
+			Object.fromEntries(
+				Array.from({ length: 1000 }, (_, index) => [
+					`anilist:${index + 1}`,
+					canonical,
+				]),
+			),
+		);
+		const createMappingRecordSpy = vi.mocked(createMappingRecord);
+		createMappingRecordSpy.mockClear();
+
+		await expect(getSourceUpstreamLayers(anilistSource(5))).resolves.toEqual({
+			anilistId: aid(5),
+			direct: canonical,
+			canonical,
+		});
+		expect(createMappingRecordSpy.mock.calls.length).toBeLessThanOrEqual(2);
+	});
+
+	it("groups only linked MAL aliases in source-key order", async () => {
+		await seedLayerSnapshot({
+			"mal:11": { facts: {}, linkedAniListId: aid(1) },
+			...records,
+			"mal:12": { facts: {} },
+		});
+
+		await expect(getSourceAliasesByAniListId()).resolves.toEqual(
+			new Map([[aid(1), [source, { source: "mal", id: mal(11) }]]]),
+		);
+	});
+});
 
 describe("refreshUpstreamMappings", () => {
 	afterEach(async () => {

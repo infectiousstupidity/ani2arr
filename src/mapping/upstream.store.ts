@@ -50,8 +50,8 @@ export async function getSourceUpstreamLayers(
 	source: SourceIdentity,
 	linkedAniListId?: AniListId | null,
 ): Promise<SourceUpstreamLayers> {
-	const snapshot = await readSnapshot();
-	const directRecord = snapshot?.records[sourceIdentityKey(source)];
+	const getRecord = await readSnapshotRecords();
+	const directRecord = getRecord(sourceIdentityKey(source));
 	let anilistId: AniListId | null;
 	if (source.source === "anilist") anilistId = source.id;
 	else if (linkedAniListId === undefined) {
@@ -60,9 +60,7 @@ export async function getSourceUpstreamLayers(
 	const canonicalRecord =
 		anilistId === null
 			? undefined
-			: snapshot?.records[
-					sourceIdentityKey({ source: "anilist", id: anilistId })
-				];
+			: getRecord(sourceIdentityKey({ source: "anilist", id: anilistId }));
 	return {
 		anilistId,
 		direct: directRecord ? withoutLink(directRecord) : null,
@@ -85,8 +83,8 @@ export async function getUniqueAniListIdForSource(
 	source: SourceIdentity,
 ): Promise<AniListId | null> {
 	if (source.source === "anilist") return source.id;
-	const snapshot = await readSnapshot();
-	return snapshot?.records[sourceIdentityKey(source)]?.linkedAniListId ?? null;
+	const getRecord = await readSnapshotRecords();
+	return getRecord(sourceIdentityKey(source))?.linkedAniListId ?? null;
 }
 
 export async function getUniqueAniListIdsForSources(
@@ -96,13 +94,13 @@ export async function getUniqueAniListIdsForSources(
 		sources.map((source) => [sourceIdentityKey(source), source]),
 	);
 	if (uniqueSources.size === 0) return {};
-	const snapshot = await readSnapshot();
+	const getRecord = await readSnapshotRecords();
 	return Object.fromEntries(
 		[...uniqueSources].map(([key, source]) => [
 			key,
 			source.source === "anilist"
 				? source.id
-				: (snapshot?.records[key]?.linkedAniListId ?? null),
+				: (getRecord(key)?.linkedAniListId ?? null),
 		]),
 	);
 }
@@ -110,16 +108,23 @@ export async function getUniqueAniListIdsForSources(
 export async function getSourceAliasesByAniListId(): Promise<
 	ReadonlyMap<AniListId, SourceIdentity[]>
 > {
-	const snapshot = await readSnapshot();
+	const { [UPSTREAM_KEY]: stored } = await browser.storage.local.get(UPSTREAM_KEY);
+	const records =
+		isObject(stored) &&
+		stored.version === 1 &&
+		validTimestamp(stored.fetchedAt) !== null &&
+		isObject(stored.records)
+			? stored.records
+			: (decodeSnapshot(stored)?.records ?? {});
 	const aliasesByAniListId = new Map<AniListId, SourceIdentity[]>();
-	for (const [rawKey, record] of Object.entries(snapshot?.records ?? {})) {
+	for (const [rawKey, record] of Object.entries(records)) {
 		const alias = parseSourceIdentityKey(rawKey);
-		if (alias?.source !== "mal" || record.linkedAniListId === undefined) {
-			continue;
-		}
-		const aliases = aliasesByAniListId.get(record.linkedAniListId) ?? [];
+		if (alias?.source !== "mal" || !isObject(record)) continue;
+		const linkedAniListId = parseAniListIdOrNull(record.linkedAniListId);
+		if (linkedAniListId === null) continue;
+		const aliases = aliasesByAniListId.get(linkedAniListId) ?? [];
 		aliases.push(alias);
-		aliasesByAniListId.set(record.linkedAniListId, aliases);
+		aliasesByAniListId.set(linkedAniListId, aliases);
 	}
 	for (const aliases of aliasesByAniListId.values()) {
 		aliases.sort((left, right) =>
@@ -203,6 +208,27 @@ export async function clearUpstreamMappings(): Promise<void> {
 async function readSnapshot(): Promise<UpstreamSnapshot | null> {
 	const stored = await browser.storage.local.get(UPSTREAM_KEY);
 	return decodeSnapshot(stored[UPSTREAM_KEY]);
+}
+
+/** Returns a reader that decodes only the requested record keys. */
+async function readSnapshotRecords(): Promise<
+	(key: string) => UpstreamMappingRecord | undefined
+> {
+	const { [UPSTREAM_KEY]: stored } = await browser.storage.local.get(UPSTREAM_KEY);
+	if (
+		isObject(stored) &&
+		stored.version === 1 &&
+		validTimestamp(stored.fetchedAt) !== null &&
+		isObject(stored.records)
+	) {
+		const raw = stored.records;
+		return (key) =>
+			Object.hasOwn(raw, key)
+				? decodeLayerRecords({ [key]: raw[key] })[key]
+				: undefined;
+	}
+	const snapshot = decodeSnapshot(stored);
+	return (key) => snapshot?.records[key];
 }
 
 /** LEGACY: direct-upgrade decoder for released v2, branch, and Task 04 snapshots. */
