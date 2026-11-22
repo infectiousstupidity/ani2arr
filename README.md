@@ -256,8 +256,8 @@ This project uses pnpm, WXT, React, TypeScript, Tailwind CSS, and Vitest.
 
 ### Requirements
 
-* Node.js 24 or newer
-* pnpm 11.5.1 or compatible
+* Node.js 26.13.1 (pinned in `mise.toml`)
+* pnpm 12.21.0 (pinned in `package.json`)
 
 ### Commands
 
