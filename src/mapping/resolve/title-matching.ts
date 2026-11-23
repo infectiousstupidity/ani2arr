@@ -661,9 +661,9 @@ function applyYearScore(
 	if (targetYear === undefined || candidateYear === undefined) return score;
 	const distance = Math.abs(targetYear - candidateYear);
 	if (distance === 0)
-		return Math.min(YEAR_SCORE_CAP, score + YEAR_EXACT_SCORE_BONUS);
+		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + YEAR_EXACT_SCORE_BONUS));
 	if (distance === 1)
-		return Math.min(YEAR_SCORE_CAP, score + YEAR_NEAR_SCORE_BONUS);
+		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + YEAR_NEAR_SCORE_BONUS));
 	return score;
 }
 
@@ -709,9 +709,9 @@ function applyYearWeightingForProvider(
 	const profile = getTitleMatchProfile(provider);
 	const distance = Math.abs(targetYear - candidateYear);
 	if (distance === 0)
-		return Math.min(YEAR_SCORE_CAP, score + profile.yearExactBonus);
+		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + profile.yearExactBonus));
 	if (distance === 1)
-		return Math.min(YEAR_SCORE_CAP, score + profile.yearOneOffBonus);
+		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + profile.yearOneOffBonus));
 	if (distance === 2) return score * profile.yearMismatchFactor;
 	return score * profile.yearFarMismatchFactor;
 }
@@ -886,6 +886,11 @@ function findTitleMatchForTermInternal(
 	targetYear: number | undefined,
 	precomputedCandidates: PrecomputedCandidate[],
 ): TitleMatch | null {
+	const yearRank = (year: number | undefined) => {
+		if (targetYear === undefined || year === undefined) return 0;
+		const distance = Math.abs(targetYear - year);
+		return distance === 0 ? 2 : (distance === 1 ? 1 : 0);
+	};
 	const scored = precomputedCandidates
 		.map((pc) =>
 			scoreCandidate({
@@ -896,7 +901,11 @@ function findTitleMatchForTermInternal(
 				candidateCount: precomputedCandidates.length,
 			}),
 		)
-		.toSorted((left, right) => right.score - left.score);
+		.toSorted(
+			(left, right) =>
+				right.score - left.score ||
+				yearRank(right.candidate.year) - yearRank(left.candidate.year),
+		);
 
 	const winner = scored[0];
 	if (!winner || winner.score < MINIMUM_SCORE) return null;

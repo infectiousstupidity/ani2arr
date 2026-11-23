@@ -134,6 +134,32 @@ describe("title matching", () => {
 		).toEqual({ providerId: 451_479, matchedTitle: "Ranma 1/2 2024" });
 	});
 
+	it.each(["sonarr", "radarr"] as const)(
+		"ranks matching and nearby years above equal titles for %s",
+		(provider) => {
+			const term = getSearchTerms(provider, media("Example Title"))[0];
+			if (!term) throw new Error("No search term");
+
+			for (const [preferredYear, otherYear] of [
+				[2020, undefined],
+				[2020, 2019],
+				[2019, undefined],
+				[2019, 2017],
+			] as const) {
+				const candidates = [
+					{ providerId: 1, title: "Example Title", year: preferredYear },
+					{ providerId: 2, title: "Example Title", ...(otherYear === undefined ? {} : { year: otherYear }) },
+				];
+				for (const order of [candidates, candidates.toReversed()]) {
+					expect(findTitleMatchForTerm(provider, term, 2020, order)).toEqual({
+						providerId: 1,
+						matchedTitle: "Example Title",
+					});
+				}
+			}
+		},
+	);
+
 	it("selects the higher-scoring candidate when both are close", () => {
 		expect(
 			matchSonarr("Close Match Story", [
