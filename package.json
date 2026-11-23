@@ -2,7 +2,7 @@
 	"name": "ani2arr",
 	"description": "Adds one-click Sonarr and Radarr actions to AniList/AniChart pages.",
 	"private": true,
-	"version": "2.1.0",
+	"version": "2.2.0",
 	"license": "GPL-3.0-only",
 	"type": "module",
 	"scripts": {

@@ -3,16 +3,16 @@
 
 # ani2arr Privacy Policy
 
-Last updated: July 16, 2026
+Last updated: November 23, 2026
 
 ## Summary
 
 ani2arr does not collect, sell, or transmit user data to the developer.
 
-The extension connects AniList and AniChart pages to the user's own self-hosted
-Sonarr, Radarr, and optional Seerr servers. To do that, it stores configuration
-locally in the browser and sends limited request data to external services that
-are necessary for the feature to work.
+The extension connects AniList, AniChart, and MyAnimeList pages to the user's
+own self-hosted Sonarr, Radarr, and optional Seerr servers. To do that, it
+stores configuration locally in the browser and sends limited request data to
+external services that are necessary for the feature to work.
 
 ## What ani2arr stores locally
 
@@ -27,7 +27,8 @@ ani2arr stores the following data in the browser's local extension storage on th
 - Sonarr and Radarr default add settings selected by the user
 - UI preferences, mapping overrides, and manual Seerr targets created by the
   user
-- Cached AniList metadata and mapping data used to reduce repeated lookups
+- Cached AniList, MyAnimeList, and mapping metadata used to reduce repeated
+  lookups
 
 This data is not sent to the developer.
 
@@ -106,7 +107,16 @@ CSRF validation. Advanced API-key mode does not bypass CSRF-protected writes.
 
 ani2arr sends AniList IDs and related query parameters to `https://graphql.anilist.co` to fetch media metadata used for matching and display.
 
-### 4. Public mapping files hosted on GitHub
+### 4. The public Jikan API
+
+For entries whose source is MyAnimeList, ani2arr sends MyAnimeList IDs to
+`https://api.jikan.moe` to fetch public anime metadata, such as titles,
+synonyms, media format, and related identifiers, used for matching and display.
+Requests are rate-limited at one request per second, and responses are cached
+locally on the user's device. ani2arr sends no user-entered settings,
+credentials, or cookies to Jikan.
+
+### 5. Public mapping files hosted on GitHub
 
 ani2arr fetches public JSON mapping files from `https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json` to improve AniList-to-TVDB and AniList-to-TMDB matching quality. GitHub may serve those release downloads through `release-assets.githubusercontent.com`.
 

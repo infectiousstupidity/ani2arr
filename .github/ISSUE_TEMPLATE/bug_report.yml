@@ -17,7 +17,7 @@ body:
     attributes:
       label: ani2arr version
       description: The extension version you are using.
-      placeholder: "2.1.0"
+      placeholder: "2.2.0"
     validations:
       required: true
 
