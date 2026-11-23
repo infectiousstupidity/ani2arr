@@ -124,8 +124,6 @@ export const createContentEntrypointShell = (
 			return pending;
 		};
 
-		await reconcile(location.href);
-
 		type LocationChangeEvent = Event & { newUrl?: URL };
 
 		ctx.addEventListener(
@@ -158,5 +156,7 @@ export const createContentEntrypointShell = (
 			browser.storage.onChanged.removeListener(onStorageChanged);
 			void removeSafely(options, location.href);
 		});
+
+		await reconcile(location.href);
 	};
 };

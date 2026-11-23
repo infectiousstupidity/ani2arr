@@ -76,6 +76,35 @@ describe("createContentEntrypointShell", () => {
 		});
 	});
 
+	it("aborts pending initial eligibility and reconciles a navigation", async () => {
+		let initialSignal: AbortSignal | undefined;
+		const mount = vi.fn();
+		const options = {
+			isEligible: ({ url, signal }) => {
+				if (url !== ROOT_URL) return true;
+				initialSignal = signal;
+				return new Promise<boolean>((_resolve, reject) => {
+					signal.addEventListener("abort", () => {
+						reject(new DOMException("Aborted", "AbortError"));
+					});
+				});
+			},
+			mount,
+			remove: vi.fn(),
+		} satisfies ShellOptions;
+
+		const initialReconcile = startShell(options);
+		await vi.waitFor(() => expect(initialSignal).toBeDefined());
+		dispatchLocationChange(ANIME_URL);
+
+		await initialReconcile;
+		await vi.waitFor(() => {
+			expect(initialSignal?.aborted).toBe(true);
+			expect(mount).toHaveBeenCalledTimes(1);
+			expect(mount).toHaveBeenCalledWith(expect.objectContaining({ url: ANIME_URL }));
+		});
+	});
+
 	it("remounts MAL browse UI after a persisted Back restoration", async () => {
 		vi.stubGlobal("location", { href: MAL_GENRE_URL });
 		const mountedUrls: string[] = [];
