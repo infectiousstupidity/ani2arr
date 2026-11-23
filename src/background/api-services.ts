@@ -57,7 +57,7 @@ const DEBOUNCED_LIBRARY_REFRESH_MS = 15 * 1000;
 
 function createDebouncer(ms: number) {
 	let timeoutId: ReturnType<typeof setTimeout> | null = null;
-	return (fn: () => Promise<void>) => {
+	return (fn: () => Promise<unknown>) => {
 		if (timeoutId !== null) clearTimeout(timeoutId);
 		timeoutId = setTimeout(() => {
 			timeoutId = null;
@@ -130,19 +130,39 @@ const resolveAutomaticMapping = createAutomaticResolver({
 	searchProviderCandidates,
 });
 
-export const mappingService = new MappingService(async (...args) => {
-	const stored = await resolveAutomaticMapping(...args);
-	if (stored) await bumpMappingsRevision();
-	return stored;
-});
+// Batch bursts of new mappings. Broadcasting plain misses can make active queries
+// retry and store the same miss again.
+const debounceAutomaticMappingsRevision = createDebouncer(1000);
+
+export const mappingService = new MappingService(
+	async (input): Promise<boolean> => {
+		if (!(await resolveAutomaticMapping(input))) return false;
+		const mapping = await mappingService.getMapping(
+			input.provider,
+			input.identity,
+			input.anilistId,
+		);
+		if (mapping.kind === "mapped") {
+			debounceAutomaticMappingsRevision(bumpMappingsRevision);
+		}
+		return true;
+	},
+);
 
 export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
 	getEffectiveTarget: ({ identity, mediaType, anilistId }) =>
 		mappingService.getSeerrMappingOutcome(identity, mediaType, anilistId),
 	getAutoResult: getSeerrAutoResult,
 	setAutoResult: async (...args) => {
+		const [, identity, mediaType, result, anilistId] = args;
+		const previous =
+			result.kind === "unmapped"
+				? await getSeerrAutoResult(identity, mediaType, anilistId)
+				: null;
 		const stored = await setSeerrAutoResult(...args);
-		if (stored) await bumpMappingsRevision();
+		if (stored && (result.kind === "mapped" || previous?.kind === "mapped")) {
+			debounceAutomaticMappingsRevision(bumpMappingsRevision);
+		}
 		return stored;
 	},
 	loadAniListMedia: (anilistId) =>
