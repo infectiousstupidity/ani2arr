@@ -19,6 +19,8 @@ import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
 import {
 	getOverwriteTargetTitle,
+	isSetupTargetLoading,
+	shouldShowMappingView,
 	pickProviderPoster,
 	targetsEqual,
 } from "../helpers";
@@ -81,32 +83,6 @@ function getRejectCandidateTmdbId(input: {
 	}
 
 	return null;
-}
-
-function shouldShowMappingView(input: {
-	view: MediaModalView;
-	verificationSettled: boolean;
-	canShowSetup: boolean;
-}): boolean {
-	if (input.view === "mapping") return true;
-
-	return input.verificationSettled && !input.canShowSetup;
-}
-
-function isSetupTargetLoading(input: {
-	view: MediaModalView;
-	isMappingView: boolean;
-	isConfigured: boolean;
-	hasSetupTarget: boolean;
-	verificationSettled: boolean;
-}): boolean {
-	return (
-		input.view === "setup" &&
-		!input.isMappingView &&
-		input.isConfigured &&
-		!input.hasSetupTarget &&
-		!input.verificationSettled
-	);
 }
 
 function getCurrentTarget(input: {

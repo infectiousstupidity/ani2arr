@@ -2,7 +2,7 @@
 // src/features/media-modal/helpers.ts
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
-import type { MediaModalTargetSummary } from "./types";
+import type { MediaModalTargetSummary, MediaModalView } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
@@ -80,4 +80,30 @@ export function getOverwriteTargetTitle(
 	}
 
 	return currentTarget.title;
+}
+
+export function shouldShowMappingView(input: {
+	view: MediaModalView;
+	verificationSettled: boolean;
+	canShowSetup: boolean;
+}): boolean {
+	if (input.view === "mapping") return true;
+
+	return input.verificationSettled && !input.canShowSetup;
+}
+
+export function isSetupTargetLoading(input: {
+	view: MediaModalView;
+	isMappingView: boolean;
+	isConfigured: boolean;
+	hasSetupTarget: boolean;
+	verificationSettled: boolean;
+}): boolean {
+	return (
+		input.view === "setup" &&
+		!input.isMappingView &&
+		input.isConfigured &&
+		!input.hasSetupTarget &&
+		!input.verificationSettled
+	);
 }
