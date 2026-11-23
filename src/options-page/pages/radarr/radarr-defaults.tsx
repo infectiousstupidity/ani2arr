@@ -3,8 +3,6 @@
 
 import { useState } from "react";
 import { ListPlus } from "lucide-react";
-import * as v from "valibot";
-import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
 import { createDefaultRadarrFormState } from "@/providers/radarr/form-state";
@@ -26,6 +24,7 @@ import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
+import { ArrDefaultsResourceFields } from "../arr-defaults-resource-fields";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding movies via the extension media modal and overlay.";
@@ -52,53 +51,16 @@ const RadarrDefaultsFields = ({
   resourceFieldsDisabled,
   values,
 }: RadarrDefaultsFieldsProps) => {
-  const rootFolderOptions =
-    formResources?.rootFolders.map((rootFolder) => ({
-      label: rootFolder.path,
-      value: rootFolder.path,
-    })) ?? [];
-
-  const qualityProfileOptions =
-    formResources?.qualityProfiles.map((qualityProfile) => ({
-      label: qualityProfile.name,
-      value: String(qualityProfile.id),
-    })) ?? [];
-
   return (
     <>
-    <SettingsRow id="radarr-root-folder" label="Root folder">
-      <SelectControl
-        id="radarr-root-folder"
-        value={values.rootFolderPath ?? ""}
-        onValueChange={(value) => onChange("rootFolderPath", value)}
-        options={rootFolderOptions}
-        placeholder="Select root folder"
-        disabled={resourceFieldsDisabled}
-      />
-    </SettingsRow>
-
-    <SettingsRow id="radarr-quality-profile" label="Quality profile">
-      <SelectControl
-        id="radarr-quality-profile"
-        value={
-          values.qualityProfileId === undefined
-            ? ""
-            : String(values.qualityProfileId)
-        }
-        onValueChange={(value) => {
-          const qualityProfileId = Number(value);
-          onChange(
-            "qualityProfileId",
-            !value || Number.isNaN(qualityProfileId)
-              ? undefined
-              : v.parse(ProviderQualityProfileIdSchema, qualityProfileId),
-          );
-        }}
-        options={qualityProfileOptions}
-        placeholder="Select quality profile"
-        disabled={resourceFieldsDisabled}
-      />
-    </SettingsRow>
+    <ArrDefaultsResourceFields
+      provider="radarr"
+      formResources={formResources}
+      resourceFieldsDisabled={resourceFieldsDisabled}
+      values={values}
+      onRootFolderChange={(value) => onChange("rootFolderPath", value)}
+      onQualityProfileChange={(value) => onChange("qualityProfileId", value)}
+    />
 
     <SettingsRow id="radarr-minimum-availability" label="Minimum availability">
       <SelectControl

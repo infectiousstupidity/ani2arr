@@ -3,8 +3,6 @@
 
 import { useState } from "react";
 import { ListPlus } from "lucide-react";
-import * as v from "valibot";
-import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
 import {
@@ -28,6 +26,7 @@ import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
+import { ArrDefaultsResourceFields } from "../arr-defaults-resource-fields";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding series via the extension media modal and overlay.";
@@ -54,53 +53,16 @@ const SonarrDefaultsFields = ({
   resourceFieldsDisabled,
   values,
 }: SonarrDefaultsFieldsProps) => {
-  const rootFolderOptions =
-    formResources?.rootFolders.map((rootFolder) => ({
-      label: rootFolder.path,
-      value: rootFolder.path,
-    })) ?? [];
-
-  const qualityProfileOptions =
-    formResources?.qualityProfiles.map((qualityProfile) => ({
-      label: qualityProfile.name,
-      value: String(qualityProfile.id),
-    })) ?? [];
-
   return (
     <>
-    <SettingsRow id="sonarr-root-folder" label="Root folder">
-      <SelectControl
-        id="sonarr-root-folder"
-        value={values.rootFolderPath ?? ""}
-        onValueChange={(value) => onChange("rootFolderPath", value)}
-        options={rootFolderOptions}
-        placeholder="Select root folder"
-        disabled={resourceFieldsDisabled}
-      />
-    </SettingsRow>
-
-    <SettingsRow id="sonarr-quality-profile" label="Quality profile">
-      <SelectControl
-        id="sonarr-quality-profile"
-        value={
-          values.qualityProfileId === undefined
-            ? ""
-            : String(values.qualityProfileId)
-        }
-        onValueChange={(value) => {
-          const qualityProfileId = Number(value);
-          onChange(
-            "qualityProfileId",
-            !value || Number.isNaN(qualityProfileId)
-              ? undefined
-              : v.parse(ProviderQualityProfileIdSchema, qualityProfileId),
-          );
-        }}
-        options={qualityProfileOptions}
-        placeholder="Select quality profile"
-        disabled={resourceFieldsDisabled}
-      />
-    </SettingsRow>
+    <ArrDefaultsResourceFields
+      provider="sonarr"
+      formResources={formResources}
+      resourceFieldsDisabled={resourceFieldsDisabled}
+      values={values}
+      onRootFolderChange={(value) => onChange("rootFolderPath", value)}
+      onQualityProfileChange={(value) => onChange("qualityProfileId", value)}
+    />
 
     <SettingsRow id="sonarr-series-type" label="Series type">
       <SelectControl
