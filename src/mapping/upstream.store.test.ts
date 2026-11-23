@@ -14,6 +14,7 @@ import {
 	getSourceUpstreamLayers,
 	getUniqueAniListIdForSource,
 	getUniqueAniListIdsForSources,
+	listAniListUpstreamLayers,
 	migrateUpstreamStore,
 	refreshUpstreamMappings,
 } from "./upstream.store";
@@ -75,6 +76,23 @@ describe("version-1 upstream lookups", () => {
 	const source = { source: "mal", id: mal(10) } as const;
 
 	afterEach(clearUpstreamMappings);
+
+	it("discards malformed current records without affecting valid records", async () => {
+		await seedLayerSnapshot({
+			"anilist:1": { facts: null },
+			"anilist:2": { facts: { tvdbShow: 500 }, conflicts: { tvdbShow: "bad" } },
+			"mal:10": { facts: {}, linkedAniListId: "bad" },
+			"anilist:3": canonical,
+		});
+		await expect(getSourceUpstreamLayers(anilistSource(1))).resolves.toEqual({
+			anilistId: aid(1), direct: null, canonical: null,
+		});
+		await expect(getSourceUpstreamLayers(anilistSource(2))).resolves.toEqual({
+			anilistId: aid(2), direct: null, canonical: null,
+		});
+		await expect(getUniqueAniListIdForSource(source)).resolves.toBeNull();
+		await expect(listAniListUpstreamLayers()).resolves.toEqual([{ anilistId: aid(3), record: canonical }]);
+	});
 
 	it("skips writes when migrating a version-1 upstream snapshot", async () => {
 		await seedLayerSnapshot({ "anilist:1": canonical });

@@ -18,6 +18,7 @@ import {
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import {
+	isAutomaticMappingRecord,
 	type AutomaticAttemptLane,
 	type AutomaticMappingRecord,
 	type AutomaticSlotMeta,
@@ -66,9 +67,10 @@ export async function getAutomaticLayerRecord(
 ): Promise<AutomaticMappingRecord | null> {
 	const source = normalizeSourceIdentity(identity);
 	const { store } = await readAutomaticStore();
-	const canonical =
-		store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
-	const alias = store.records[sourceIdentityKey(source)];
+	const canonicalValue = store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
+	const aliasValue = store.records[sourceIdentityKey(source)];
+	const canonical = isAutomaticMappingRecord(canonicalValue) ? canonicalValue : undefined;
+	const alias = isAutomaticMappingRecord(aliasValue) ? aliasValue : undefined;
 	const record =
 		canonical && alias && canonical !== alias
 			? mergeAutomaticRecords(canonical, [alias])
@@ -83,7 +85,7 @@ export async function listAniListAutomaticLayers(): Promise<AutomaticRecord[]> {
 	const now = Date.now();
 	return Object.entries(store.records).flatMap(([rawKey, record]) => {
 		const identity = parseSourceIdentityKey(rawKey);
-		if (identity?.source !== "anilist") return [];
+		if (identity?.source !== "anilist" || !isAutomaticMappingRecord(record)) return [];
 		const active = activeRecord(record, now);
 		return isEmptyRecord(active)
 			? []
@@ -262,6 +264,7 @@ async function updateAutomaticStore(
 		const { store: stored } = await readAutomaticStore();
 		const store = structuredClone(stored);
 		const before = JSON.stringify(store);
+		discardMalformedRecords(store);
 		update(store);
 		if (JSON.stringify(store) === before) return;
 		for (const [key, record] of Object.entries(store.records)) {
@@ -281,6 +284,7 @@ async function updateAutomaticStoreGuarded(
 		const store = structuredClone(stored);
 		const before = JSON.stringify(store);
 		if (token !== automaticWriteToken) return false;
+		discardMalformedRecords(store);
 		update(store);
 		if (JSON.stringify(store) === before) return true;
 		for (const [key, record] of Object.entries(store.records)) {
@@ -291,6 +295,12 @@ async function updateAutomaticStoreGuarded(
 		}
 		return true;
 	});
+}
+
+function discardMalformedRecords(store: MappingStore<AutomaticMappingRecord>): void {
+	for (const [key, record] of Object.entries(store.records)) {
+		if (!isAutomaticMappingRecord(record)) delete store.records[key];
+	}
 }
 
 async function enqueueAutomaticStoreUpdate<Result>(

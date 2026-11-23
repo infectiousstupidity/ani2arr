@@ -4,7 +4,7 @@ import { browser } from "wxt/browser";
 import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
-import type { MappingRecord, UpstreamMappingRecord } from "./mapping-record";
+import { isUpstreamMappingRecord, type MappingRecord, type UpstreamMappingRecord } from "./mapping-record";
 import {
 	parseSourceIdentityKey,
 	sourceIdentityKey,
@@ -62,7 +62,7 @@ export async function listAniListUpstreamLayers(): Promise<
 	const snapshot = await readSnapshot();
 	return Object.entries(snapshot?.records ?? {}).flatMap(([rawKey, record]) => {
 		const identity = parseSourceIdentityKey(rawKey);
-		if (identity?.source !== "anilist") return [];
+		if (identity?.source !== "anilist" || !isUpstreamMappingRecord(record)) return [];
 		return [{ anilistId: identity.id, record: structuredClone(record) }];
 	});
 }
@@ -200,7 +200,10 @@ async function readSnapshotRecords(): Promise<
 > {
 	const snapshot = await readSnapshot();
 	const records = snapshot?.records;
-	return (key) => records && Object.hasOwn(records, key) ? records[key] : undefined;
+	return (key) => {
+		const record = records && Object.hasOwn(records, key) ? records[key] : undefined;
+		return isUpstreamMappingRecord(record) ? record : undefined;
+	};
 }
 
 function currentSnapshot(value: unknown): UpstreamSnapshot | null {

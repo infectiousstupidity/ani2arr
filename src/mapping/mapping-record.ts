@@ -1,6 +1,7 @@
 /** Persisted mapping records and one-time candidate normalization. */
 
-import type { TmdbId, TvdbId } from "@/providers/schemas";
+import * as v from "valibot";
+import { TmdbIdSchema, TvdbIdSchema, type TmdbId, type TvdbId } from "@/providers/schemas";
 import { normalizeSeasonNumbers } from "./season-numbers";
 
 export type MappingFacts = {
@@ -62,6 +63,57 @@ export type AutomaticMappingRecord = MappingRecord & {
 export type UpstreamMappingRecord = MappingRecord & {
 	linkedAniListId?: import("@/anilist/types").AniListId;
 };
+
+const seasonsSchema = v.array(v.pipe(v.number(), v.safeInteger(), v.minValue(0)));
+const tmdbShowSchema = v.object({ id: TmdbIdSchema, seasons: v.optional(seasonsSchema) });
+const tvdbShowSchema = v.object({ id: TvdbIdSchema, seasons: v.optional(seasonsSchema) });
+const mappingRecordEntries = {
+	facts: v.object({
+		tmdbMovie: v.optional(TmdbIdSchema),
+		tmdbShow: v.optional(TmdbIdSchema),
+		tvdbShow: v.optional(TvdbIdSchema),
+	}),
+	conflicts: v.optional(v.object({
+		tmdbMovie: v.optional(v.array(TmdbIdSchema)),
+		tmdbShow: v.optional(v.array(tmdbShowSchema)),
+		tvdbShow: v.optional(v.array(tvdbShowSchema)),
+	})),
+	scopes: v.optional(v.object({
+		tmdbShow: v.optional(v.object({ id: TmdbIdSchema, seasons: seasonsSchema })),
+		tvdbShow: v.optional(v.object({ id: TvdbIdSchema, seasons: seasonsSchema })),
+	})),
+};
+const expirySchema = v.object({ expiresAt: v.pipe(v.number(), v.finite()) });
+const slotMetaSchema = v.object({
+	expiresAt: v.pipe(v.number(), v.finite()),
+	matchedTitle: v.optional(v.string()),
+});
+const automaticRecordSchema = v.object({
+	...mappingRecordEntries,
+	slotMeta: v.optional(v.object({
+		tmdbMovie: v.optional(slotMetaSchema),
+		tmdbShow: v.optional(slotMetaSchema),
+		tvdbShow: v.optional(slotMetaSchema),
+	})),
+	attempts: v.optional(v.object({
+		sonarrTvdb: v.optional(expirySchema),
+		radarrTmdbMovie: v.optional(expirySchema),
+		seerrTmdbMovie: v.optional(expirySchema),
+		seerrTmdbShow: v.optional(expirySchema),
+	})),
+});
+const upstreamRecordSchema = v.object({
+	...mappingRecordEntries,
+	linkedAniListId: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+});
+
+export function isAutomaticMappingRecord(value: unknown): value is AutomaticMappingRecord {
+	return v.is(automaticRecordSchema, value);
+}
+
+export function isUpstreamMappingRecord(value: unknown): value is UpstreamMappingRecord {
+	return v.is(upstreamRecordSchema, value);
+}
 
 type ShowCandidate<TId extends number> = {
 	id: TId;
