@@ -8,6 +8,7 @@ import {
 	getMappingIdentities,
 	listEffectiveMappingsByProvider,
 } from "./list-mappings";
+import * as mappingRecord from "./mapping-record";
 
 const aid = parseAniListId;
 const tmdb = parseTmdbId;
@@ -114,5 +115,43 @@ describe("list mappings", () => {
 				{ anilistId: aid(1), provider: "radarr" },
 			],
 		);
+	});
+
+	it("selects only requested IDs with the same results as the full list", async () => {
+		const unrequested = { facts: { tvdbShow: tvdb(22) } };
+		const slotMeta = { tmdbMovie: { expiresAt: Date.now() + 10_000 } };
+		await seed({
+			manual: { "anilist:3": { facts: { tvdbShow: tvdb(33) } } },
+			upstream: {
+				"anilist:2": unrequested,
+				"anilist:3": { facts: { tvdbShow: tvdb(34), tmdbMovie: tmdb(35) } },
+				"anilist:4": { facts: { tvdbShow: -1 } },
+			},
+			automatic: {
+				"anilist:1": { facts: { tmdbMovie: tmdb(11) }, slotMeta },
+				"anilist:3": { facts: { tmdbMovie: tmdb(36) }, slotMeta },
+				"anilist:4": {
+					facts: { tmdbMovie: tmdb(44) },
+					slotMeta: { tmdbMovie: { expiresAt: 1 } },
+				},
+			},
+		});
+		const full = await listEffectiveMappingsByProvider();
+		const expected = [aid(3), aid(1)].flatMap((id) =>
+			[...full.sonarr, ...full.radarr]
+				.filter((record) => record.anilistId === id)
+				.map((record) => ({ ...record, source: { source: "anilist", id } })),
+		);
+
+		const validateUpstream = vi.spyOn(mappingRecord, "isUpstreamMappingRecord");
+		const storageRead = vi.spyOn(browser.storage.local, "get");
+		const identities = await getMappingIdentities([
+			aid(3), aid(1), aid(4), aid(5), aid(3),
+		]);
+		expect(storageRead).toHaveBeenCalledTimes(3);
+		expect(validateUpstream).not.toHaveBeenCalledWith(unrequested);
+		storageRead.mockRestore();
+		validateUpstream.mockRestore();
+		expect(identities).toEqual(expected);
 	});
 });

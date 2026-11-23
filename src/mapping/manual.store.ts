@@ -82,6 +82,23 @@ export async function listAniListManualLayers(): Promise<ManualRecord[]> {
 	});
 }
 
+export async function readManualRecords(): Promise<
+	(key: string) => ManualMappingRecord | undefined
+> {
+	const [local, sync] = await readManualStorage();
+	const current = local[MANUAL_KEY];
+	if (!isMappingStore(current)) {
+		const { records } = decodeManualStore(local, sync);
+		return (key) => records[key];
+	}
+	return (key) => {
+		const record = Object.hasOwn(current.records, key)
+			? current.records[key]
+			: undefined;
+		return isObject(record) ? normalizeManualRecord(record) : undefined;
+	};
+}
+
 export async function setManualMapping(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,
@@ -338,15 +355,7 @@ async function readManualStoreState(): Promise<{
 	store: MappingStore<ManualMappingRecord>;
 	hasLegacyData: boolean;
 }> {
-	const [local, sync] = await Promise.all([
-		browser.storage.local.get([
-			MANUAL_KEY,
-			LEGACY_SEERR_KEY,
-			V1_LOCAL_OVERRIDE_KEY,
-			V1_LOCAL_IGNORE_KEY,
-		]),
-		browser.storage.sync.get([V1_SYNC_OVERRIDE_KEY, V1_SYNC_IGNORE_KEY]),
-	]);
+	const [local, sync] = await readManualStorage();
 	return {
 		store: decodeManualStore(local, sync),
 		hasLegacyData:
@@ -357,6 +366,18 @@ async function readManualStoreState(): Promise<{
 			sync[V1_SYNC_OVERRIDE_KEY] !== undefined ||
 			sync[V1_SYNC_IGNORE_KEY] !== undefined,
 	};
+}
+
+function readManualStorage() {
+	return Promise.all([
+		browser.storage.local.get([
+			MANUAL_KEY,
+			LEGACY_SEERR_KEY,
+			V1_LOCAL_OVERRIDE_KEY,
+			V1_LOCAL_IGNORE_KEY,
+		]),
+		browser.storage.sync.get([V1_SYNC_OVERRIDE_KEY, V1_SYNC_IGNORE_KEY]),
+	]);
 }
 
 /** LEGACY: direct-upgrade decoder for released v1/v2 and pre-cutover Seerr data. */

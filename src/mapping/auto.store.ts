@@ -93,6 +93,21 @@ export async function listAniListAutomaticLayers(): Promise<AutomaticRecord[]> {
 	});
 }
 
+export async function readAutomaticRecords(): Promise<
+	(key: string) => AutomaticMappingRecord | undefined
+> {
+	const { store } = await readAutomaticStore();
+	const now = Date.now();
+	return (key) => {
+		const record = Object.hasOwn(store.records, key)
+			? store.records[key]
+			: undefined;
+		if (!isAutomaticMappingRecord(record)) return;
+		const active = activeRecord(record, now);
+		return isEmptyRecord(active) ? undefined : active;
+	};
+}
+
 function hasAutomaticAttempt(
 	record: AutomaticMappingRecord | null,
 	lane: AutomaticAttemptLane,

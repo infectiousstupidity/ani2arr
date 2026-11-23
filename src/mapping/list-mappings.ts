@@ -1,17 +1,17 @@
 /** Lists flat effective mapping records and discovers active AniList identities. */
 
-import type { AniListId } from "@/anilist/types";
+import { isAniListId, type AniListId } from "@/anilist/types";
 import { PROVIDERS, type Provider } from "@/providers/types";
-import { listAniListAutomaticLayers } from "./auto.store";
+import { listAniListAutomaticLayers, readAutomaticRecords } from "./auto.store";
 import {
 	type EffectiveMappingRecord,
 	type MappingSelectionRecords,
 	selectArrMapping,
 } from "./effective-mapping";
-import { listAniListManualLayers } from "./manual.store";
-import type { SourceIdentity } from "./source-identity";
+import { listAniListManualLayers, readManualRecords } from "./manual.store";
+import { sourceIdentityKey, type SourceIdentity } from "./source-identity";
 import type { MappingResult } from "./types";
-import { listAniListUpstreamLayers } from "./upstream.store";
+import { listAniListUpstreamLayers, readSnapshotRecords } from "./upstream.store";
 
 export interface ActiveMappingIdentity {
 	source: SourceIdentity;
@@ -70,25 +70,32 @@ export async function getMappingIdentities(
 ): Promise<ActiveMappingIdentity[]> {
 	const requestedIds = new Set(ids);
 	if (requestedIds.size === 0) return [];
-	const recordsByProvider = await listEffectiveMappingsByProvider();
-	const identities = new Map<string, ActiveMappingIdentity>();
-	for (const provider of PROVIDERS) {
-		for (const record of recordsByProvider[provider]) {
-			if (!requestedIds.has(record.anilistId)) continue;
-			identities.set(`${provider}:${record.anilistId}`, {
-				source: { source: "anilist", id: record.anilistId },
-				anilistId: record.anilistId,
+	const [getManual, getUpstream, getAutomatic] = await Promise.all([
+		readManualRecords(),
+		readSnapshotRecords(),
+		readAutomaticRecords(),
+	]);
+	const identities: ActiveMappingIdentity[] = [];
+	for (const anilistId of requestedIds) {
+		if (!isAniListId(anilistId)) continue;
+		const key = sourceIdentityKey({ source: "anilist", id: anilistId });
+		const records: MappingSelectionRecords = {
+			manual: getManual(key) ?? null,
+			direct: getUpstream(key) ?? null,
+			canonical: null,
+			automatic: getAutomatic(key) ?? null,
+		};
+		for (const provider of PROVIDERS) {
+			if (!hasMappingState(provider, records)) continue;
+			identities.push({
+				source: { source: "anilist", id: anilistId },
+				anilistId,
 				provider,
-				result: record.result,
+				result: selectArrMapping(provider, records),
 			});
 		}
 	}
-	return [...requestedIds].flatMap((anilistId) =>
-		PROVIDERS.flatMap((provider) => {
-			const identity = identities.get(`${provider}:${anilistId}`);
-			return identity ? [identity] : [];
-		}),
-	);
+	return identities;
 }
 
 function hasMappingState(

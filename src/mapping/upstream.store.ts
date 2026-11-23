@@ -195,7 +195,7 @@ async function readSnapshot(): Promise<UpstreamSnapshot | null> {
 	return currentSnapshot(stored[UPSTREAM_KEY]);
 }
 
-async function readSnapshotRecords(): Promise<
+export async function readSnapshotRecords(): Promise<
 	(key: string) => UpstreamMappingRecord | undefined
 > {
 	const snapshot = await readSnapshot();
