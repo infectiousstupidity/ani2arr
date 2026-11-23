@@ -73,11 +73,8 @@ export class MappingService {
 				? {}
 				: { metadata: options.metadata }),
 		});
-		const automatic = await getAutomaticLayerRecord(
-			source,
-			state.anilistId ?? undefined,
-		);
-		return selectArrMapping(provider, { ...state.records, automatic });
+		const updated = await this.getMappingState(source, linkedAniListId);
+		return selectArrMapping(provider, updated.records);
 	}
 
 	public async getSeerrMappingOutcome(

@@ -273,33 +273,35 @@ async function removeLegacyConnectionStorage(): Promise<void> {
 }
 
 export async function initializeSettingsStorage(): Promise<void> {
-	const [storedConnections, legacySonarr, legacyRadarr, legacySeerr] =
-		await Promise.all([
-			storage.getItem<unknown>(PRIVATE_CONNECTIONS_STORAGE_KEY),
-			...LEGACY_CONNECTION_STORAGE_KEYS.map((key) =>
-				storage.getItem<unknown>(key),
-			),
-		]);
-	const current = parsePrivateConnections(storedConnections);
-	const migrated: PrivateConnections = {
-		sonarr: chooseMigratedProviderConnection(current.sonarr, legacySonarr),
-		radarr: chooseMigratedProviderConnection(current.radarr, legacyRadarr),
-		seerr: chooseMigratedSeerrConnection(current.seerr, legacySeerr),
-	};
-	const hasCompleteStoredRecord = v.safeParse(
-		PrivateConnectionsSchema,
-		storedConnections,
-	).success;
-	const migrationChangedConnections =
-		migrated.sonarr.url !== current.sonarr.url ||
-		migrated.sonarr.apiKey !== current.sonarr.apiKey ||
-		migrated.radarr.url !== current.radarr.url ||
-		migrated.radarr.apiKey !== current.radarr.apiKey ||
-		JSON.stringify(migrated.seerr) !== JSON.stringify(current.seerr);
+	await enqueueConnectionWrite(async () => {
+		const [storedConnections, legacySonarr, legacyRadarr, legacySeerr] =
+			await Promise.all([
+				storage.getItem<unknown>(PRIVATE_CONNECTIONS_STORAGE_KEY),
+				...LEGACY_CONNECTION_STORAGE_KEYS.map((key) =>
+					storage.getItem<unknown>(key),
+				),
+			]);
+		const current = parsePrivateConnections(storedConnections);
+		const migrated: PrivateConnections = {
+			sonarr: chooseMigratedProviderConnection(current.sonarr, legacySonarr),
+			radarr: chooseMigratedProviderConnection(current.radarr, legacyRadarr),
+			seerr: chooseMigratedSeerrConnection(current.seerr, legacySeerr),
+		};
+		const hasCompleteStoredRecord = v.safeParse(
+			PrivateConnectionsSchema,
+			storedConnections,
+		).success;
+		const migrationChangedConnections =
+			migrated.sonarr.url !== current.sonarr.url ||
+			migrated.sonarr.apiKey !== current.sonarr.apiKey ||
+			migrated.radarr.url !== current.radarr.url ||
+			migrated.radarr.apiKey !== current.radarr.apiKey ||
+			JSON.stringify(migrated.seerr) !== JSON.stringify(current.seerr);
 
-	await (!hasCompleteStoredRecord || migrationChangedConnections
-		? enqueueConnectionWrite(() => writeConnectionState(migrated))
-		: syncPublicConnectionStatus(migrated));
+		await (!hasCompleteStoredRecord || migrationChangedConnections
+			? writeConnectionState(migrated)
+			: syncPublicConnectionStatus(migrated));
+	});
 
 	await removeLegacyConnectionStorage();
 }
@@ -319,12 +321,14 @@ export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
 export async function savePublicOptionsSnapshot(
 	options: PublicOptions,
 ): Promise<void> {
-	const connections = parsePrivateConnections(
-		await privateConnectionsStorage.getValue(),
-	);
-	await writePublicOptions(
-		withConnectionStatus(parsePublicOptions(options), connections),
-	);
+	await enqueueConnectionWrite(async () => {
+		const connections = parsePrivateConnections(
+			await privateConnectionsStorage.getValue(),
+		);
+		await writePublicOptions(
+			withConnectionStatus(parsePublicOptions(options), connections),
+		);
+	});
 }
 
 export async function saveProviderConnectionSnapshot(
@@ -355,10 +359,10 @@ export async function saveSeerrConnectionSnapshot(
 }
 
 export async function resetAllSettingsSnapshot(): Promise<void> {
-	await writePublicOptions(createDefaultPublicOptions());
-	await enqueueConnectionWrite(() =>
-		writeConnectionState(createDefaultPrivateConnections()),
-	);
+	await enqueueConnectionWrite(async () => {
+		await writePublicOptions(createDefaultPublicOptions());
+		await writeConnectionState(createDefaultPrivateConnections());
+	});
 	await removeLegacyConnectionStorage();
 }
 

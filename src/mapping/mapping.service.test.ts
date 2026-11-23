@@ -110,6 +110,25 @@ describe("MappingService", () => {
 		expect(resolver).toHaveBeenCalledOnce();
 	});
 
+	it("returns a manual mapping saved during automatic resolution", async () => {
+		const source = { source: "anilist", id: aid(2) } as const;
+		const search = createDeferred<void>();
+		const resolver = vi.fn(async ({ writeToken, provider, identity }) => {
+			await search.promise;
+			return setAutoResult(writeToken, provider, identity, {
+				kind: "mapped",
+				providerId: tvdb(100),
+			});
+		});
+		const pending = new MappingService(resolver).resolveMapping("sonarr", source, source.id);
+		await vi.waitFor(() => expect(resolver).toHaveBeenCalledOnce());
+		await setManualMapping("sonarr", source, { providerId: tvdb(200) });
+		search.resolve();
+		await expect(pending).resolves.toEqual({
+			kind: "mapped", source: "manual", providerId: tvdb(200),
+		});
+	});
+
 	it("captures the automatic write token before mapping-state reads", async () => {
 		const source = { source: "anilist", id: aid(2) } as const;
 		let releaseStateRead!: () => void;
