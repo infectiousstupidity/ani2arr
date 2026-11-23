@@ -3,10 +3,11 @@
 
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
-import { parseTmdbIdOrNull, type TmdbId } from "@/providers/schemas";
+import { parseTmdbIdOrNull } from "@/providers/schemas";
 import { useAddMovie, useMovieStatus } from "@/queries/radarr";
 import {
 	buildMediaActionStatusQuery,
+	quickAddArrMedia,
 	type MediaAction,
 	type MediaActionInputBase,
 	useMediaAction,
@@ -14,29 +15,6 @@ import {
 
 type RadarrMediaActionInput = MediaActionInputBase<RadarrFormState>;
 export type RadarrMediaAction = MediaAction;
-
-type AddMovieMutation = ReturnType<typeof useAddMovie>;
-
-function quickAdd(input: {
-	mediaInput: RadarrMediaActionInput;
-	tmdbId: TmdbId | null;
-	addMovie: AddMovieMutation;
-}): void {
-	if (
-		input.mediaInput.providerTitle === null ||
-		input.mediaInput.defaultForm === null ||
-		input.tmdbId === null
-	) return;
-
-	input.addMovie.mutate({
-		source: input.mediaInput.source,
-		tmdbId: input.tmdbId,
-		title: input.mediaInput.providerTitle,
-		primaryTitleHint: input.mediaInput.providerTitle,
-		metadata: input.mediaInput.metadata,
-		form: { ...input.mediaInput.defaultForm },
-	});
-}
 
 export function useRadarrMediaAction(
 	input: RadarrMediaActionInput,
@@ -60,11 +38,10 @@ export function useRadarrMediaAction(
 			movieStatus.data?.movie ?? addMovie.data ?? null,
 		),
 		runQuickAdd: () => {
-			quickAdd({
-				mediaInput: input,
-				tmdbId,
-				addMovie,
-			});
+			if (tmdbId !== null)
+				quickAddArrMedia(input, (details) =>
+					addMovie.mutate({ ...details, tmdbId }),
+				);
 		},
 	});
 }

@@ -106,6 +106,26 @@ export function buildMediaActionStatusQuery(
 	return { payload, options };
 }
 
+export function quickAddArrMedia<TForm>(
+	input: MediaActionInputBase<TForm>,
+	add: (details: {
+		source: SourceIdentity;
+		title: string;
+		primaryTitleHint: string;
+		metadata: AniListMediaHint | null;
+		form: TForm;
+	}) => void,
+): void {
+	if (input.providerTitle === null || input.defaultForm === null) return;
+	add({
+		source: input.source,
+		title: input.providerTitle,
+		primaryTitleHint: input.providerTitle,
+		metadata: input.metadata,
+		form: { ...input.defaultForm },
+	});
+}
+
 export function useMediaAction<TForm>(
 	input: UseMediaActionInput<TForm>,
 ): MediaAction {
@@ -140,10 +160,11 @@ export function useMediaAction<TForm>(
 	return {
 		status,
 		openProvider: providerOpenTarget
-			? () => openProviderPage({
-					provider: input.provider,
-					target: providerOpenTarget,
-				})
+			? () =>
+					openProviderPage({
+						provider: input.provider,
+						target: providerOpenTarget,
+					})
 			: null,
 		runPrimaryAction: () => {
 			switch (status.action) {

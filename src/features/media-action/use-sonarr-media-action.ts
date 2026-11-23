@@ -2,11 +2,12 @@
 // src/features/media-action/use-sonarr-media-action.ts
 
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
-import { parseTvdbIdOrNull, type TvdbId } from "@/providers/schemas";
+import { parseTvdbIdOrNull } from "@/providers/schemas";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import { useAddSeries, useSeriesStatus } from "@/queries/sonarr";
 import {
 	buildMediaActionStatusQuery,
+	quickAddArrMedia,
 	type MediaAction,
 	type MediaActionInputBase,
 	useMediaAction,
@@ -15,34 +16,14 @@ import {
 type SonarrMediaActionInput = MediaActionInputBase<SonarrFormState>;
 export type SonarrMediaAction = MediaAction;
 
-type AddSeriesMutation = ReturnType<typeof useAddSeries>;
-
-function quickAdd(input: {
-	mediaInput: SonarrMediaActionInput;
-	tvdbId: TvdbId | null;
-	addSeries: AddSeriesMutation;
-}): void {
-	if (
-		input.mediaInput.providerTitle === null ||
-		input.mediaInput.defaultForm === null ||
-		input.tvdbId === null
-	) return;
-
-	input.addSeries.mutate({
-		source: input.mediaInput.source,
-		tvdbId: input.tvdbId,
-		title: input.mediaInput.providerTitle,
-		primaryTitleHint: input.mediaInput.providerTitle,
-		metadata: input.mediaInput.metadata,
-		form: { ...input.mediaInput.defaultForm },
-	});
-}
-
 export function useSonarrMediaAction(
 	input: SonarrMediaActionInput,
 ): SonarrMediaAction {
 	const statusQuery = buildMediaActionStatusQuery(input);
-	const seriesStatus = useSeriesStatus(statusQuery.payload, statusQuery.options);
+	const seriesStatus = useSeriesStatus(
+		statusQuery.payload,
+		statusQuery.options,
+	);
 	const addSeries = useAddSeries();
 	const mapping = seriesStatus.data?.mapping;
 	const tvdbId = parseTvdbIdOrNull(
@@ -60,11 +41,10 @@ export function useSonarrMediaAction(
 			seriesStatus.data?.series ?? addSeries.data ?? null,
 		),
 		runQuickAdd: () => {
-			quickAdd({
-				mediaInput: input,
-				tvdbId,
-				addSeries,
-			});
+			if (tvdbId !== null)
+				quickAddArrMedia(input, (details) =>
+					addSeries.mutate({ ...details, tvdbId }),
+				);
 		},
 	});
 }

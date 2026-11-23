@@ -11,6 +11,7 @@ import {
 	normalizeSeerrSearchRequest,
 	normalizeSeerrTargetRequest,
 	normalizeSonarrStatusRequest,
+	normalizeRadarrStatusRequest,
 	queryKeys,
 } from "./query-keys";
 import {
@@ -19,6 +20,7 @@ import {
 	useSeerrSearch,
 	useSeerrTarget,
 } from "./seerr";
+import { useMovieStatus } from "./radarr";
 import { useSeriesStatus, useSonarrLookupSearch } from "./sonarr";
 
 const mocks = vi.hoisted(() => ({
@@ -30,6 +32,7 @@ const mocks = vi.hoisted(() => ({
 	},
 	api: {
 		getSeriesStatus: vi.fn(),
+		getMovieStatus: vi.fn(),
 		getSeerrTarget: vi.fn(),
 		getSeerrMediaStatus: vi.fn(),
 		searchSonarr: vi.fn(),
@@ -53,6 +56,10 @@ type CapturedQuery = {
 	enabled?: boolean;
 	staleTime?: number;
 	refetchOnMount?: boolean | "always";
+	placeholderData: (
+		data: unknown,
+		query?: { queryKey: readonly unknown[] },
+	) => unknown;
 };
 
 const aid = parseAniListId;
@@ -106,6 +113,41 @@ describe("normalized query resource hooks", () => {
 			force_verify: true,
 			force_mapping_retry: true,
 		});
+	});
+
+	it("keeps previous Arr status only for the same provider and source", async () => {
+		const input: StatusInput = {
+			source: { source: "anilist", id: aid(1) },
+			title: " Movie ",
+		};
+		useMovieStatus(input);
+		const movie = capturedQuery();
+		const request = normalizeRadarrStatusRequest(input);
+		expect(movie.queryKey).toEqual(
+			queryKeys.providerMediaStatus("radarr", request),
+		);
+		await movie.queryFn();
+		expect(mocks.api.getMovieStatus).toHaveBeenCalledWith(request);
+		const previous = { isInLibrary: true };
+		expect(movie.placeholderData(previous, { queryKey: movie.queryKey })).toBe(
+			previous,
+		);
+		expect(
+			movie.placeholderData(previous, {
+				queryKey: queryKeys.providerMediaStatus(
+					"sonarr",
+					normalizeSonarrStatusRequest(input),
+				),
+			}),
+		).toBeUndefined();
+		expect(
+			movie.placeholderData(previous, {
+				queryKey: queryKeys.providerMediaStatusItem("radarr", {
+					source: "anilist",
+					id: aid(2),
+				}),
+			}),
+		).toBeUndefined();
 	});
 
 	it("reuses the normal Seerr target key and forces retry execution", async () => {
