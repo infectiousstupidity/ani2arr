@@ -5,20 +5,14 @@ import type * as v from "valibot";
 
 import type {
 	AddSonarrSeriesInputSchema,
-	SonarrAlternateTitlesSchema,
 	SonarrAddPayloadOptionsSchema,
-	SonarrAddOptionsSchema,
 	SonarrEditOptionsSchema,
 	SonarrGeneratedFolderSchema,
-	SonarrImageSchema,
-	SonarrLookupCacheRowSchema,
 	SonarrLookupSeriesSchema,
 	SonarrQualityProfileSchema,
 	SonarrRootFolderSchema,
-	SonarrSeasonSchema,
 	SonarrSeriesSchema,
 	SonarrSeriesSnapshotSchema,
-	SonarrSeriesStatusSchema,
 	SonarrSeriesType,
 	SonarrTagSchema,
 	UpdateSonarrSeriesInputSchema,
@@ -28,13 +22,7 @@ import type {
 	ProviderTagId,
 } from "../schemas";
 
-export type SonarrSeriesStatus = v.InferOutput<typeof SonarrSeriesStatusSchema>;
 
-export type SonarrAlternateTitles = v.InferOutput<
-	typeof SonarrAlternateTitlesSchema
->;
-export type SonarrSeason = v.InferOutput<typeof SonarrSeasonSchema>;
-export type SonarrImage = v.InferOutput<typeof SonarrImageSchema>;
 
 export type SonarrSeries = v.InferOutput<typeof SonarrSeriesSchema>;
 export type SonarrLookupSeries = v.InferOutput<typeof SonarrLookupSeriesSchema>;
@@ -48,8 +36,7 @@ export type SonarrQualityProfile = v.InferOutput<
 >;
 export type SonarrTag = v.InferOutput<typeof SonarrTagSchema>;
 
-export type SonarrAddOptions = v.InferOutput<typeof SonarrAddOptionsSchema>;
-export type SonarrAddPayloadOptions = v.InferOutput<
+type SonarrAddPayloadOptions = v.InferOutput<
 	typeof SonarrAddPayloadOptionsSchema
 >;
 export type SonarrAddSeriesPayload = SonarrLookupSeries & {
@@ -60,11 +47,6 @@ export type SonarrAddSeriesPayload = SonarrLookupSeries & {
 	monitored: boolean;
 	tags: ProviderTagId[];
 	addOptions: SonarrAddPayloadOptions;
-};
-export type SonarrAddDefaults = SonarrAddOptions;
-export type SonarrAddDraft = {
-	options: SonarrAddOptions;
-	saveAsDefaults: boolean;
 };
 
 export type SonarrEditOptions = v.InferOutput<typeof SonarrEditOptionsSchema>;
@@ -79,8 +61,4 @@ export type UpdateSonarrSeriesInput = v.InferOutput<
 
 export type SonarrSeriesSnapshot = v.InferOutput<
 	typeof SonarrSeriesSnapshotSchema
->;
-
-export type SonarrLookupCacheRow = v.InferOutput<
-	typeof SonarrLookupCacheRowSchema
 >;

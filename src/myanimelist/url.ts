@@ -18,7 +18,7 @@ function parseUrl(value: string): URL | null {
 	}
 }
 
-export function stripMyAnimeListVideoSuffix(value: string): string {
+function stripMyAnimeListVideoSuffix(value: string): string {
 	return value.replace(/\/video(?:[/?#].*)?$/i, "");
 }
 

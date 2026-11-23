@@ -67,7 +67,7 @@ export function buildSeerrRequestPayload(
 	};
 }
 
-export function readSeerrStatus(value: unknown): SeerrMediaStatus {
+function readSeerrStatus(value: unknown): SeerrMediaStatus {
 	switch (value) {
 		case SEERR_STATUS_UNKNOWN: {
 			return "unknown";

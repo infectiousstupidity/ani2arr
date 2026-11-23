@@ -7,7 +7,7 @@ import type {
 	SeerrStatusSummary,
 } from "@/providers/seerr/types";
 
-export type SeerrActionStatus = SeerrMediaStatus | undefined;
+type SeerrActionStatus = SeerrMediaStatus | undefined;
 
 export interface SeerrActionStateInput {
 	isConfigured: boolean;

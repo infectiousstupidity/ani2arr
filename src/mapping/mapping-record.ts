@@ -9,13 +9,13 @@ export type MappingFacts = {
 	tvdbShow?: TvdbId;
 };
 
-export type MappingConflicts = {
+type MappingConflicts = {
 	tmdbMovie?: TmdbId[];
 	tmdbShow?: Array<{ id: TmdbId; seasons?: number[] }>;
 	tvdbShow?: Array<{ id: TvdbId; seasons?: number[] }>;
 };
 
-export type MappingScopes = {
+type MappingScopes = {
 	tmdbShow?: { id: TmdbId; seasons: number[] };
 	tvdbShow?: { id: TvdbId; seasons: number[] };
 };
@@ -49,7 +49,7 @@ export type AutomaticSlotMeta = {
 	matchedTitle?: string;
 };
 
-export type AutomaticAttemptMeta = { expiresAt: number };
+type AutomaticAttemptMeta = { expiresAt: number };
 
 export type AutomaticAttemptLane =
 	"sonarrTvdb" | "radarrTmdbMovie" | "seerrTmdbMovie" | "seerrTmdbShow";

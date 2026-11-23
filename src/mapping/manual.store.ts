@@ -82,13 +82,6 @@ export async function listAniListManualLayers(): Promise<ManualRecord[]> {
 	});
 }
 
-export function getManualDecision(
-	record: ManualMappingRecord | null,
-	provider: Provider,
-): ManualProviderDecision | null {
-	return record?.decisions?.[provider] ?? null;
-}
-
 export async function setManualMapping(
 	provider: Provider,
 	identity: SourceIdentity | AniListId,

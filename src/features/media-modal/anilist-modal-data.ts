@@ -20,7 +20,7 @@ import {
 import type { GetAniListMetadataOutput } from "@/rpc/types";
 import type { AniListHeaderData, MediaModalMetadataHint } from "./types";
 
-export type MediaModalTitles = {
+type MediaModalTitles = {
 	english: string | undefined;
 	romaji: string | undefined;
 	native: string | undefined;
@@ -36,7 +36,7 @@ export type ResolvedMediaModalMetadata = {
 	statusTitle?: string | undefined;
 };
 
-export function pickString(
+function pickString(
 	...values: Array<string | null | undefined>
 ): string | undefined {
 	const found = values.find(
@@ -45,7 +45,7 @@ export function pickString(
 	return found === null || found === undefined ? undefined : found;
 }
 
-export function getMediaFormat(input: {
+function getMediaFormat(input: {
 	canonicalMetadata: AniListMediaHint | null;
 	anilistMedia: AniListMedia | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
@@ -58,7 +58,7 @@ export function getMediaFormat(input: {
 	);
 }
 
-export function getCoverImage(input: {
+function getCoverImage(input: {
 	anilistMedia: AniListMedia | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
 	coverImageHint: string | null | undefined;

@@ -14,7 +14,6 @@ import type {
 	GetSeerrMediaStatusInput,
 	GetSeerrMediaStatusOutput,
 	GetSeerrTargetInput,
-	GetSeerrTargetsInput,
 	RequestInSeerrInput,
 	RequestInSeerrOutput,
 	SearchSeerrMediaOutput,
@@ -94,29 +93,6 @@ export const useSeerrMediaStatus = (options: {
 		staleTime: 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: shouldRetrySeerrQuery,
-	});
-};
-
-export const useSeerrTargets = (
-	items: GetSeerrTargetsInput,
-	options?: { enabled?: boolean },
-) => {
-	const normalizedItems = [
-		...new Map(
-			items.map((item) => [`${item.anilistId}:${item.mediaType}`, item]),
-		).values(),
-	].toSorted(
-		(left, right) =>
-			left.anilistId - right.anilistId ||
-			left.mediaType.localeCompare(right.mediaType),
-	);
-	return useQuery<SeerrRequestTarget[], ExtensionError>({
-		queryKey: queryKeys.seerrTargets(normalizedItems),
-		queryFn: () => getAni2arrApi().getSeerrTargets(normalizedItems),
-		enabled: (options?.enabled ?? true) && normalizedItems.length > 0,
-		staleTime: 10 * 60 * 1000,
-		gcTime: 60 * 60 * 1000,
-		refetchOnWindowFocus: false,
 	});
 };
 

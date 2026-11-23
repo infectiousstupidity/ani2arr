@@ -34,7 +34,7 @@ export const SONARR_EDIT_MONITORING_ACTIONS = [
 
 export const SONARR_MONITOR_NEW_ITEMS_OPTIONS = ["all", "none"] as const;
 
-export const SONARR_SERIES_STATUSES = [
+const SONARR_SERIES_STATUSES = [
 	"continuing",
 	"ended",
 	"upcoming",
@@ -61,15 +61,12 @@ export type SonarrEditMonitoringAction = v.InferOutput<
 export const SonarrMonitorNewItemsOptionSchema = v.picklist(
 	SONARR_MONITOR_NEW_ITEMS_OPTIONS,
 );
-export type SonarrMonitorNewItemsOption = v.InferOutput<
-	typeof SonarrMonitorNewItemsOptionSchema
->;
 
 // Display/cache status returned on Sonarr series and lookup results.
 export const SonarrSeriesStatusSchema = v.picklist(SONARR_SERIES_STATUSES);
 
 // Raw nested Sonarr response shape. Keep this PUT-compatible for full series saves.
-export const SonarrAlternateTitleResourceSchema = v.object({
+const SonarrAlternateTitleResourceSchema = v.object({
 	title: v.optional(v.nullable(v.string())),
 	sceneSeasonNumber: v.optional(v.nullable(v.number())),
 	seasonNumber: v.optional(v.nullable(v.number())),
@@ -83,7 +80,7 @@ export const SonarrAlternateTitlesSchema = v.optional(
 );
 
 // Nested Sonarr stats used for library cache/display counts.
-export const SonarrStatisticsSchema = v.object({
+const SonarrStatisticsSchema = v.object({
 	seasonCount: v.optional(v.number()),
 	episodeCount: v.optional(v.number()),
 	episodeFileCount: v.optional(v.number()),

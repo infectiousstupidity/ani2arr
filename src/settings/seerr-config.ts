@@ -139,7 +139,7 @@ export function normalizeSeerrApiKeyConnectionInput(input: {
 	};
 }
 
-export function normalizeSeerrConnectionSettings(
+function normalizeSeerrConnectionSettings(
 	settings: ExtensionOptions | undefined,
 ): NormalizedSeerrConnection | null {
 	if (!settings) return null;

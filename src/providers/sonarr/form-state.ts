@@ -35,7 +35,7 @@ const SonarrProviderFieldEntries = {
 
 export const SonarrDefaultsSchema = v.object(SonarrProviderFieldEntries);
 
-export const SonarrFormStateSchema = v.object({
+const SonarrFormStateSchema = v.object({
 	...SonarrProviderFieldEntries,
 	monitorNewItems: v.optional(SonarrMonitorNewItemsOptionSchema),
 });

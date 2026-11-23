@@ -230,7 +230,7 @@ describe("MappingService", () => {
 		});
 	});
 
-	it("covers Seerr bulk, list-all, and reverse-read surfaces", async () => {
+	it("covers Seerr list-all and reverse-read surfaces", async () => {
 		await setManualSeerrTarget(aid(10), {
 			mediaType: "movie",
 			tmdbId: tmdb(100),
@@ -244,25 +244,6 @@ describe("MappingService", () => {
 		});
 		const service = new MappingService(vi.fn());
 
-		await expect(
-			service.listSeerrTargets([
-				{ anilistId: aid(10), mediaType: "movie" },
-				{ anilistId: aid(30), mediaType: "movie" },
-			]),
-		).resolves.toEqual([
-			{
-				anilistId: aid(10),
-				source: "manual",
-				mediaType: "movie",
-				tmdbId: tmdb(100),
-			},
-			{
-				anilistId: aid(30),
-				source: "anibridge",
-				mediaType: "movie",
-				tmdbId: tmdb(100),
-			},
-		]);
 		await expect(service.listAllSeerrTargets("movie")).resolves.toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ anilistId: aid(20), tmdbId: tmdb(200) }),

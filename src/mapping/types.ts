@@ -55,7 +55,7 @@ function normalizeSeerrTargetWithSeasonField(
 
 export type SeerrTargetWithEvidence = SeerrTarget;
 
-export type ArrUpstreamTarget =
+type ArrUpstreamTarget =
 	| { provider: "sonarr"; providerId: TvdbId; season?: number }
 	| { provider: "radarr"; providerId: TmdbId };
 

@@ -13,7 +13,6 @@ const apiServicesMock = vi.hoisted(() => ({
 	mappingService: {
 		getSeerrTarget: vi.fn(),
 		listAllSeerrTargets: vi.fn(),
-		listSeerrTargets: vi.fn(),
 	},
 	seerrClient: {
 		requestMedia: vi.fn(),
@@ -157,11 +156,6 @@ describe("seerrHandlers", () => {
 				source,
 				mediaType: "series" as "tv",
 			}),
-		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
-		await expect(
-			seerrHandlers.getSeerrTargets([
-				{ anilistId: 0 as ReturnType<typeof aid>, mediaType: "movie" },
-			]),
 		).rejects.toMatchObject({ code: ErrorCode.VALIDATION_ERROR });
 		await expect(
 			seerrHandlers.setManualSeerrTarget({

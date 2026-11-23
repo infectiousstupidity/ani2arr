@@ -93,7 +93,7 @@ export async function listAniListAutomaticLayers(): Promise<AutomaticRecord[]> {
 	});
 }
 
-export function hasAutomaticAttempt(
+function hasAutomaticAttempt(
 	record: AutomaticMappingRecord | null,
 	lane: AutomaticAttemptLane,
 ): boolean {

@@ -139,58 +139,8 @@ export function getSeerrSeasonDisplayTitle(season: {
 	return `S${season.seasonNumber} - ${name}`;
 }
 
-type SeerrSeasonShape = "tmdb" | "tvdb" | "unknown";
-
-function getSeerrSeasonShape(
-	seasons: readonly SeerrSeasonStatus[] | undefined,
-): SeerrSeasonShape {
-	if (!seasons || seasons.length === 0) return "unknown";
-
-	let namedSeasonCount = 0;
-	let numericSeasonNameCount = 0;
-
-	for (const season of seasons) {
-		if (season.seasonNumber === 0) continue;
-
-		const name = season.name?.trim();
-		if (!name) continue;
-
-		if (isNumericSeasonName(name, season.seasonNumber)) {
-			numericSeasonNameCount += 1;
-		} else {
-			namedSeasonCount += 1;
-		}
-	}
-
-	if (namedSeasonCount > 0) return "tmdb";
-	if (numericSeasonNameCount > 0) return "tvdb";
-	return "unknown";
-}
-
-export function getMappedSeasonsForDetails(input: {
-	mappedSeasons?: readonly number[] | undefined;
-	tmdbMappedSeasons?: readonly number[] | undefined;
-	tvdbMappedSeasons?: readonly number[] | undefined;
-	seasons: readonly SeerrSeasonStatus[] | undefined;
-}): number[] {
-	const shape = getSeerrSeasonShape(input.seasons);
-	let mappedSeasons: readonly number[];
-
-	if (shape === "tvdb" && input.tvdbMappedSeasons?.length) {
-		mappedSeasons = input.tvdbMappedSeasons;
-	} else if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
-		mappedSeasons = input.tmdbMappedSeasons;
-	} else {
-		mappedSeasons = input.mappedSeasons ?? [];
-	}
-
-	return normalizeSeasonNumbers(mappedSeasons);
-}
-
 export function getDefaultSelectedSeasons(input: {
 	mappedSeasons?: readonly number[] | undefined;
-	tmdbMappedSeasons?: readonly number[] | undefined;
-	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;
 	enableSpecialEpisodes?: boolean | undefined;
 }): number[] {
@@ -198,7 +148,7 @@ export function getDefaultSelectedSeasons(input: {
 		input.seasons,
 		input.enableSpecialEpisodes,
 	);
-	const mappedSeasons = getMappedSeasonsForDetails(input);
+	const mappedSeasons = normalizeSeasonNumbers(input.mappedSeasons ?? []);
 
 	// No season evidence means AniBridge cannot claim which season represents
 	// this title, so nothing is preselected and the user picks one.

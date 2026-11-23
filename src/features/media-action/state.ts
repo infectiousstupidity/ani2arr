@@ -13,7 +13,7 @@ export type MediaActionState =
 	| "in-library"
 	| "can-add";
 
-export type MediaActionCommand =
+type MediaActionCommand =
 	| "configure"
 	| "quick-add"
 	| "open-mapping"

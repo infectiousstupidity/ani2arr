@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { MODAL_Z_INDEX_FLOATING } from "../chrome/modal-shell";
 
-export function createContentPortalContainer(
+function createContentPortalContainer(
 	documentRef: Pick<Document, "createElement"> | null,
 ): HTMLDivElement | null {
 	if (!documentRef) {

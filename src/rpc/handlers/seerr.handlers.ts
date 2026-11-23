@@ -18,7 +18,6 @@ import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import {
-	requireAniListId,
 	requireMediaType,
 	requireSeasons,
 	requireSeerrSeasons,
@@ -26,14 +25,11 @@ import {
 	requireTmdbId,
 	requireTvdbId,
 } from "./mapping-validation";
-import { createError } from "@/shared/errors/error-utils";
-import { ErrorCode } from "@/shared/errors/error.types";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrMediaDetailsInput,
 	GetSeerrMediaStatusInput,
 	GetSeerrTargetInput,
-	GetSeerrTargetsInput,
 	ClearManualSeerrTargetInput,
 	MappingDetailsLinkedAniListEntry,
 	RequestInSeerrInput,
@@ -94,22 +90,6 @@ export const seerrHandlers = {
 			});
 		}
 		return mappingService.getSeerrTarget(source, mediaType, linkedAniListId);
-	},
-
-	async getSeerrTargets(input: GetSeerrTargetsInput) {
-		if (!Array.isArray(input)) {
-			throw createError(
-				ErrorCode.VALIDATION_ERROR,
-				"Invalid Seerr target list.",
-				"Invalid Seerr target list.",
-			);
-		}
-		return mappingService.listSeerrTargets(
-			input.map((item) => ({
-				anilistId: requireAniListId(item?.anilistId),
-				mediaType: requireMediaType(item?.mediaType),
-			})),
-		);
 	},
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {

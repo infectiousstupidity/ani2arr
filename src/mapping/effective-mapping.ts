@@ -132,7 +132,7 @@ export function selectSeerrMapping(
 	};
 }
 
-export function findTvdbSeasons(
+function findTvdbSeasons(
 	records: MappingSelectionRecords,
 	selectedTvdbId: TvdbId,
 ): number[] {
@@ -149,7 +149,7 @@ export function findTvdbSeasons(
 	return [];
 }
 
-export function findTmdbSeasons(
+function findTmdbSeasons(
 	records: MappingSelectionRecords,
 	selectedTmdbId: TmdbId,
 ): number[] {

@@ -12,7 +12,7 @@ const COVER_SELECTOR = 'a.cover';
 const TITLE_SELECTOR = 'a.title';
 const SECTION_HEADING_SELECTOR = 'h2.section-heading, h2';
 
-export const getDirectSectionHeadingText = (heading: Element | null): string => {
+const getDirectSectionHeadingText = (heading: Element | null): string => {
   if (!heading) return '';
 
   return [...heading.childNodes]

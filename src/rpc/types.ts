@@ -130,10 +130,6 @@ export type ValidateTmdbInput = {
 };
 
 export type GetMappingIdentitiesInput = AniListId[];
-export type GetSeerrTargetsInput = Array<{
-	anilistId: AniListId;
-	mediaType: "movie" | "tv";
-}>;
 export type GetSeerrTargetInput = {
 	source: SourceIdentity;
 	mediaType: "movie" | "tv";

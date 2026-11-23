@@ -17,7 +17,7 @@ import type { SonarrSeries } from "@/providers/sonarr/types";
 import type { GetSeriesStatusOutput } from "@/rpc/types";
 import { areArraysEqual } from "../helpers";
 
-export const SONARR_EDIT_MONITORING_ACTION_DEFAULT = "noChange" as const;
+const SONARR_EDIT_MONITORING_ACTION_DEFAULT = "noChange" as const;
 
 export type SonarrEditDefaults = {
 	form: SonarrFormState;
@@ -79,13 +79,13 @@ function readProviderFolderName(value: unknown): string | undefined {
 	return folder.length > 0 ? folder : undefined;
 }
 
-export function hasFullSonarrEditItem(
+function hasFullSonarrEditItem(
 	status: GetSeriesStatusOutput | null | undefined,
 ): status is GetSeriesStatusOutput & { series: SonarrSeries } {
 	return status?.isInLibrary === true && isFullSonarrSeries(status.series);
 }
 
-export function getSonarrAddDefaults(
+function getSonarrAddDefaults(
 	defaults: Partial<SonarrFormState> | null | undefined,
 ): SonarrFormState {
 	return normalizeSonarrDefaults(defaults);

@@ -34,7 +34,7 @@ type SonarrDraftState = {
 	monitoringAction: SonarrEditMonitoringAction;
 };
 
-export type SonarrSetupFooterState = {
+type SonarrSetupFooterState = {
 	canSubmit: boolean;
 	isBusy: boolean;
 	isDirty: boolean;

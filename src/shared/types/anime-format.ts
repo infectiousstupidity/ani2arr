@@ -1,6 +1,6 @@
 /** Source-neutral anime formats normalized by supported content adapters. */
 
-export const ANIME_FORMATS = [
+const ANIME_FORMATS = [
 	"TV",
 	"TV_SHORT",
 	"MOVIE",

@@ -21,7 +21,7 @@ import {
 import { createError, getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 
-export type SeerrFailureScope = "session" | "apiKey" | "global";
+type SeerrFailureScope = "session" | "apiKey" | "global";
 
 export type SeerrConnectionFailure = {
 	message: string;

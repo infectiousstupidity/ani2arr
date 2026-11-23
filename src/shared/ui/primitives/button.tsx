@@ -6,7 +6,7 @@ import { cn } from "@/shared/utils/cn";
 import TooltipWrapper from "./tooltip";
 import type { FloatingPortalContainer } from "../portal-container";
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	asChild?: boolean;
 	variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive";
 	size?: "sm" | "md" | "lg" | "icon";

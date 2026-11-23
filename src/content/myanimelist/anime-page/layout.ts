@@ -8,7 +8,7 @@ import {
 } from "@/anilist/types";
 
 export const TITLE_SELECTOR = "h1.title-name";
-export const DETAILS_COLUMN_SELECTOR = "#content .leftside, .leftside";
+const DETAILS_COLUMN_SELECTOR = "#content .leftside, .leftside";
 export const ACTIONS_HOST_SELECTOR = [
 	"#content .anime-detail-header-stats .js-user-status-block",
 	"#content .anime-detail-header-stats .user-status-block",

@@ -58,7 +58,6 @@ import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrLinkedAniListEntriesOutput,
 	GetSeerrTargetInput,
-	GetSeerrTargetsInput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
 	ClearManualSeerrTargetInput,
@@ -111,7 +110,6 @@ export interface Ani2arrApi {
 	getSeerrTarget(
 		input: GetSeerrTargetInput,
 	): Promise<SeerrRequestTarget | null>;
-	getSeerrTargets(input: GetSeerrTargetsInput): Promise<SeerrRequestTarget[]>;
 	setManualSeerrTarget(input: SetManualSeerrTargetInput): Promise<{ ok: true }>;
 	clearManualSeerrTarget(
 		input: ClearManualSeerrTargetInput,

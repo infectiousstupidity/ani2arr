@@ -20,7 +20,6 @@ import type {
 	GetMappingInspectionInput,
 	GetSeerrMediaStatusInput,
 	GetSeerrTargetInput,
-	GetSeerrTargetsInput,
 	SearchSeerrMediaInput,
 	StatusInput,
 } from "@/rpc/types";
@@ -276,18 +275,6 @@ export const queryKeys = {
 	seerrTargetsRoot: seerrTargetsRootKey,
 	seerrTarget: (input: NormalizedSeerrTargetRequest) =>
 		[...seerrTargetsRootKey(), "single", input] as const,
-	seerrTargets: (items: GetSeerrTargetsInput) =>
-		[
-			...seerrTargetsRootKey(),
-			"batch",
-			items
-				.map((item) => ({ ...item }))
-				.toSorted(
-					(left, right) =>
-						left.anilistId - right.anilistId ||
-						left.mediaType.localeCompare(right.mediaType),
-				),
-		] as const,
 	seerrMediaStatusItem: seerrMediaStatusItemKey,
 	seerrMediaStatus: (input: NormalizedSeerrMediaStatusRequest | null) =>
 		input === null

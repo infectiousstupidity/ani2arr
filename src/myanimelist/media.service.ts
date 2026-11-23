@@ -17,7 +17,7 @@ const MYANIMELIST_METADATA_CACHE_TTL = {
 	hardMs: 30 * 24 * 60 * 60 * 1000,
 } as const;
 
-export const myAnimeListMetadataCache = createTtlCache<MyAnimeListMetadata>(
+const myAnimeListMetadataCache = createTtlCache<MyAnimeListMetadata>(
 	"myanimelist:metadata",
 );
 

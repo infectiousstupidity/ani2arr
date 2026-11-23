@@ -11,7 +11,7 @@ import {
 } from "./types";
 import { sourceIdentityKey } from "@/mapping/source-identity";
 
-export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
+const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
 	childList: true,
 	subtree: true,
 	attributes: true,

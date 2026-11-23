@@ -3,7 +3,7 @@
 
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 
-export type SeerrAuth =
+type SeerrAuth =
 	| {
 			mode: "session";
 	  }

@@ -95,7 +95,7 @@ const SeerrAuthSchema = v.union([
 	}),
 ]);
 
-export const SeerrConnectionSchema = v.object({
+const SeerrConnectionSchema = v.object({
 	url: v.string(),
 	auth: SeerrAuthSchema,
 	account: v.optional(SeerrAccountSummarySchema),

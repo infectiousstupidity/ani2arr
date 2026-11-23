@@ -12,7 +12,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/shared/utils/cn";
 import type { MediaModalContainer } from "../types";
 
-export const MODAL_Z_INDEX_BASE = 2_147_483_600;
+const MODAL_Z_INDEX_BASE = 2_147_483_600;
 const MODAL_Z_INDEX_OVERLAY = MODAL_Z_INDEX_BASE;
 const MODAL_Z_INDEX_CONTENT = MODAL_Z_INDEX_BASE + 1;
 export const MODAL_Z_INDEX_FLOATING = MODAL_Z_INDEX_BASE + 2;

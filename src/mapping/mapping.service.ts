@@ -105,22 +105,6 @@ export class MappingService {
 		return outcome.kind === "mapped" ? effectiveSeerrTarget(outcome) : null;
 	}
 
-	public async listSeerrTargets(
-		items: readonly { anilistId: AniListId; mediaType: "movie" | "tv" }[],
-	): Promise<EffectiveSeerrTarget[]> {
-		if (items.length === 0) return [];
-		const records = await loadAniListRecords();
-		return items.flatMap(({ anilistId, mediaType }) => {
-			const outcome = selectSeerrMapping(
-				mediaType,
-				recordsForAniList(records, anilistId),
-			);
-			return outcome.kind === "mapped"
-				? [effectiveSeerrTarget({ ...outcome, anilistId })]
-				: [];
-		});
-	}
-
 	public async listAllSeerrTargets(
 		mediaType: "movie" | "tv",
 	): Promise<Array<EffectiveSeerrTarget & { anilistId: AniListId }>> {

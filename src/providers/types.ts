@@ -22,7 +22,7 @@ export interface ProviderRootFolder {
 	freeSpace?: number | null;
 }
 
-export interface ProviderQualityProfile {
+interface ProviderQualityProfile {
 	id: ProviderQualityProfileId;
 	name: string;
 }

@@ -8,7 +8,7 @@ import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 
 export type MediaModalView = "setup" | "mapping";
-export type MediaModalOpenSource = "content" | "options-page";
+type MediaModalOpenSource = "content" | "options-page";
 
 export type MediaModalMetadataHint = {
 	title?: string;
@@ -55,15 +55,15 @@ type ProviderMediaModalStateBase = MediaModalStateBase & {
 	initialView?: MediaModalView;
 };
 
-export type SonarrMediaModalState = ProviderMediaModalStateBase & {
+type SonarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "sonarr";
 };
 
-export type RadarrMediaModalState = ProviderMediaModalStateBase & {
+type RadarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "radarr";
 };
 
-export type SeerrMediaModalState = MediaModalStateBase & {
+type SeerrMediaModalState = MediaModalStateBase & {
 	kind: "seerr";
 	mediaType: "movie" | "tv";
 };
@@ -75,7 +75,7 @@ export type MediaModalOpenState = Exclude<MediaModalState, null>;
 
 export type MediaModalContainer = HTMLElement | ShadowRoot;
 
-export type MediaModalSharedProps = {
+type MediaModalSharedProps = {
 	onClose: () => void;
 	container?: MediaModalContainer | undefined;
 };

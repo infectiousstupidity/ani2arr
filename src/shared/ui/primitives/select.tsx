@@ -92,7 +92,7 @@ export function SelectValue(
   return <SelectPrimitive.Value {...props} />;
 }
 
-export interface SelectControlProps {
+interface SelectControlProps {
   value: string;
   onValueChange: (value: string) => void;
   options: ReadonlyArray<{ label: string; value: string }>;

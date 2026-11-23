@@ -23,7 +23,7 @@ import {
 	type RadarrSetupTarget,
 } from "./radarr-setup-values";
 
-export type RadarrSetupFooterState = {
+type RadarrSetupFooterState = {
 	canSubmit: boolean;
 	isBusy: boolean;
 	isDirty: boolean;

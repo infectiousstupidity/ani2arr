@@ -35,7 +35,7 @@ const RadarrAddFieldEntries = {
 
 export const RadarrDefaultsSchema = v.object(RadarrAddFieldEntries);
 
-export const RadarrFormStateSchema = v.object({
+const RadarrFormStateSchema = v.object({
 	...RadarrAddFieldEntries,
 	monitored: v.optional(v.boolean()),
 });

@@ -4,9 +4,6 @@
 import type * as v from "valibot";
 
 import type {
-	RadarrAddPayloadOptionsSchema,
-	RadarrAlternateTitleSchema,
-	RadarrImageSchema,
 	RadarrLookupMovieSchema,
 	RadarrMinimumAvailability,
 	RadarrMovieMonitor,
@@ -21,10 +18,6 @@ import type {
 	ProviderTagId,
 } from "../schemas";
 
-export type RadarrImage = v.InferOutput<typeof RadarrImageSchema>;
-export type RadarrAlternateTitle = v.InferOutput<
-	typeof RadarrAlternateTitleSchema
->;
 
 export type RadarrMovie = v.InferOutput<typeof RadarrMovieSchema>;
 export type RadarrLookupMovie = v.InferOutput<typeof RadarrLookupMovieSchema>;
@@ -35,9 +28,6 @@ export type RadarrQualityProfile = v.InferOutput<
 >;
 export type RadarrTag = v.InferOutput<typeof RadarrTagSchema>;
 
-export type RadarrAddPayloadOptions = v.InferOutput<
-	typeof RadarrAddPayloadOptionsSchema
->;
 export type RadarrAddMoviePayload = Omit<
 	RadarrLookupMovie,
 	| "addOptions"

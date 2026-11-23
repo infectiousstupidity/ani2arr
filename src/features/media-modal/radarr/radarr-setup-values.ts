@@ -66,13 +66,13 @@ function readProviderFolderName(value: unknown): string | undefined {
 	return folderName.length > 0 ? folderName : undefined;
 }
 
-export function hasFullRadarrEditItem(
+function hasFullRadarrEditItem(
 	status: GetMovieStatusOutput | null | undefined,
 ): status is GetMovieStatusOutput & { movie: RadarrMovie } {
 	return status?.isInLibrary === true && isFullRadarrMovie(status.movie);
 }
 
-export function getRadarrAddDefaults(
+function getRadarrAddDefaults(
 	defaults: Partial<RadarrFormState> | null | undefined,
 ): RadarrFormState {
 	return normalizeRadarrDefaults(defaults);

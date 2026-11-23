@@ -20,7 +20,7 @@ export type ConfiguredProvider = {
 	options: ExtensionOptions;
 };
 
-export function createProviderNotConfiguredError(
+function createProviderNotConfiguredError(
 	provider: Provider,
 ): ExtensionError {
 	const label = getProviderLabel(provider);
@@ -60,7 +60,7 @@ export async function requireProviderCredentials(
 	return credentials;
 }
 
-export function createSeerrNotConfiguredError(): ExtensionError {
+function createSeerrNotConfiguredError(): ExtensionError {
 	return createError(
 		ErrorCode.CONFIGURATION_ERROR,
 		"Seerr connection is not configured.",
