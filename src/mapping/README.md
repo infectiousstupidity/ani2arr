@@ -53,9 +53,10 @@ two services may number seasons differently.
 
 ## Persistence
 
-Store reads are pure: they may decode released data and omit expired automatic
-state, but they do not rewrite storage. Explicit migration and mutation paths
-write the current format before removing old keys. Writes are serialized.
+Store reads are pure: they omit malformed cache records and expired automatic
+state without rewriting storage. Only the manual store decodes legacy data;
+upstream and automatic legacy caches are discarded. Explicit migration and
+mutation paths write the current format where needed. Writes are serialized.
 Automatic facts and attempt lanes expire independently, and a full reset
 advances a write token so automatic work started before the reset cannot write
 stale results afterward.
