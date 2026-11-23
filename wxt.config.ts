@@ -8,6 +8,7 @@ import { defineConfig, type WxtViteConfig } from "wxt";
 export default defineConfig({
 	webExt: {
 		openDevtools: true,
+		binaries: { firefox: "firefoxdeveloperedition" },
 		chromiumArgs: ["--auto-open-devtools-for-tabs"],
 	},
 	dev: {
