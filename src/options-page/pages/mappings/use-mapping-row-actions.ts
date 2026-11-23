@@ -5,17 +5,11 @@ import { useState } from "react";
 import type { AniListMetadata } from "@/anilist/types";
 import type { AniListTitleLanguage } from "@/anilist/title";
 import { resolveTitlePreference } from "@/anilist/title";
-import type { MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
-import {
-	parseTmdbIdOrNull,
-	parseTvdbIdOrNull,
-} from "@/providers/schemas";
+import type { MediaModalMetadataHint } from "@/features/media-modal/types";
+import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
-import type {
-	TmdbId,
-	TvdbId,
-} from "@/providers/schemas";
+import type { TmdbId, TvdbId } from "@/providers/schemas";
 import {
 	useClearManualMapping,
 	useClearMappingIgnore,
@@ -118,16 +112,26 @@ export function useMappingRowActions(
 
 	const handleIgnore = (row: MappingRow, action: IgnoreAction): void => {
 		void runRowMutation(row, async () => {
+			const input = {
+				provider: action.provider,
+				source: { source: "anilist" as const, id: action.anilistId },
+			};
 			await (action.kind === "clear-ignore"
-				? clearIgnore.mutateAsync(action)
-				: setIgnore.mutateAsync(action));
+				? clearIgnore.mutateAsync(input)
+				: setIgnore.mutateAsync(input));
 		});
 	};
 
-	const handleClearMatch = (row: MappingRow, action: ClearMatchAction): void => {
+	const handleClearMatch = (
+		row: MappingRow,
+		action: ClearMatchAction,
+	): void => {
 		void runRowMutation(row, async () => {
 			if (action.kind === "clear-manual") {
-				await clearManualMapping.mutateAsync(action);
+				await clearManualMapping.mutateAsync({
+					provider: action.provider,
+					source: { source: "anilist", id: action.anilistId },
+				});
 				return;
 			}
 
@@ -139,11 +143,11 @@ export function useMappingRowActions(
 
 			await (action.kind === "clear-rejected"
 				? clearRejectedCandidate.mutateAsync({
-						anilistId: action.anilistId,
+						source: { source: "anilist", id: action.anilistId },
 						...target,
 					})
 				: setRejectedCandidate.mutateAsync({
-						anilistId: action.anilistId,
+						source: { source: "anilist", id: action.anilistId },
 						...target,
 					}));
 		});
@@ -152,7 +156,7 @@ export function useMappingRowActions(
 	const handleEdit = (row: MappingRow): void => {
 		const metadata = metadataById.get(row.anilistId) ?? null;
 		mediaModal.open({
-			anilistId: row.anilistId,
+			source: { source: "anilist", id: row.anilistId },
 			kind: "provider",
 			provider: row.provider,
 			initialView: "mapping",

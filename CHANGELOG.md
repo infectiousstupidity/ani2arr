@@ -2,6 +2,51 @@
 
 All notable user-facing changes to ani2arr are documented in this file.
 
+## v2.2.0 - MyAnimeList support added
+
+Released: Unreleased
+
+### Added
+
+- Added MyAnimeList support: ani2arr actions on MyAnimeList anime pages and on
+  MyAnimeList seasonal, ranking, and search listings.
+- Added MyAnimeList metadata lookups through the public Jikan API, cached
+  locally and rate-limited to one request per second.
+- Added MyAnimeList source rows from the public AniBridge mapping files. For an
+  entry whose source is MyAnimeList, the direct MyAnimeList mapping takes
+  precedence.
+- Added a one-time storage migration that consolidates the mapping records and
+  settings written by earlier versions.
+
+### Changed
+
+- Mapping and settings storage now key entries by source identity (AniList or
+  MyAnimeList) instead of AniList IDs only. Existing v2.1 data migrates on the
+  first run after the update.
+- Consolidated manual movie mappings: when v2.1.0 stored different Radarr and
+  Seerr movie overrides for one title, only the Radarr override is kept.
+- Flattened the mapping lists and normalized media format and routing handling.
+- Kept released Seerr TV seasons that were previously dropped.
+- Seerr now preselects no seasons for a TV title when no season mapping exists,
+  so the season is chosen explicitly; mapped seasons still preselect.
+- Skipped unchanged storage writes and decoded only the upstream mapping records
+  that were requested.
+- Updated dependencies to pass the security audit, and updated the build
+  toolchain (Node.js and pnpm).
+- Permissions changed: `https://api.jikan.moe/*` is now required, the `cookies`
+  permission is now requested for Seerr CSRF support, and the AniList and
+  AniChart page origins are no longer declared as required hosts. Firefox prompts
+  for the new permissions after the update.
+
+### Notes
+
+- Existing Sonarr, Radarr, Seerr, AniList, and AniChart behavior is unchanged,
+  apart from the fixes above.
+- Settings, mappings, and manual Seerr targets carry over through the automatic
+  migration; no reconfiguration is expected.
+- The version was bumped to a minor release because a new optional integration
+  was added with no user workflow removed.
+
 ## v2.1.0 - Seerr support added
 
 Released: 2026-06-16

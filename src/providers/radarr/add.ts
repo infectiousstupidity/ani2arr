@@ -3,37 +3,21 @@
 
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	TmdbId,
+} from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
 import type { RadarrFormState } from "./form-state";
 import type { RadarrMinimumAvailability, RadarrMovieMonitor } from "./schemas";
 import type {
+	RadarrAddMoviePayload,
 	RadarrLookupMovie,
 	RadarrMovie,
-	RadarrQualityProfileId,
-	RadarrTagId,
-	TmdbId,
 } from "./types";
 import { resolveProviderTagIds } from "../provider-tags";
-
-export type RadarrAddMoviePayload = Omit<
-	RadarrLookupMovie,
-	| "addOptions"
-	| "id"
-	| "minimumAvailability"
-	| "monitored"
-	| "qualityProfileId"
-	| "rootFolderPath"
-	| "tags"
-> & {
-	id: 0;
-	rootFolderPath: string;
-	qualityProfileId: RadarrQualityProfileId;
-	monitored: boolean;
-	minimumAvailability: RadarrMinimumAvailability;
-	tags: RadarrTagId[];
-	addOptions: { monitor: RadarrMovieMonitor; searchForMovie: boolean };
-};
 
 type AddRadarrMovieInput = {
 	tmdbId: TmdbId;
@@ -50,11 +34,11 @@ function buildAddRadarrMoviePayload(
 	movie: RadarrLookupMovie,
 	options: {
 		rootFolderPath: string;
-		qualityProfileId: RadarrQualityProfileId;
+		qualityProfileId: ProviderQualityProfileId;
 		monitor: RadarrMovieMonitor;
 		minimumAvailability: RadarrMinimumAvailability;
 		searchForMovie: boolean;
-		tags: RadarrTagId[];
+		tags: ProviderTagId[];
 	},
 ): RadarrAddMoviePayload {
 	return {
@@ -182,10 +166,10 @@ async function resolveRadarrAddPayload(input: {
 }
 
 function resolveRequiredQualityProfileId(input: {
-	value: RadarrQualityProfileId | undefined;
-	fallback: RadarrQualityProfileId | undefined;
+	value: ProviderQualityProfileId | undefined;
+	fallback: ProviderQualityProfileId | undefined;
 	actionLabel: "add";
-}): RadarrQualityProfileId {
+}): ProviderQualityProfileId {
 	const resolvedValue =
 		typeof input.value === "number" && Number.isFinite(input.value)
 			? input.value

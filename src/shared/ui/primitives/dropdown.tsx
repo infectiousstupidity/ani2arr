@@ -48,5 +48,3 @@ export const DropdownItem: React.FC<{
     {children}
   </DropdownMenu.Item>
 );
-
-export default Dropdown;

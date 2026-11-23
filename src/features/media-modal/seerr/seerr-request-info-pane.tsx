@@ -8,11 +8,11 @@ import type {
 	SeerrRequestTarget,
 } from "@/rpc/types";
 import { MappingLinkedEntries } from "../details/linked-entries";
-import { RIGHT_PANE_SCROLL_CLASS } from "./seerr-modal.constants";
 import { SeerrDetailCard } from "./seerr-detail-card";
+import { RIGHT_PANE_SCROLL_CLASS } from "./seerr-modal.constants";
 
 export function SeerrRequestInfoPane(props: {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	target: SeerrRequestTarget | null;
 	details: SeerrMediaDetails | null;
 	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
@@ -22,8 +22,7 @@ export function SeerrRequestInfoPane(props: {
 	const targetFallbackTitle = target
 		? `${target.mediaType === "movie" ? "Movie" : "TV"} TMDB ID: ${target.tmdbId}`
 		: "";
-	const tvdbId =
-		details?.tvdbId ?? (target?.mediaType === "tv" ? target.tvdbId : undefined);
+	const tvdbId = details?.tvdbId;
 
 	return (
 		<div className={RIGHT_PANE_SCROLL_CLASS}>

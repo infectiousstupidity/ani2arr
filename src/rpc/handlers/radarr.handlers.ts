@@ -2,7 +2,6 @@
 // src/rpc/handlers/radarr.handlers.ts
 
 import {
-	bumpLibraryRevision,
 	mappingService,
 	radarrClient,
 	radarrLibrary,
@@ -14,6 +13,7 @@ import {
 	requireProviderCredentials,
 } from "@/background/provider-config";
 import type { MappingResult } from "@/mapping/types";
+import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { addRadarrMovie } from "@/providers/radarr/add";
 import { updateRadarrMovie as updateRadarrMovieProvider } from "@/providers/radarr/edit";
 import {
@@ -35,6 +35,7 @@ import type {
 	UpdateRadarrInput,
 	ValidateTmdbInput,
 } from "@/rpc/types";
+import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 type RadarrMappingResult =
@@ -61,9 +62,12 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		await radarrLibrary.upsertMovieSnapshot(toRadarrMovieSnapshot(created));
+		const changed = await radarrLibrary.upsertMovieSnapshot(
+			toRadarrMovieSnapshot(created),
+			credentials,
+		);
 		scheduleLibraryRefresh("radarr");
-		await bumpLibraryRevision("radarr");
+		if (changed) await bumpProviderLibraryRevision("radarr");
 		return created;
 	},
 
@@ -77,9 +81,12 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		await radarrLibrary.upsertMovieSnapshot(toRadarrMovieSnapshot(updated));
+		const changed = await radarrLibrary.upsertMovieSnapshot(
+			toRadarrMovieSnapshot(updated),
+			credentials,
+		);
 		scheduleLibraryRefresh("radarr");
-		await bumpLibraryRevision("radarr");
+		if (changed) await bumpProviderLibraryRevision("radarr");
 		return updated;
 	},
 
@@ -130,10 +137,11 @@ export const radarrHandlers = {
 			}
 		}
 
-		const linkedAniListIds = await mappingService.getLinkedAniListIdsByProviderIds(
-			"radarr",
-			uniqueTmdbIds,
-		);
+		const linkedAniListIds =
+			await mappingService.getLinkedAniListIdsByProviderIds(
+				"radarr",
+				uniqueTmdbIds,
+			);
 		for (const [tmdbId, linked] of linkedAniListIds) {
 			linkedAniListIdsByTmdbId[tmdbId] = linked;
 		}
@@ -183,6 +191,9 @@ async function getRadarrLibraryStatusForRpc(input: {
 	return radarrLibrary.getMovieLibraryStatusByTmdbId({
 		tmdbId: input.tmdbId,
 		credentials,
+		onCacheChanged: async () => {
+			await bumpProviderLibraryRevision("radarr");
+		},
 		...(input.forceVerify === undefined
 			? {}
 			: { forceVerify: input.forceVerify }),
@@ -214,11 +225,17 @@ async function getRadarrStatusFromMappingAndLibrary(
 async function resolveRadarrMapping(
 	input: StatusInput,
 ): Promise<RadarrMappingResult> {
-	const mapping = await mappingService.resolveMapping("radarr", input.anilistId, {
-		forceRetry: input.force_mapping_retry === true,
-		...(input.title === undefined ? {} : { title: input.title }),
-		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-	});
+	const linkedAniListId = await getUniqueAniListIdForSource(input.source);
+	const mapping = await mappingService.resolveMapping(
+		"radarr",
+		input.source,
+		linkedAniListId,
+		{
+			forceRetry: input.force_mapping_retry === true,
+			...(input.title === undefined ? {} : { title: input.title }),
+			...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+		},
+	);
 	if (mapping.kind === "mapped") {
 		const tmdbId = parseTmdbIdOrNull(mapping.providerId);
 		if (tmdbId === null) return { kind: "unmapped", mapping };

@@ -3,7 +3,10 @@
 
 import type { SeerrSeasonStatus } from "@/providers/seerr/types";
 import Pill from "@/shared/ui/primitives/pill";
-import { getSeerrSeasonDisplayTitle } from "./seerr-selection";
+import {
+	getSeerrSeasonDisplayTitle,
+	isSelectableSeerrSeason,
+} from "./seerr-selection";
 
 type PillTone =
 	| "muted"
@@ -19,10 +22,10 @@ function getSeasonStatusLabel(
 ): string {
 	switch (status) {
 		case "available": {
-			return "Available in Seerr";
+			return "Available";
 		}
 		case "partial": {
-			return "Partial in Seerr";
+			return "Partially available";
 		}
 		case "pending":
 		case "processing": {
@@ -36,7 +39,7 @@ function getSeasonStatusLabel(
 		}
 		case "not-requested":
 		case "unknown": {
-			return "Requestable";
+			return "Not requested";
 		}
 		default: {
 			return "Checking";
@@ -79,7 +82,7 @@ export function SeerrSeasonRows(props: {
 	if (seasons.length === 0) {
 		return (
 			<div className="rounded-lg border border-border-primary/50 bg-bg-tertiary/45 px-3 py-4 text-sm text-text-secondary">
-				No season rows returned by Seerr.
+				No seasons returned by Seerr.
 			</div>
 		);
 	}
@@ -88,17 +91,22 @@ export function SeerrSeasonRows(props: {
 		<div className="flex flex-col gap-2">
 			{seasons.map((season) => {
 				const checked = selected.has(season.seasonNumber);
+				const selectable = isSelectableSeerrSeason(season);
 				const label = getSeerrSeasonDisplayTitle(season);
 
 				return (
 					<label
 						key={season.seasonNumber}
-						className="flex min-h-12 items-center gap-3 rounded-lg border border-border-primary/50 bg-bg-tertiary/35 px-3 py-2 text-sm"
+						className={`flex min-h-12 items-center gap-3 rounded-lg border border-border-primary/50 bg-bg-tertiary/35 px-3 py-2 text-sm ${
+							selectable
+								? "cursor-pointer"
+								: "cursor-not-allowed opacity-60"
+						}`}
 					>
 						<input
 							type="checkbox"
 							checked={checked}
-							disabled={!season.requestable}
+							disabled={!selectable}
 							onChange={() => onToggleSeason(season.seasonNumber)}
 							className="h-4 w-4 accent-accent-primary"
 						/>

@@ -5,6 +5,7 @@ import type { Ani2arrApi } from "@/rpc";
 import { anilistHandlers } from "./anilist.handlers";
 import { maintenanceHandlers } from "./maintenance.handlers";
 import { mappingHandlers } from "./mapping.handlers";
+import { myAnimeListHandlers } from "./myanimelist.handlers";
 import { optionsHandlers } from "./options.handlers";
 import { providerHandlers } from "./provider.handlers";
 import { radarrHandlers } from "./radarr.handlers";
@@ -19,5 +20,6 @@ export const apiHandlers = {
 	...radarrHandlers,
 	...mappingHandlers,
 	...anilistHandlers,
+	...myAnimeListHandlers,
 	...maintenanceHandlers,
 } satisfies Ani2arrApi;

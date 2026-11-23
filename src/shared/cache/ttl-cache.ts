@@ -111,7 +111,6 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
 		if (!entry) return null;
 
 		if (now >= entry.expiresAt) {
-			await db.delete(TTL_CACHE_STORE_NAME, cacheKey);
 			return null;
 		}
 

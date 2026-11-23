@@ -3,12 +3,12 @@
 
 import { browser } from "wxt/browser";
 import type { ContentScriptContext } from "wxt/utils/content-script-context";
-import { awaitBackgroundReady } from "./await-background-ready";
 import {
 	getPublicOptionsSnapshot,
 	PUBLIC_OPTIONS_CHANGE_KEY,
 } from "@/settings/store";
 import type { PublicOptions } from "@/settings/types";
+import { logger } from "@/shared/utils/logger";
 
 export interface ContentEntrypointShellContext {
 	ctx: ContentScriptContext;
@@ -51,61 +51,77 @@ export const createContentEntrypointShell = (
 	return async (ctx: ContentScriptContext): Promise<void> => {
 		let currentUrl = "";
 		let activeController: AbortController | null = null;
+		let reconciliationQueue = Promise.resolve();
 
-		const reconcile = async (url: string) => {
+		const reconcile = (
+			url: string,
+			removeBeforeReconcile = false,
+		): Promise<void> => {
 			activeController?.abort();
 			const controller = new AbortController();
 			activeController = controller;
 			currentUrl = url;
 
 			const isCurrent = () => currentUrl === url && !controller.signal.aborted;
-
-			let phase: "load-public-options" | "evaluate" | "mount" | "remove" =
-				"load-public-options";
-			try {
-				const publicOptions = await getPublicOptionsSnapshot();
+			const run = async (): Promise<void> => {
 				if (!isCurrent()) return;
 
-				const shellContext: ContentEntrypointShellContext = {
-					ctx,
-					url,
-					publicOptions,
-					signal: controller.signal,
-					isCurrent,
-				};
-
-				phase = "evaluate";
-				const eligible = await options.isEligible(shellContext);
-				if (!isCurrent()) return;
-
-				if (!eligible) {
-					phase = "remove";
-					await options.remove();
-					return;
+				if (removeBeforeReconcile) {
+					await removeSafely(options, url);
+					if (!isCurrent()) return;
 				}
 
-				await awaitBackgroundReady();
-				if (!isCurrent()) return;
+				let phase: "load-public-options" | "evaluate" | "mount" | "remove" =
+					"load-public-options";
+				try {
+					const publicOptions = await getPublicOptionsSnapshot();
+					if (!isCurrent()) return;
+					logger.configure({
+						enabled: publicOptions.debugLogging || import.meta.env.DEV,
+					});
 
-				phase = "mount";
-				await options.mount(shellContext);
-				if (!isCurrent()) {
-					phase = "remove";
-					await options.remove();
-				}
-			} catch (error) {
-				if (controller.signal.aborted || isAbortError(error)) {
-					return;
-				}
-				options.onError?.(error, phase, url);
-				if (phase !== "remove") {
-					try {
+					const shellContext: ContentEntrypointShellContext = {
+						ctx,
+						url,
+						publicOptions,
+						signal: controller.signal,
+						isCurrent,
+					};
+
+					phase = "evaluate";
+					const eligible = await options.isEligible(shellContext);
+					if (!isCurrent()) return;
+
+					if (!eligible) {
+						phase = "remove";
 						await options.remove();
-					} catch {
-						// Ignore secondary errors during cleanup
+						return;
+					}
+
+					phase = "mount";
+					await options.mount(shellContext);
+					if (!isCurrent()) {
+						phase = "remove";
+						await options.remove();
+					}
+				} catch (error) {
+					if (controller.signal.aborted || isAbortError(error)) {
+						return;
+					}
+					options.onError?.(error, phase, url);
+					if (phase !== "remove") {
+						try {
+							await options.remove();
+						} catch {
+							// Ignore secondary errors during cleanup
+						}
 					}
 				}
-			}
+			};
+
+			const pending = reconciliationQueue.then(run, run);
+			reconciliationQueue = pending;
+			return pending;
 		};
 
 		await reconcile(location.href);
@@ -121,6 +137,11 @@ export const createContentEntrypointShell = (
 				void reconcile(nextUrl);
 			},
 		);
+
+		ctx.addEventListener(globalThis.window, "pageshow", (event: Event) => {
+			if ((event as PageTransitionEvent).persisted !== true) return;
+			void reconcile(location.href, true);
+		});
 
 		const onStorageChanged: Parameters<
 			typeof browser.storage.onChanged.addListener

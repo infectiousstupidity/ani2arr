@@ -7,62 +7,51 @@ import {
 	FOOTER_BUTTON_CLASS,
 } from "./seerr-modal.constants";
 
-type SeerrView = "request" | "change-target";
+type SeerrFooterProps =
+	| {
+			view: "request";
+			isManualTarget: boolean;
+			canRequest: boolean;
+			isBusy: boolean;
+			isRequesting: boolean;
+			requestLabel: string;
+			onClose: () => void;
+			onChangeTarget: () => void;
+			onClearManualTarget: () => void;
+			onRequest: () => void;
+	  }
+	| {
+			view: "change-target";
+			canSaveTvTarget: boolean;
+			isBusy: boolean;
+			onBackToRequest: () => void;
+			onSaveTvTarget: () => void;
+	  };
 
-export function SeerrFooter(props: {
-	view: SeerrView;
-	isManualTarget: boolean;
-	canSaveTvTarget: boolean;
-	canRequest: boolean;
-	isBusy: boolean;
-	isRequesting: boolean;
-	requestLabel: string;
-	onClose: () => void;
-	onChangeTarget: () => void;
-	onBackToRequest: () => void;
-	onClearManualTarget: () => void;
-	onSaveTvTarget: () => void;
-	onRequest: () => void;
-}): React.JSX.Element {
-	const {
-		view,
-		isManualTarget,
-		canSaveTvTarget,
-		canRequest,
-		isBusy,
-		isRequesting,
-		requestLabel,
-		onClose,
-		onChangeTarget,
-		onBackToRequest,
-		onClearManualTarget,
-		onSaveTvTarget,
-		onRequest,
-	} = props;
-
+export function SeerrFooter(props: SeerrFooterProps): React.JSX.Element {
 	return (
 		<footer className="bg-bg-primary px-4 py-3 md:px-8 md:py-4">
 			<div className="mx-auto grid w-full max-w-250 grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-6 md:gap-y-3 lg:gap-x-8">
 				<div className="flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:col-start-1 md:row-start-1">
-					{view === "request" ? (
+					{props.view === "request" ? (
 						<Button
 							type="button"
 							variant="outline"
 							size="sm"
 							className={AUX_BUTTON_CLASS}
-							onClick={onChangeTarget}
+							onClick={props.onChangeTarget}
 						>
 							Change Seerr target
 						</Button>
 					) : null}
-					{view === "request" && isManualTarget ? (
+					{props.view === "request" && props.isManualTarget ? (
 						<Button
 							type="button"
 							variant="outline"
 							size="sm"
 							className={AUX_BUTTON_CLASS}
-							disabled={isBusy}
-							onClick={onClearManualTarget}
+							disabled={props.isBusy}
+							onClick={props.onClearManualTarget}
 						>
 							Clear manual target
 						</Button>
@@ -74,23 +63,27 @@ export function SeerrFooter(props: {
 						variant="outline"
 						size="sm"
 						className={FOOTER_BUTTON_CLASS}
-						disabled={isBusy}
-						onClick={view === "request" ? onClose : onBackToRequest}
+						disabled={props.isBusy}
+						onClick={
+							props.view === "request"
+								? props.onClose
+								: props.onBackToRequest
+						}
 					>
-						{view === "request" ? "Exit modal" : "Back to request"}
+						{props.view === "request" ? "Exit modal" : "Back to request"}
 					</Button>
-					{view === "request" ? (
+					{props.view === "request" ? (
 						<Button
 							type="button"
 							variant="primary"
 							size="sm"
 							className={FOOTER_BUTTON_CLASS}
-							disabled={!canRequest || isBusy}
-							isLoading={isRequesting}
+							disabled={!props.canRequest || props.isBusy}
+							isLoading={props.isRequesting}
 							loadingText="Requesting..."
-							onClick={onRequest}
+							onClick={props.onRequest}
 						>
-							{requestLabel}
+							{props.requestLabel}
 						</Button>
 					) : (
 						<Button
@@ -98,8 +91,8 @@ export function SeerrFooter(props: {
 							variant="primary"
 							size="sm"
 							className={FOOTER_BUTTON_CLASS}
-							disabled={!canSaveTvTarget || isBusy}
-							onClick={onSaveTvTarget}
+							disabled={!props.canSaveTvTarget || props.isBusy}
+							onClick={props.onSaveTvTarget}
 						>
 							Save TV target
 						</Button>

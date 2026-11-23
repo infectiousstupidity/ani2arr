@@ -8,13 +8,13 @@
 <h1 align="center">ani2arr</h1>
 
 <p align="center">
-  One-click Sonarr, Radarr, and Seerr actions for AniList and AniChart.
+  One-click Sonarr, Radarr, and Seerr actions for AniList, AniChart, and MyAnimeList.
 </p>
 
 <p align="center">
   <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer"><img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white"></a>
 	<a href="https://chromewebstore.google.com/detail/ani2arr/eabpmdcepaidljblhlojckmkmnhdlfcc" target="_blank" rel="noopener noreferrer"><img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge"></a>
-  <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer"><img alt="Release 2.1.0" src="https://img.shields.io/badge/Release-v2.1.0-6e6e6e?style=for-the-badge&logo=github&logoColor=white"></a>
+  <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer"><img alt="Release 2.2.0" src="https://img.shields.io/badge/Release-v2.2.0-6e6e6e?style=for-the-badge&logo=github&logoColor=white"></a>
 	<br>
   <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge&logo=githubactions&logoColor=white"></a>
   <img alt="Languages: en | ja" src="https://img.shields.io/badge/Languages-en%20%7C%20ja-6e6e6e?style=for-the-badge">
@@ -23,19 +23,20 @@
 
 ## What is ani2arr?
 
-ani2arr is a browser extension that adds Sonarr, Radarr, and Seerr actions directly to AniList and AniChart.
+ani2arr is a browser extension that adds Sonarr, Radarr, and Seerr actions directly to AniList, AniChart, and MyAnimeList.
 
-It is built for self-hosted media users who browse anime on AniList or AniChart and want to add or request media without copying titles, IDs, or metadata by hand.
+It is built for self-hosted media users who browse anime on AniList, AniChart, or MyAnimeList and want to add or request media without copying titles, IDs, or metadata by hand.
 
 ## Features
 
 * Adds Sonarr, Radarr, and Seerr actions to <a href="https://anilist.co/anime/21/ONE-PIECE/" target="_blank" rel="noopener noreferrer">AniList anime pages</a>, <a href="https://anilist.co/search/anime" target="_blank" rel="noopener noreferrer">AniList browse</a>, and <a href="https://anichart.net" target="_blank" rel="noopener noreferrer">AniChart</a>.
+* Adds the same actions to <a href="https://myanimelist.net/anime/1" target="_blank" rel="noopener noreferrer">MyAnimeList anime pages</a> and MyAnimeList seasonal, ranking, and search listings.
 * Adds AniList TV entries to Sonarr.
 * Adds AniList movie entries to Radarr.
 * Adds optional Seerr request actions for request-based workflows.
 * Shows Seerr request status such as requested, processing, partially available, or available.
 * Supports Seerr target selection when the automatic TMDB target is missing, wrong, or ambiguous.
-* Uses AniList metadata and public <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge mappings</a> to improve matching.
+* Uses AniList and MyAnimeList metadata and public <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge mappings</a> to improve matching.
 * Supports manual mappings when automatic Sonarr, Radarr, or Seerr matching is wrong, missing, or ambiguous.
 * Stores settings locally in browser extension storage.
 * Does not include analytics, advertising, tracking SDKs, or a developer-operated backend.
@@ -90,10 +91,12 @@ Release assets on GitHub include SHA256 checksums for manual verification.
    * Sonarr
    * Radarr
    * Seerr
-4. Add the provider URL and API key.
-5. Set the default profiles, root folders, monitored state, and add behavior.
-6. Open AniList or AniChart.
-7. Use the ani2arr actions shown on supported pages.
+4. For Sonarr or Radarr, add the provider URL and API key.
+5. For Seerr, enter the server URL and check your existing browser session. If
+   needed, use the advanced global API-key mode.
+6. Set the default profiles, root folders, monitored state, and add behavior.
+7. Open AniList, AniChart, or MyAnimeList.
+8. Use the ani2arr actions shown on supported pages.
 
 ## Screenshots
 
@@ -115,11 +118,12 @@ Release assets on GitHub include SHA256 checksums for manual verification.
 
 ## ID Matching
 
-ani2arr uses multiple sources to match AniList entries to the correct Sonarr, Radarr, or Seerr target:
+ani2arr uses multiple sources to match AniList, AniChart, and MyAnimeList entries to the correct Sonarr, Radarr, or Seerr target:
 
 * AniList metadata
-* AniList media type
-* public AniBridge mapping files
+* MyAnimeList metadata through the public Jikan API
+* AniList and MyAnimeList media type
+* public AniBridge mapping files for both AniList and MyAnimeList sources
 * provider search results
 * manual mappings saved by the user
 * manual Seerr target selections saved by the user
@@ -139,6 +143,41 @@ No. ani2arr does not implement delete actions. It can only add new items or edit
 <summary><strong>Does ani2arr work with Seerr?</strong></summary>
 
 Yes. ani2arr can request media through a configured Seerr instance and show request status when available.
+
+</details>
+
+<details>
+<summary><strong>How does ani2arr sign in to Seerr?</strong></summary>
+
+By default, ani2arr uses the Seerr session already stored by your browser. Enter
+the Seerr URL, click **Check Seerr session**, and sign in on Seerr's own page if
+prompted. ani2arr does not collect your Seerr, Plex, Jellyfin, or Emby password,
+and it does not copy or store the Seerr session cookie.
+
+The global Seerr API key remains available under **Advanced connection**. It is
+a privileged server credential and should not be shared with untrusted users.
+
+</details>
+
+<details>
+<summary><strong>Why can’t ani2arr use my Seerr browser session?</strong></summary>
+
+Third-party-cookie blocking, Firefox Containers, incognito separation, or other
+browser privacy settings can keep an extension background request from using
+the same Seerr session. Sign in to the configured Seerr URL in the same browser
+profile and try **I have signed in — check again**. If the session remains
+unavailable, use the advanced API-key mode when Seerr CSRF protection is
+disabled.
+
+Seerr installations with CSRF protection may also reject request creation after
+the session check succeeds. ani2arr reports this separately and offers an
+explicit **Enable CSRF support** action. Only then does the browser ask for
+optional cookie access so ani2arr can read the configured server's readable
+`XSRF-TOKEN`; the HTTP-only session cookie is never read. The global API-key
+mode remains available for servers without CSRF protection, but it does not
+bypass CSRF-protected request creation. If cookie permission is denied, ani2arr
+cannot create requests on that server until browser-session CSRF support is
+enabled.
 
 </details>
 
@@ -183,7 +222,12 @@ For security issues, do not open a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Privacy and permissions
 
-ani2arr stores configuration locally in browser extension storage, including provider URLs, API keys, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
+ani2arr stores configuration locally in browser extension storage, including provider URLs, Sonarr/Radarr API keys, an optional global Seerr API key, Seerr authentication mode, a minimal last-verified Seerr account summary, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
+
+In Seerr session mode, the browser manages the session cookie. ani2arr asks the
+browser to include applicable cookies when its background process calls the
+configured Seerr server, but ani2arr does not read, store, log, or return the
+session-cookie value.
 
 ani2arr may request data from:
 
@@ -214,8 +258,8 @@ This project uses pnpm, WXT, React, TypeScript, Tailwind CSS, and Vitest.
 
 ### Requirements
 
-* Node.js 24 or newer
-* pnpm 11.5.1 or compatible
+* Node.js 26.13.1 (pinned in `mise.toml`)
+* pnpm 12.21.0 (pinned in `package.json`)
 
 ### Commands
 

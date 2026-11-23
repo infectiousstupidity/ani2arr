@@ -10,10 +10,12 @@ import type {
 	SeerrMediaDetails,
 	SeerrMediaStatus,
 	SeerrMediaStatusInput,
+	SeerrPublicSettings,
 	SeerrRequestInput,
 	SeerrRequestPayload,
 	SeerrSearchResult,
 	SeerrSeasonStatus,
+	SeerrStatusSummary,
 } from "./types";
 
 const SEERR_STATUS_UNKNOWN = 1;
@@ -33,14 +35,28 @@ export function buildSeerrRequestPayload(
 	const mediaId = parseTmdbId(input.tmdbId);
 
 	if (input.mediaType === "tv") {
-		if (!Array.isArray(input.seasons) || input.seasons.length === 0) {
-			throw new Error("TV Seerr requests require explicit seasons.");
+		if (input.seasons === "all") {
+			return {
+				mediaType: "tv",
+				mediaId,
+				seasons: "all",
+				...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
+			};
+		}
+
+		if (!Array.isArray(input.seasons)) {
+			throw new TypeError("TV Seerr requests require explicit seasons.");
+		}
+
+		const seasons = normalizeSeasons(input.seasons);
+		if (seasons.length === 0) {
+			throw new RangeError("TV Seerr requests require explicit seasons.");
 		}
 
 		return {
 			mediaType: "tv",
 			mediaId,
-			seasons: normalizeSeasons(input.seasons),
+			seasons,
 			...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
 		};
 	}
@@ -86,7 +102,7 @@ export function isRequestableSeerrStatus(status: SeerrMediaStatus): boolean {
 
 function normalizeSeasons(seasons: readonly number[]): number[] {
 	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season))
+		.filter((season) => Number.isSafeInteger(season) && season >= 0)
 		.toSorted((a, b) => a - b);
 }
 
@@ -110,6 +126,7 @@ function hasActiveRequestForSeason(
 
 		return seasons.some((season) => {
 			if (!season || typeof season !== "object") return false;
+
 			return (
 				(season as { seasonNumber?: unknown }).seasonNumber === seasonNumber
 			);
@@ -117,17 +134,15 @@ function hasActiveRequestForSeason(
 	});
 }
 
-function readSeerrTvSeasonStatus(
+function readSeerrTvSeasonStatuses(
+	value: object,
 	mediaInfo: object,
-	targetSeasons: readonly number[],
-	fallbackStatus: SeerrMediaStatus,
-): SeerrMediaStatus {
-	if (fallbackStatus === "available") return "available";
-
-	const seasons = (mediaInfo as { seasons?: unknown }).seasons;
+): Map<number, SeerrMediaStatus> {
 	const seasonStatus = new Map<number, SeerrMediaStatus>();
 
-	if (Array.isArray(seasons)) {
+	const addSeasonStatuses = (seasons: unknown): void => {
+		if (!Array.isArray(seasons)) return;
+
 		for (const season of seasons) {
 			if (!season || typeof season !== "object") continue;
 
@@ -139,16 +154,45 @@ function readSeerrTvSeasonStatus(
 				readSeerrStatus((season as { status?: unknown }).status),
 			);
 		}
-	}
+	};
+
+	addSeasonStatuses((value as { seasons?: unknown }).seasons);
+	addSeasonStatuses((mediaInfo as { seasons?: unknown }).seasons);
+
+	return seasonStatus;
+}
+
+function readSeerrTvOverallStatus(
+	status: SeerrMediaStatus,
+	seasonStatus: ReadonlyMap<number, SeerrMediaStatus>,
+): SeerrMediaStatus {
+	if (status === "available" || status === "partial") return status;
+
+	return [...seasonStatus.values()].some((season) =>
+		["available", "partial"].includes(season),
+	)
+		? "partial"
+		: status;
+}
+
+function readSeerrTvSeasonStatus(
+	mediaInfo: object,
+	seasonStatus: ReadonlyMap<number, SeerrMediaStatus>,
+	targetSeasons: readonly number[],
+	fallbackStatus: SeerrMediaStatus,
+): SeerrMediaStatus {
+	if (fallbackStatus === "available") return "available";
 
 	const hasAnyTargetSeasonStatus = targetSeasons.some((seasonNumber) =>
 		seasonStatus.has(seasonNumber),
 	);
-	if (!hasAnyTargetSeasonStatus) return fallbackStatus;
+	if (!hasAnyTargetSeasonStatus) return "not-requested";
 
 	const statuses: SeerrMediaStatus[] = [];
+
 	for (const seasonNumber of targetSeasons) {
 		const status = seasonStatus.get(seasonNumber);
+
 		if (status === undefined) {
 			return "not-requested";
 		}
@@ -171,32 +215,52 @@ function readSeerrTvSeasonStatus(
 	}
 
 	if (statuses.every((status) => status === "available")) return "available";
+
 	if (statuses.some((status) => ["available", "partial"].includes(status))) {
-		return "partial";
+		return targetSeasons.length === 1 ? "available" : "partial";
 	}
+
 	if (statuses.includes("processing")) return "processing";
+
 	return "pending";
 }
 
 export function readSeerrMediaStatus(
 	value: unknown,
 	input?: Pick<SeerrMediaStatusInput, "mediaType" | "seasons">,
-): SeerrMediaStatus {
-	if (!value || typeof value !== "object") return "unknown";
+): SeerrStatusSummary {
+	if (!value || typeof value !== "object") {
+		return { target: "unknown", overall: "unknown" };
+	}
 
 	const mediaInfo = (value as { mediaInfo?: unknown }).mediaInfo;
-	if (!mediaInfo || typeof mediaInfo !== "object") return "not-requested";
+	if (!mediaInfo || typeof mediaInfo !== "object") {
+		return { target: "not-requested", overall: "not-requested" };
+	}
 
 	const status = readSeerrStatus((mediaInfo as { status?: unknown }).status);
+	const seasonStatus = readSeerrTvSeasonStatuses(value, mediaInfo);
+	const overall =
+		input?.mediaType === "tv"
+			? readSeerrTvOverallStatus(status, seasonStatus)
+			: status;
 	const targetSeasons =
 		input?.mediaType === "tv" && Array.isArray(input.seasons)
 			? normalizeSeasons(input.seasons)
 			: [];
-	if (targetSeasons.length > 0) {
-		return readSeerrTvSeasonStatus(mediaInfo, targetSeasons, status);
-	}
 
-	return status;
+	return {
+		target:
+			targetSeasons.length > 0
+				? readSeerrTvSeasonStatus(
+						mediaInfo,
+						seasonStatus,
+						targetSeasons,
+						overall,
+					)
+				: overall,
+		overall,
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -228,11 +292,18 @@ function readYear(value: unknown): number | undefined {
 function readTitle(
 	value: Record<string, unknown>,
 	mediaType: "movie" | "tv",
-): string | null {
-	return (
-		readString(value.title) ??
-		readString(value.name) ??
-		(mediaType === "movie" ? "Untitled movie" : "Untitled TV show")
+): string {
+	return mediaType === "movie"
+		? (readString(value.title) ?? "Untitled movie")
+		: (readString(value.name) ?? "Untitled TV show");
+}
+
+function readAlternateTitles(
+	primaryTitle: string,
+	values: readonly unknown[],
+): string[] {
+	return [...new Set(values.flatMap((value) => readString(value) ?? []))].filter(
+		(title) => title !== primaryTitle,
 	);
 }
 
@@ -249,11 +320,13 @@ export function readSeerrSearchResults(value: unknown): SeerrSearchResult[] {
 		if (!isRecord(item)) continue;
 		if (item.mediaType !== "movie" && item.mediaType !== "tv") continue;
 
-		const tmdbId = parseTmdbIdOrNull(item.tmdbId ?? item.id);
+		const tmdbId = parseTmdbIdOrNull(item.id ?? item.tmdbId);
 		if (tmdbId === null) continue;
 
 		const title = readTitle(item, item.mediaType);
-		if (title === null) continue;
+		const alternateTitles = readAlternateTitles(title, [
+			item.mediaType === "movie" ? item.originalTitle : item.originalName,
+		]);
 
 		const year = readYear(
 			item.mediaType === "movie" ? item.releaseDate : item.firstAirDate,
@@ -265,6 +338,7 @@ export function readSeerrSearchResults(value: unknown): SeerrSearchResult[] {
 			mediaType: item.mediaType,
 			tmdbId,
 			title,
+			...(alternateTitles.length === 0 ? {} : { alternateTitles }),
 			...(year === undefined ? {} : { year }),
 			...(posterPath === undefined ? {} : { posterPath }),
 			...(overview === undefined ? {} : { overview }),
@@ -272,6 +346,21 @@ export function readSeerrSearchResults(value: unknown): SeerrSearchResult[] {
 	}
 
 	return results;
+}
+
+export function readSeerrPublicSettings(value: unknown): SeerrPublicSettings {
+	const settings = isRecord(value) ? value : {};
+
+	return {
+		partialRequestsEnabled:
+			typeof settings.partialRequestsEnabled === "boolean"
+				? settings.partialRequestsEnabled
+				: true,
+		enableSpecialEpisodes:
+			typeof settings.enableSpecialEpisodes === "boolean"
+				? settings.enableSpecialEpisodes
+				: false,
+	};
 }
 
 function readSeerrSeason(value: unknown): SeerrSeasonStatus | null {
@@ -312,6 +401,7 @@ function readSeerrSeason(value: unknown): SeerrSeasonStatus | null {
 function readSeerrSeasons(value: Record<string, unknown>): SeerrSeasonStatus[] {
 	const mediaInfo = isRecord(value.mediaInfo) ? value.mediaInfo : {};
 	const seasonRows = new Map<number, Record<string, unknown>>();
+
 	const addSeasonRow = (season: unknown): void => {
 		if (!isRecord(season)) return;
 
@@ -355,12 +445,14 @@ export function readSeerrMediaDetails(
 		throw new Error("Invalid Seerr media details.");
 	}
 
-	const tmdbId = parseTmdbId(value.tmdbId ?? value.id);
-	const tvdbId = parseTvdbIdOrNull(value.tvdbId);
+	const tmdbId = parseTmdbId(value.id ?? value.tmdbId);
+	const externalIds = isRecord(value.externalIds) ? value.externalIds : {};
+	const tvdbId =
+		parseTvdbIdOrNull(externalIds.tvdbId) ?? parseTvdbIdOrNull(value.tvdbId);
 	const title = readTitle(value, mediaType);
-	if (title === null) {
-		throw new Error("Invalid Seerr media details.");
-	}
+	const alternateTitles = readAlternateTitles(title, [
+		mediaType === "movie" ? value.originalTitle : value.originalName,
+	]);
 
 	const year = readYear(
 		mediaType === "movie" ? value.releaseDate : value.firstAirDate,
@@ -375,11 +467,12 @@ export function readSeerrMediaDetails(
 		tmdbId,
 		...(tvdbId === null ? {} : { tvdbId }),
 		title,
+		...(alternateTitles.length === 0 ? {} : { alternateTitles }),
 		...(year === undefined ? {} : { year }),
 		...(posterPath === undefined ? {} : { posterPath }),
 		...(backdropPath === undefined ? {} : { backdropPath }),
 		...(overview === undefined ? {} : { overview }),
-		status: readSeerrMediaStatus(value, { mediaType }),
+		status: readSeerrMediaStatus(value, { mediaType }).overall,
 		...(seasons === undefined ? {} : { seasons }),
 	};
 }

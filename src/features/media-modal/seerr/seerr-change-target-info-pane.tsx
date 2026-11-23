@@ -14,7 +14,7 @@ import { RIGHT_PANE_SCROLL_CLASS } from "./seerr-modal.constants";
 import { SeerrSeasonRows } from "./seerr-season-rows";
 
 export function SeerrChangeTargetInfoPane(props: {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	selectedResult: SeerrSearchResult | null;
 	selectedDetails: SeerrMediaDetails | null;
 	draftSeasons: readonly number[];

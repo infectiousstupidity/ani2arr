@@ -1,7 +1,7 @@
 /** Pure Seerr modal helpers for season selection and search filtering. */
 // src/features/media-modal/seerr/seerr-selection.ts
 
-import type { AniListMediaFormat } from "@/anilist/types";
+import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import type {
 	SeerrMediaType,
 	SeerrSearchResult,
@@ -27,20 +27,29 @@ export function getSeerrTargetSeasonKey(
 ): string {
 	if (target?.mediaType !== "tv") return "";
 
-	return [
-		`effective:${target.seasons.join(",")}`,
-		`tmdb:${target.tmdbSeasons?.join(",") ?? ""}`,
-		`tvdb:${target.tvdbSeasons?.join(",") ?? ""}`,
-	].join("|");
+	return `tmdb:${target.seasons?.join(",") ?? ""}`;
+}
+
+export function isSelectableSeerrSeason(
+	season: Pick<SeerrSeasonStatus, "requestable" | "status">,
+): boolean {
+	return season.requestable || season.status === "partial";
 }
 
 export function getRequestableSeasonNumbers(
 	seasons: readonly SeerrSeasonStatus[] | undefined,
+	enableSpecialEpisodes = true,
 ): number[] {
-	return (seasons ?? [])
-		.filter((season) => season.requestable)
-		.map((season) => season.seasonNumber)
-		.toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers(
+		(seasons ?? [])
+			.filter(
+				(season) =>
+					isSelectableSeerrSeason(season) &&
+					season.episodeCount !== 0 &&
+					(enableSpecialEpisodes || season.seasonNumber !== 0),
+			)
+			.map((season) => season.seasonNumber),
+	);
 }
 
 export type SeerrSeasonAvailabilitySummary = {
@@ -158,37 +167,47 @@ function getSeerrSeasonShape(
 	return "unknown";
 }
 
-function chooseMappedSeasons(input: {
-	mappedSeasons: readonly number[];
-	tmdbMappedSeasons?: readonly number[] | undefined;
-	tvdbMappedSeasons?: readonly number[] | undefined;
-	seasons: readonly SeerrSeasonStatus[] | undefined;
-}): readonly number[] {
-	const shape = getSeerrSeasonShape(input.seasons);
-
-	if (shape === "tvdb" && input.tvdbMappedSeasons?.length) {
-		return input.tvdbMappedSeasons;
-	}
-
-	if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
-		return input.tmdbMappedSeasons;
-	}
-
-	return input.mappedSeasons;
-}
-
-export function getDefaultSelectedSeasons(input: {
-	mappedSeasons: readonly number[];
+export function getMappedSeasonsForDetails(input: {
+	mappedSeasons?: readonly number[] | undefined;
 	tmdbMappedSeasons?: readonly number[] | undefined;
 	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;
 }): number[] {
-	const requestable = new Set(getRequestableSeasonNumbers(input.seasons));
-	const mappedSeasons = chooseMappedSeasons(input);
+	const shape = getSeerrSeasonShape(input.seasons);
+	let mappedSeasons: readonly number[];
 
-	return [...new Set(mappedSeasons)]
-		.filter((season) => requestable.has(season))
-		.toSorted((left, right) => left - right);
+	if (shape === "tvdb" && input.tvdbMappedSeasons?.length) {
+		mappedSeasons = input.tvdbMappedSeasons;
+	} else if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
+		mappedSeasons = input.tmdbMappedSeasons;
+	} else {
+		mappedSeasons = input.mappedSeasons ?? [];
+	}
+
+	return normalizeSeasonNumbers(mappedSeasons);
+}
+
+export function getDefaultSelectedSeasons(input: {
+	mappedSeasons?: readonly number[] | undefined;
+	tmdbMappedSeasons?: readonly number[] | undefined;
+	tvdbMappedSeasons?: readonly number[] | undefined;
+	seasons: readonly SeerrSeasonStatus[] | undefined;
+	enableSpecialEpisodes?: boolean | undefined;
+}): number[] {
+	const requestableSeasons = getRequestableSeasonNumbers(
+		input.seasons,
+		input.enableSpecialEpisodes,
+	);
+	const mappedSeasons = getMappedSeasonsForDetails(input);
+
+	// No season evidence means AniBridge cannot claim which season represents
+	// this title, so nothing is preselected and the user picks one.
+	if (mappedSeasons.length === 0) {
+		return [];
+	}
+
+	const requestable = new Set(requestableSeasons);
+	return mappedSeasons.filter((season) => requestable.has(season));
 }
 
 export function toggleSeasonSelection(
@@ -202,7 +221,7 @@ export function toggleSeasonSelection(
 		selected.add(seasonNumber);
 	}
 
-	return [...selected].toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers([...selected]);
 }
 
 export function getTmdbPosterUrl(
@@ -211,30 +230,6 @@ export function getTmdbPosterUrl(
 	if (!posterPath?.startsWith("/")) return null;
 
 	return `https://image.tmdb.org/t/p/w342${posterPath}`;
-}
-
-export function getExpectedSeerrMediaType(input: {
-	currentTargetMediaType?: SeerrMediaType | undefined;
-	format?: AniListMediaFormat | null | undefined;
-}): SeerrMediaType | null {
-	if (input.currentTargetMediaType) return input.currentTargetMediaType;
-
-	switch (input.format) {
-		case "MOVIE": {
-			return "movie";
-		}
-		case "TV":
-		case "TV_SHORT":
-		case "SPECIAL":
-		case "OVA":
-		case "ONA":
-		case "MUSIC": {
-			return "tv";
-		}
-		default: {
-			return null;
-		}
-	}
 }
 
 export function filterSeerrSearchResults(input: {

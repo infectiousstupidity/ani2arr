@@ -2,7 +2,7 @@
 # src/locales/en.yml
 
 extName: ani2arr
-extDescription: Adds one-click Sonarr, Radarr, and Seerr actions to AniList and AniChart pages
+extDescription: Adds one-click Sonarr, Radarr, and Seerr actions to AniList, AniChart, and MyAnimeList pages
 
 popup:
   loading: Loading...

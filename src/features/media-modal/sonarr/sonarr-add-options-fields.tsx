@@ -13,7 +13,7 @@ import {
 } from '@/providers/sonarr/form-options';
 import { SelectField } from '@/shared/ui/fields/select-field';
 import { SwitchField } from '@/shared/ui/fields/switch-field';
-import { ProviderTagField } from '@/providers/provider-tag-field';
+import { ProviderTagField } from '@/features/provider-ui/provider-tag-field';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from '../setup/provider-root-folder-select';

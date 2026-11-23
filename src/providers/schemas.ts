@@ -22,8 +22,7 @@ function createPositiveIntegerIdSchema<TId extends number>(): v.GenericSchema<
 > {
 	return v.pipe(
 		v.number(),
-		v.finite(),
-		v.integer(),
+		v.safeInteger(),
 		v.minValue(1),
 		v.transform((value): TId => value as TId),
 	);

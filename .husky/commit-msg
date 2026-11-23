@@ -1,2 +1,6 @@
 # .husky/commit-msg
-npx --no -- commitlint --edit "$1"
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  mise.exe exec -- pnpm exec commitlint --edit "$1"
+else
+  pnpm exec commitlint --edit "$1"
+fi

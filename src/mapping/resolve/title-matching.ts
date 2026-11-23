@@ -69,7 +69,6 @@ const NON_ANIMATION_SCORE_FACTOR = 0.85;
 const SHORT_QUERY_VERBOSE_RESULT_FACTOR = 0.85;
 const RARE_TOKEN_MIN_LENGTH = 4;
 const MINIMUM_SCORE = 0.82;
-const MINIMUM_WINNER_MARGIN = 0.02;
 
 type NormalizeTitleTokensOptions = {
 	stripDiacritics?: boolean;
@@ -160,6 +159,12 @@ export type TitleMatch = {
 	providerId: number;
 	matchedTitle: string;
 };
+
+export type SearchMedia = Pick<
+	AniListMedia,
+	"title" | "synonyms" | "startDate"
+> &
+	Partial<Pick<AniListMedia, "format" | "id">>;
 
 const DEFAULT_NORMALIZE_OPTIONS: Required<NormalizeTitleTokensOptions> = {
 	stripDiacritics: false,
@@ -437,7 +442,7 @@ function makeTitleSearchTerm(
 
 export function getSearchTerms(
 	provider: Provider,
-	media: AniListMedia,
+	media: SearchMedia,
 ): TitleSearchTerm[] {
 	return makeTitleSearchTerms(provider, media.title, media.synonyms);
 }
@@ -465,6 +470,13 @@ function makeTitleSearchTerms(
 		const stripped = stripParenContent(value);
 		if (stripped !== value) {
 			register(stripped, priority + 0.5);
+		}
+
+		if (provider === "sonarr") {
+			const baseTitle = /^(.*)\s+[-–—]\s+\S.*$/.exec(value)?.[1]?.trim();
+			if (baseTitle) {
+				register(baseTitle, priority + 1);
+			}
 		}
 	};
 
@@ -887,10 +899,7 @@ function findTitleMatchForTermInternal(
 		.toSorted((left, right) => right.score - left.score);
 
 	const winner = scored[0];
-	const second = scored[1];
 	if (!winner || winner.score < MINIMUM_SCORE) return null;
-	if (second && winner.score - second.score < MINIMUM_WINNER_MARGIN)
-		return null;
 
 	return {
 		providerId: winner.candidate.providerId,

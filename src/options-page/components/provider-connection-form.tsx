@@ -11,8 +11,8 @@ import {
 	hasConfiguredProviderCredentials,
 } from "@/settings/provider-config";
 import Button from "@/shared/ui/primitives/button";
+import { Input, PasswordInput } from "@/shared/ui/primitives/input";
 import { SettingsRow, SettingsSection } from "./settings-section";
-import { Input, PasswordInput } from "./ui/input";
 
 interface ProviderConnectionFormProps {
 	provider: Provider;
@@ -36,7 +36,10 @@ export const ProviderConnectionForm = ({
 
 	const savedUrl = savedCredentials.url;
 	const savedApiKey = savedCredentials.apiKey;
-	const isConfigured = hasConfiguredProviderCredentials(savedSettings, provider);
+	const isConfigured = hasConfiguredProviderCredentials(
+		savedSettings,
+		provider,
+	);
 
 	return (
 		<ProviderConnectionDraft

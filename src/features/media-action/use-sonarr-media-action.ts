@@ -29,7 +29,7 @@ function quickAdd(input: {
 	) return;
 
 	input.addSeries.mutate({
-		anilistId: input.mediaInput.anilistId,
+		source: input.mediaInput.source,
 		tvdbId: input.tvdbId,
 		title: input.mediaInput.providerTitle,
 		primaryTitleHint: input.mediaInput.providerTitle,

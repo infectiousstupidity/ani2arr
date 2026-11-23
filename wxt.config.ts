@@ -1,12 +1,14 @@
 // wxt.config.ts
-import { defineConfig, type WxtViteConfig } from "wxt";
+
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import babel from "@rolldown/plugin-babel";
+import { defineConfig, type WxtViteConfig } from "wxt";
 
 export default defineConfig({
 	webExt: {
 		openDevtools: true,
+		binaries: { firefox: "firefoxdeveloperedition" },
 		chromiumArgs: ["--auto-open-devtools-for-tabs"],
 	},
 	dev: {
@@ -30,6 +32,16 @@ export default defineConfig({
 					presets: [reactCompilerPreset()],
 				}),
 				tailwindcss(),
+				{
+					name: "ignore",
+					config: () => ({
+						server: {
+							watch: {
+								ignored: ["**/docs/**", "**/scripts/**"],
+							},
+						},
+					}),
+				},
 			],
 			css: { devSourcemap: true },
 			build: {
@@ -44,12 +56,9 @@ export default defineConfig({
 		}) as WxtViteConfig,
 
 	manifest: ({ manifestVersion }) => {
-		const requiredHosts = [
-			"https://anilist.co/*",
-			"https://www.anilist.co/*",
+		const backgroundFetchHosts = [
 			"https://graphql.anilist.co/*",
-			"https://anichart.net/*",
-			"https://www.anichart.net/*",
+			"https://api.jikan.moe/*",
 			"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json",
 			"https://release-assets.githubusercontent.com/*",
 		];
@@ -58,13 +67,14 @@ export default defineConfig({
 
 		const mv3Permissions = {
 			permissions: basePermissions,
-			host_permissions: requiredHosts,
+			host_permissions: backgroundFetchHosts,
+			optional_permissions: ["cookies"],
 			optional_host_permissions: ["http://*/*", "https://*/*"],
 		};
 
 		const mv2Permissions = {
-			permissions: [...basePermissions, ...requiredHosts],
-			optional_permissions: ["http://*/*", "https://*/*"],
+			permissions: [...basePermissions, ...backgroundFetchHosts],
+			optional_permissions: ["cookies", "http://*/*", "https://*/*"],
 		};
 
 		return {

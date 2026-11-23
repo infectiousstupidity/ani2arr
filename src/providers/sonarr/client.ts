@@ -5,9 +5,9 @@ import * as v from "valibot";
 
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
+import type { SonarrSeriesId, TvdbId } from "../schemas";
 import { ProviderApiClient } from "../shared.client";
 import type { ProviderCredentials } from "../types";
-import type { SonarrAddSeriesPayload } from "./add";
 import {
 	SonarrGeneratedFolderSchema,
 	SonarrLookupSeriesSchema,
@@ -18,14 +18,13 @@ import {
 } from "./schemas";
 import type { SonarrMonitorOption } from "./schemas";
 import type {
+	SonarrAddSeriesPayload,
 	SonarrGeneratedFolder,
 	SonarrLookupSeries,
 	SonarrQualityProfile,
 	SonarrRootFolder,
 	SonarrSeries,
-	SonarrSeriesId,
 	SonarrTag,
-	TvdbId,
 } from "./types";
 
 const SONARR_API_BASE_PATH = "/api/v3";

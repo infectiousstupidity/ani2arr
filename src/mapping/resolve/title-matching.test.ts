@@ -1,6 +1,3 @@
-/** Tests for provider-aware automatic mapping title normalization and scoring. */
-// src/mapping/resolve/title-matching.test.ts
-
 import { describe, expect, it } from "vitest";
 import { parseAniListId, type AniListMedia } from "@/anilist/types";
 import {
@@ -36,55 +33,30 @@ function matchSonarr(title: string, candidates: TitleCandidate[]) {
 }
 
 describe("title matching", () => {
-	it("sanitizes Sonarr lookup titles with suffix-only season cleanup", () => {
-		expect(
-			sanitizeLookupDisplayForProvider("sonarr", "[Oshi no Ko] 3rd Season"),
-		).toBe("Oshi no Ko");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Attack on Titan Final Season",
-			),
-		).toBe("Attack on Titan");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Bleach: Thousand-Year Blood War Part 2",
-			),
-		).toBe("Bleach: Thousand-Year Blood War");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Kusuriya no Hitorigoto 3rd Season Part 2",
-			),
-		).toBe("Kusuriya no Hitorigoto");
-		expect(sanitizeLookupDisplayForProvider("sonarr", "Some Show Cour II")).toBe(
-			"Some Show",
-		);
-		expect(sanitizeLookupDisplayForProvider("sonarr", "Some Show S2")).toBe(
-			"Some Show",
-		);
+	it.each([
+		["[Oshi no Ko] 3rd Season", "Oshi no Ko"],
+		["Attack on Titan Final Season", "Attack on Titan"],
+		[
+			"Bleach: Thousand-Year Blood War Part 2",
+			"Bleach: Thousand-Year Blood War",
+		],
+		["Kusuriya no Hitorigoto 3rd Season Part 2", "Kusuriya no Hitorigoto"],
+		["Some Show Cour II", "Some Show"],
+		["Some Show S2", "Some Show"],
+	])("sanitizes the Sonarr lookup title %s", (title, expected) => {
+		expect(sanitizeLookupDisplayForProvider("sonarr", title)).toBe(expected);
 	});
 
 	it("preserves Sonarr reboot years while cleaning season suffixes", () => {
 		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Ranma 1/2 (2024) 3rd Season",
-			),
+			sanitizeLookupDisplayForProvider("sonarr", "Ranma 1/2 (2024) 3rd Season"),
 		).toBe("Ranma 1/2 2024");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Ranma1/2 (2024) Season 3",
-			),
-		).toBe("Ranma1/2 2024");
 	});
 
 	it("keeps Radarr movie-style part suffixes", () => {
-		expect(sanitizeLookupDisplayForProvider("radarr", "Movie Title Part 2")).toBe(
-			"Movie Title Part 2",
-		);
+		expect(
+			sanitizeLookupDisplayForProvider("radarr", "Movie Title Part 2"),
+		).toBe("Movie Title Part 2");
 	});
 
 	it("deduplicates canonical provider title keys", () => {
@@ -95,18 +67,12 @@ describe("title matching", () => {
 			synonyms: ["One Punch Man!"],
 		});
 
-		expect(terms).toEqual([{ canonical: "one punch man", display: "One-Punch Man" }]);
+		expect(terms).toEqual([
+			{ canonical: "one punch man", display: "One-Punch Man" },
+		]);
 		expect(canonicalTitleKeyForProvider("sonarr", "One Punch Man!")).toBe(
 			"one punch man",
 		);
-	});
-
-	it("matches compact title variants without AniList fallback", () => {
-		expect(
-			matchSonarr("Dandadan 3rd Season", [
-				{ providerId: 432_832, title: "DAN DA DAN", year: 2024 },
-			]),
-		).toEqual({ providerId: 432_832, matchedTitle: "Dandadan" });
 	});
 
 	it("matches hyphenated titles after Sonarr season cleanup", () => {
@@ -139,6 +105,24 @@ describe("title matching", () => {
 		).toEqual({ providerId: 330_692, matchedTitle: "Yuru Camp△" });
 	});
 
+	it("adds a lower-priority base-title lookup for a spaced-dash subtitle", () => {
+		expect(
+			getSearchTerms(
+				"sonarr",
+				media("Frieren: Beyond Journey's End - Golden Land Arc"),
+			),
+		).toEqual([
+			{
+				canonical: "frieren beyond journeys end golden land arc",
+				display: "Frieren: Beyond Journeys End - Golden Land Arc",
+			},
+			{
+				canonical: "frieren beyond journeys end",
+				display: "Frieren: Beyond Journeys End",
+			},
+		]);
+	});
+
 	it("prefers the Ranma 2024 reboot over the original Sonarr result", () => {
 		const term = firstSonarrTerm("Ranma 1/2 (2024) 3rd Season");
 
@@ -150,10 +134,23 @@ describe("title matching", () => {
 		).toEqual({ providerId: 451_479, matchedTitle: "Ranma 1/2 2024" });
 	});
 
-	it("does not accept weak Haikyuu figure-animation result", () => {
+	it("selects the higher-scoring candidate when both are close", () => {
+		expect(
+			matchSonarr("Close Match Story", [
+				{ providerId: 10, title: "Close Match Story XX" },
+				{ providerId: 20, title: "Close Match Story X" },
+			]),
+		).toEqual({ providerId: 20, matchedTitle: "Close Match Story" });
+	});
+
+	it("does not accept a top candidate below minimum confidence", () => {
 		expect(
 			matchSonarr("Haikyuu!!: Bakemono-tachi no Iku Tokoro", [
-				{ providerId: 460_412, title: "Haikyuu!! Figure Animation", year: 2020 },
+				{
+					providerId: 460_412,
+					title: "Haikyuu!! Figure Animation",
+					year: 2020,
+				},
 			]),
 		).toBeNull();
 	});

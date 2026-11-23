@@ -1,26 +1,36 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Plain payload and response types used by RPC and adjacent provider flows. */
 // src/rpc/types.ts
 
 import type {
 	AniListId,
 	AniListMediaHint,
-	AniListMediaFormat,
 	AniListMetadata,
 } from "@/anilist/types";
-import type { Provider, ProviderCredentials } from "@/providers/types";
+import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type {
+	MappingResult,
+	SeerrTarget,
+	SeerrTargetWithEvidence,
+} from "@/mapping/types";
+import type { MyAnimeListMetadata } from "@/myanimelist/types";
 import type { ProviderOpenTarget } from "@/providers/provider-links";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
-	RadarrMovieSnapshot,
 	RadarrLookupMovie,
 	RadarrMovie,
+	RadarrMovieSnapshot,
 } from "@/providers/radarr/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type {
+	SeerrAccountSummary,
+	SeerrConnection,
 	SeerrMediaDetails,
 	SeerrMediaRequest,
-	SeerrMediaStatus,
+	SeerrPublicSettings,
 	SeerrSearchResult,
+	SeerrStatusSummary,
 	SeerrTargetSource,
 	SeerrTvSeasons,
 } from "@/providers/seerr/types";
@@ -31,12 +41,13 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type { MappingResult, MappingSource } from "@/mapping/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
+import type { PublicOptions } from "@/settings/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
 export type StatusInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	title?: string;
 	force_verify?: boolean;
 	force_mapping_retry?: boolean;
@@ -44,7 +55,7 @@ export type StatusInput = {
 };
 
 export type AddSonarrInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	tvdbId: TvdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -53,7 +64,7 @@ export type AddSonarrInput = {
 };
 
 export type UpdateSonarrInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	tvdbId: TvdbId;
 	title: string;
 	form: SonarrFormState;
@@ -61,7 +72,7 @@ export type UpdateSonarrInput = {
 };
 
 export type AddRadarrInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	tmdbId: TmdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -70,14 +81,14 @@ export type AddRadarrInput = {
 };
 
 export type UpdateRadarrInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	tmdbId: TmdbId;
 	title: string;
 	form: RadarrFormState;
 };
 
 export type SetManualMappingInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	force?: boolean;
 } & (
 	| { provider: "sonarr"; providerId: TvdbId }
@@ -85,7 +96,7 @@ export type SetManualMappingInput = {
 );
 
 export type ClearManualMappingInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	provider: Provider;
 };
 
@@ -93,7 +104,7 @@ export type SetMappingIgnoreInput = ClearManualMappingInput;
 export type ClearMappingIgnoreInput = ClearManualMappingInput;
 
 export type SetMappingRejectedCandidateInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 } & (
 	| { provider: "sonarr"; providerId: TvdbId }
 	| { provider: "radarr"; providerId: TmdbId }
@@ -118,20 +129,21 @@ export type ValidateTmdbInput = {
 	tmdbId: TmdbId;
 };
 
-export type GetMappingsInput = {
-	providers?: Provider[];
-	statuses?: MappingListRowStatus[];
-	source?: MappingSource;
-	limit?: number;
-	query?: string;
+export type GetMappingIdentitiesInput = AniListId[];
+export type GetSeerrTargetsInput = Array<{
+	anilistId: AniListId;
+	mediaType: "movie" | "tv";
+}>;
+export type GetSeerrTargetInput = {
+	source: SourceIdentity;
+	mediaType: "movie" | "tv";
+	title?: string | null;
+	metadata?: AniListMediaHint | null;
+	forceRetry?: boolean;
 };
 
-export type GetMappingIdentitiesInput = AniListId[];
-export type GetSeerrTargetsInput = AniListId[];
-export type GetSeerrTargetInput = AniListId;
-
 export type GetMappingInspectionInput = {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	provider: Provider;
 };
 
@@ -143,18 +155,29 @@ export type ProviderConnectionTestInput = {
 	credentials: ProviderCredentials;
 };
 
+export type CheckSeerrSessionInput = {
+	url: string;
+};
+
+export type TestSeerrApiKeyConnectionInput = {
+	url: string;
+	apiKey: string;
+};
+
+export type SeerrConnectionCheckOutput = {
+	account: SeerrAccountSummary;
+};
+
 export type RequestInSeerrInput =
 	| {
-			anilistId: AniListId;
 			mediaType: "movie";
 			tmdbId: TmdbId;
 	  }
 	| {
-			anilistId: AniListId;
 			mediaType: "tv";
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
-			seasons: number[];
+			seasons: SeerrTvSeasons;
 	  };
 
 export type GetSeerrMediaStatusInput =
@@ -168,44 +191,21 @@ export type GetSeerrMediaStatusInput =
 			seasons?: SeerrTvSeasons;
 	  };
 
-export type GetSeerrMediaStatusOutput = {
-	status: SeerrMediaStatus;
-};
+export type GetSeerrMediaStatusOutput = SeerrStatusSummary;
 
 export type SeerrRequestTarget = {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	source: SeerrTargetSource;
-} & (
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			seasons: number[];
-			tmdbSeasons?: number[];
-			tvdbSeasons?: number[];
-			tvdbId?: TvdbId;
-	  }
-);
+} & SeerrTargetWithEvidence;
 
 export type SetManualSeerrTargetInput = {
-	anilistId: AniListId;
-} & (
-	| {
-			mediaType: "movie";
-			tmdbId: TmdbId;
-	  }
-	| {
-			mediaType: "tv";
-			tmdbId: TmdbId;
-			tvdbId?: TvdbId;
-			seasons: number[];
-	  }
-);
+	source: SourceIdentity;
+} & SeerrTarget;
 
-export type ClearManualSeerrTargetInput = AniListId;
+export type ClearManualSeerrTargetInput = {
+	source: SourceIdentity;
+	mediaType: "movie" | "tv";
+};
 
 export type SearchSeerrMediaInput = {
 	query: string;
@@ -224,6 +224,8 @@ export type GetSeerrMediaDetailsInput =
 	  };
 
 export type GetSeerrMediaDetailsOutput = SeerrMediaDetails;
+
+export type GetSeerrPublicSettingsOutput = SeerrPublicSettings;
 
 export type GetSeerrLinkedAniListEntriesInput =
 	| {
@@ -254,9 +256,15 @@ export type OpenSeerrPageInput = {
 
 export type OpenSeerrPageOutput = OpenProviderPageOutput;
 
-export type NotifyProviderConnectionChangedInput = {
-	changedProviders?: Provider[];
-	disconnectedProviders?: Provider[];
+export type SavePublicOptionsInput = PublicOptions;
+
+export type SaveProviderConnectionInput = {
+	provider: Provider;
+	credentials: ProviderCredentials | null;
+};
+
+export type SaveSeerrConnectionInput = {
+	connection: SeerrConnection | null;
 };
 
 export type GetProviderFormResourcesInput = {
@@ -288,17 +296,15 @@ export type MappingListRowStatus =
 
 export interface MappingListProviderMeta {
 	title?: string;
-	type?: "series" | "movie";
 	statusLabel?: string;
 	providerRouteSlug?: string;
 }
 
 export interface MappingListRow {
 	anilistId: AniListId;
+	aliases?: SourceIdentity[];
 	provider: Provider;
 	result: MappingResult;
-	providerId: ProviderExternalId | null;
-	isInLibrary: boolean | null;
 	mappingRowStatus: MappingListRowStatus;
 	providerMeta?: MappingListProviderMeta;
 }
@@ -308,34 +314,25 @@ export interface MappingListGroup {
 	provider: Provider;
 	providerId: ProviderExternalId | null;
 	rows: MappingListRow[];
-	linkedAniListIds: readonly AniListId[];
 	isInLibrary: boolean | null;
 	providerMeta?: MappingListProviderMeta;
 }
 
-export interface GetMappingsOutput {
-	groups: MappingListGroup[];
-	total: number;
-}
-
-export interface MappingIdentity {
-	anilistId: AniListId;
-	provider: Provider;
-	result: MappingResult;
-}
+export type MappingIdentity = ActiveMappingIdentity;
 
 export type GetMappingIdentitiesOutput = MappingIdentity[];
 
 export interface MappingDetailsLinkedAniListEntry {
 	anilistId: AniListId;
 	title?: string;
-	format?: AniListMediaFormat | null;
+	format?: AnimeFormat | null;
 	year?: number | null;
 	coverImage?: string | null;
 	relation?: "current";
 }
 
 export interface MappingDetailsPayload {
+	source: SourceIdentity;
 	mapping: MappingResult;
 	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
 }
@@ -366,3 +363,5 @@ export interface GetAniListMetadataOutput {
 	metadata: AniListMetadata[];
 	missingIds?: number[];
 }
+
+export type GetMyAnimeListMetadataOutput = MyAnimeListMetadata | null;

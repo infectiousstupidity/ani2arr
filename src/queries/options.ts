@@ -2,28 +2,33 @@
 // src/queries/options.ts
 
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { normalizeError } from "@/shared/errors/error-utils";
+import {
+	type QueryClient,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { logger } from "@/shared/utils/logger";
+import { resetAfterProviderConnectionChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
 import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
+import type { SeerrConnection } from "@/providers/seerr/types";
+import { getAni2arrApi } from "@/rpc";
 import {
 	getPublicOptionsSnapshot,
 	getExtensionOptionsSnapshot,
-	saveProviderConnectionSnapshot,
-	saveSeerrConnectionSnapshot,
-	savePublicOptionsSnapshot,
-	toPublicOptions,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
 } from "../settings/store";
 import type { ExtensionOptions, PublicOptions } from "../settings/types";
 
 export function useOptionsQuerySync(): void {
+	usePublicOptionsQuerySync();
+
 	const queryClient = useQueryClient();
 
 	useEffect(() => {
@@ -34,19 +39,8 @@ export function useOptionsQuerySync(): void {
 			queryClient.setQueryData(queryKeys.options(), snapshot);
 		};
 
-		const applyPublicOptionsSnapshot = (snapshot: PublicOptions) => {
-			if (!active) return;
-			queryClient.setQueryData(queryKeys.publicOptions(), snapshot);
-			logger.configure({
-				enabled: snapshot.debugLogging || import.meta.env.DEV,
-			});
-		};
-
 		const unsubscribeExtension = watchExtensionOptionsSnapshot(
 			applyExtensionOptionsSnapshot,
-		);
-		const unsubscribePublic = watchPublicOptionsSnapshot(
-			applyPublicOptionsSnapshot,
 		);
 
 		void queryClient
@@ -56,6 +50,27 @@ export function useOptionsQuerySync(): void {
 				staleTime: Infinity,
 			})
 			.then(applyExtensionOptionsSnapshot, () => {});
+		return () => {
+			active = false;
+			unsubscribeExtension();
+		};
+	}, [queryClient]);
+}
+
+export function usePublicOptionsQuerySync(): void {
+	const queryClient = useQueryClient();
+
+	useEffect(() => {
+		let active = true;
+		const applyPublicOptionsSnapshot = (snapshot: PublicOptions) => {
+			if (!active) return;
+			queryClient.setQueryData(queryKeys.publicOptions(), snapshot);
+			logger.configure({
+				enabled: snapshot.debugLogging || import.meta.env.DEV,
+			});
+		};
+		const unsubscribe = watchPublicOptionsSnapshot(applyPublicOptionsSnapshot);
+
 		void queryClient
 			.ensureQueryData({
 				queryKey: queryKeys.publicOptions(),
@@ -66,8 +81,7 @@ export function useOptionsQuerySync(): void {
 
 		return () => {
 			active = false;
-			unsubscribeExtension();
-			unsubscribePublic();
+			unsubscribe();
 		};
 	}, [queryClient]);
 }
@@ -86,29 +100,31 @@ export const usePublicOptions = () =>
 		staleTime: Infinity,
 	});
 
+function syncOptionsSnapshots(queryClient: QueryClient): void {
+	void Promise.all([
+		getExtensionOptionsSnapshot(),
+		getPublicOptionsSnapshot(),
+	]).then(
+		([options, publicOptions]) => {
+			queryClient.setQueryData(queryKeys.options(), options);
+			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
+		},
+		() => {},
+	);
+}
+
 export const useSavePublicOptions = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<
-		{ extensionOptions: ExtensionOptions; publicOptions: PublicOptions },
-		ExtensionError,
-		PublicOptions
-	>({
-		mutationFn: async (options: PublicOptions) => {
-			try {
-				await savePublicOptionsSnapshot(options);
-				const [extensionOptions, publicOptions] = await Promise.all([
-					getExtensionOptionsSnapshot(),
-					getPublicOptionsSnapshot(),
-				]);
-				return { extensionOptions, publicOptions };
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: (saved) => {
-			queryClient.setQueryData(queryKeys.options(), saved.extensionOptions);
-			queryClient.setQueryData(queryKeys.publicOptions(), saved.publicOptions);
+	return useMutation<{ ok: true }, ExtensionError, PublicOptions>({
+		mutationFn: (options) => getAni2arrApi().savePublicOptions(options),
+		onSuccess: () => {
+			void getPublicOptionsSnapshot().then(
+				(publicOptions) => {
+					queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
+				},
+				() => {},
+			);
 		},
 	});
 };
@@ -117,23 +133,14 @@ export const useSaveProviderConnection = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation<
-		ExtensionOptions,
+		{ ok: true },
 		ExtensionError,
 		{ provider: Provider; credentials: ProviderCredentials | null }
 	>({
-		mutationFn: async ({ provider, credentials }) => {
-			try {
-				return await saveProviderConnectionSnapshot(provider, credentials);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: (savedOptions) => {
-			queryClient.setQueryData(queryKeys.options(), savedOptions);
-			queryClient.setQueryData(
-				queryKeys.publicOptions(),
-				toPublicOptions(savedOptions),
-			);
+		mutationFn: (input) => getAni2arrApi().saveProviderConnection(input),
+		onSuccess: (_, { provider }) => {
+			resetAfterProviderConnectionChange(queryClient, provider);
+			syncOptionsSnapshots(queryClient);
 		},
 	});
 };
@@ -142,23 +149,14 @@ export const useSaveSeerrConnection = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation<
-		ExtensionOptions,
+		{ ok: true },
 		ExtensionError,
-		{ credentials: ProviderCredentials | null }
+		{ connection: SeerrConnection | null }
 	>({
-		mutationFn: async ({ credentials }) => {
-			try {
-				return await saveSeerrConnectionSnapshot(credentials);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: (savedOptions) => {
-			queryClient.setQueryData(queryKeys.options(), savedOptions);
-			queryClient.setQueryData(
-				queryKeys.publicOptions(),
-				toPublicOptions(savedOptions),
-			);
+		mutationFn: (input) => getAni2arrApi().saveSeerrConnection(input),
+		onSuccess: () => {
+			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
+			syncOptionsSnapshots(queryClient);
 		},
 	});
 };

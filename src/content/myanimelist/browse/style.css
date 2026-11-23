@@ -1,0 +1,171 @@
+/* MyAnimeList light-DOM placement for browse-card overlays. */
+
+a[data-a2a-processed] {
+	position: relative;
+	overflow: visible !important;
+}
+
+.a2a-overlay-container {
+	position: absolute;
+	display: inline-block;
+	pointer-events: none;
+	z-index: 80;
+	overflow: visible;
+}
+
+/*
+ * Only poster overlays use the corner position.
+ * Action rows and status columns have their own placement.
+ */
+.a2a-overlay-container[data-corner="top-left"]:not(
+		[data-presentation="action-row"],
+		[data-presentation="status-column"]
+	) {
+	left: var(--badge-offset-x, -8px);
+	top: 14px;
+}
+
+.a2a-overlay-container[data-presentation="status-column"] {
+	position: static;
+	display: block;
+	width: 100%;
+	pointer-events: none;
+	z-index: auto;
+	overflow: visible;
+}
+
+.a2a-overlay-container[data-presentation="status-column"]:not(:empty) {
+	margin-bottom: 5px;
+}
+
+.a2a-anime-search-header,
+.a2a-anime-search-action-cell {
+	box-sizing: border-box;
+	width: 160px;
+	min-width: 160px;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.a2a-anime-search-action-cell {
+	padding: 0 4px;
+	vertical-align: middle;
+}
+
+.a2a-anime-search-action-cell
+	> .a2a-overlay-container[data-presentation="status-column"]:not(:empty) {
+	margin-bottom: 0;
+}
+
+/*
+ * Preserve MAL's original card content height and reserve a footer:
+ *
+ * 5px top gap + 23px button height + 7px bottom padding = 35px.
+ */
+.seasonal-anime.js-seasonal-anime[data-a2a-processed] {
+	--a2a-action-row-height: 23px;
+	--a2a-action-row-space: 35px;
+
+	height: calc(
+		var(--a2a-action-row-host-height) + var(--a2a-action-row-space)
+	) !important;
+}
+
+/* Move MAL's native score/list row above the injected footer. */
+.seasonal-anime.js-seasonal-anime[data-a2a-processed] > .information {
+	bottom: var(--a2a-action-row-space) !important;
+}
+
+/* Place the injected row inside the reserved footer. */
+.a2a-overlay-container[data-presentation="action-row"] {
+	position: absolute;
+	inset: auto 0 0;
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: var(--a2a-action-row-space);
+	padding: 5px 6px 7px;
+	pointer-events: none;
+	z-index: auto;
+	overflow: visible;
+}
+
+.a2a-card-overlay[data-presentation="action-row"] {
+	display: flex;
+	flex: 1 1 0;
+	align-items: stretch;
+	gap: 5px;
+	min-width: 0;
+	width: 100%;
+	pointer-events: none;
+	z-index: auto;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	:is(.a2a-card-overlay__row-primary, .a2a-card-overlay__row-external) {
+	appearance: none;
+	box-sizing: border-box;
+	pointer-events: auto;
+	height: var(--a2a-action-row-height);
+	margin: 0;
+	padding: 0;
+	border: 1px solid #4069bd;
+	border-radius: 3px;
+	background: #4f74c8;
+	color: #fff;
+	font-family: Verdana, Arial, sans-serif;
+	font-size: 10px;
+	font-weight: 400;
+	line-height: 21px;
+	white-space: nowrap;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	:is(.a2a-card-overlay__row-primary, .a2a-card-overlay__row-external):is(
+		:hover,
+		:active
+	):not(:disabled) {
+	opacity: 0.7;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	:is(
+		.a2a-card-overlay__row-primary,
+		.a2a-card-overlay__row-external
+	):focus-visible {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid #8aa9ed;
+	outline-offset: -2px;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	.a2a-card-overlay__row-primary {
+	min-width: 0;
+	flex: 1 1 0;
+	padding: 0 5px;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	.a2a-card-overlay__row-external {
+	display: inline-grid;
+	flex: 0 0 var(--a2a-action-row-height);
+	place-items: center;
+	width: var(--a2a-action-row-height);
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	.a2a-card-overlay__row-external
+	.a2a-provider-icon {
+	width: 16px;
+	height: 16px;
+	color: currentColor;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	button:is(:disabled, [aria-disabled="true"]) {
+	cursor: default;
+	opacity: 0.72;
+}

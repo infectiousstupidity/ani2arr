@@ -15,6 +15,7 @@ type OptionsPageSectionId =
 interface OpenOptionsPageInput {
 	sectionId?: OptionsPageSectionId;
 	targetAnilistId?: AniListId;
+	enableSeerrCsrf?: boolean;
 }
 
 export function openOptionsPage(input: OpenOptionsPageInput = {}): void {
@@ -26,6 +27,7 @@ export function openOptionsPage(input: OpenOptionsPageInput = {}): void {
 			...(input.targetAnilistId
 				? { targetAnilistId: input.targetAnilistId }
 				: {}),
+			...(input.enableSeerrCsrf ? { enableSeerrCsrf: true } : {}),
 			timestamp: Date.now(),
 		})
 		.catch(() => {});

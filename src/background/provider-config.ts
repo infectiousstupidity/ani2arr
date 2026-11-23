@@ -3,8 +3,9 @@
 
 import { getExtensionOptionsSnapshot } from "@/settings/store";
 import { getProviderCredentials } from "@/settings/provider-config";
-import { getSeerrCredentials } from "@/settings/seerr-config";
+import { getSeerrConnection } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import type {
 	Provider,
 	ProviderCredentials,
@@ -62,20 +63,20 @@ export async function requireProviderCredentials(
 export function createSeerrNotConfiguredError(): ExtensionError {
 	return createError(
 		ErrorCode.CONFIGURATION_ERROR,
-		"Seerr credentials are not configured.",
+		"Seerr connection is not configured.",
 		"Configure your Seerr connection in ani2arr options.",
 	);
 }
 
-export async function getSeerrConfig(): Promise<ProviderCredentials | null> {
+export async function getSeerrConfig(): Promise<SeerrConnection | null> {
 	const options = await getExtensionOptionsSnapshot();
-	return getSeerrCredentials(options);
+	return getSeerrConnection(options);
 }
 
-export async function requireSeerrCredentials(): Promise<ProviderCredentials> {
+export async function requireSeerrConnection(): Promise<SeerrConnection> {
 	const options = await getExtensionOptionsSnapshot();
-	const credentials = getSeerrCredentials(options);
-	if (!credentials) throw createSeerrNotConfiguredError();
+	const connection = getSeerrConnection(options);
+	if (!connection) throw createSeerrNotConfiguredError();
 
-	return credentials;
+	return connection;
 }

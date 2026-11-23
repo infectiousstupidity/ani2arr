@@ -3,7 +3,7 @@
 
 import { ChevronDown, CircleHelp } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { RadarrIcon, SonarrIcon } from "../../components/icons";
+import { RadarrIcon, SonarrIcon } from "@/features/provider-ui/provider-icons";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";

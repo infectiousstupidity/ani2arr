@@ -5,228 +5,284 @@
 @import "@/shared/styles/color-tokens.css";
 
 :host {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f2f5f7;
-  --bg-tertiary: #edf1f5;
-  --text-primary: #212529;
-  --text-secondary: #607080;
-  --border-primary: #dee2e6;
-  --accent-primary: #3db4f2;
-  --accent-hover: #299dd1;
-  --warning: #f2c94c;
-  --success: #00ba7c;
-  --success-foreground: #166534;
-  --error: #f91880;
-  --iconbutton-text: #fafafa;
+	--bg-primary: #ffffff;
+	--bg-secondary: #f2f5f7;
+	--bg-tertiary: #edf1f5;
+	--text-primary: #212529;
+	--text-secondary: #607080;
+	--border-primary: #dee2e6;
+	--accent-primary: #3db4f2;
+	--accent-hover: #299dd1;
+	--warning: #f2c94c;
+	--success: #00ba7c;
+	--success-foreground: #166534;
+	--error: #f91880;
+	--iconbutton-text: #fafafa;
 
-  color: var(--text-primary);
+	color: var(--text-primary);
 }
 
 :host(.dark) {
-  --bg-primary: #0b1622;
-  --bg-secondary: #151f2e;
-  --bg-tertiary: #253341;
-  --text-primary: #f7f9f9;
-  --text-secondary: #9fadbd;
-  --border-primary: #38444d;
-  --accent-primary: #3db4f2;
-  --accent-hover: #299dd1;
-  --success-foreground: #86efac;
-  --iconbutton-text: #f7f9f9;
+	--bg-primary: #0b1622;
+	--bg-secondary: #151f2e;
+	--bg-tertiary: #253341;
+	--text-primary: #f7f9f9;
+	--text-secondary: #9fadbd;
+	--border-primary: #38444d;
+	--accent-primary: #3db4f2;
+	--accent-hover: #299dd1;
+	--success-foreground: #86efac;
+	--iconbutton-text: #f7f9f9;
 }
 
+/*
+ * Content scripts run inside host-page shadow roots, but rem units still use
+ * the host document's root font size. Keep injected UI dimensions in pixels so
+ * AniList, AniChart, MyAnimeList, and future hosts render at the same scale.
+ */
 @theme {
-  --spacing: 0.4rem;
-  --text-xs: 1.2rem;
-  --text-sm: 1.4rem;
-  --text-base: 1.6rem;
-  --text-lg: 1.8rem;
-  --text-xl: 2rem;
-  --text-2xl: 2.4rem;
-  --text-3xl: 3rem;
-  --text-button: 2.2rem;
+	--spacing: 4px;
+
+	--text-xs: 12px;
+	--text-sm: 14px;
+	--text-base: 16px;
+	--text-lg: 18px;
+	--text-xl: 20px;
+	--text-2xl: 24px;
+	--text-3xl: 30px;
+	--text-button: 22px;
+
+	--radius-xs: 1.25px;
+	--radius-sm: 2.5px;
+	--radius-md: 3.75px;
+	--radius-lg: 5px;
+	--radius-xl: 7.5px;
+	--radius-2xl: 10px;
+	--radius-3xl: 15px;
+	--radius-4xl: 20px;
 }
 
 [data-radix-popper-content-wrapper] {
-  z-index: 99999 !important;
+	z-index: 99999 !important;
 }
 
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 .focus-trap {
-  isolation: isolate;
+	isolation: isolate;
 }
 
 :host *:focus,
 :host *:focus-visible,
 :host *:focus-within {
-  outline: none !important;
-  outline-offset: 0 !important;
-  box-shadow: none !important;
+	outline: none !important;
+	outline-offset: 0 !important;
+	box-shadow: none !important;
 }
 
 .a2a-modal-overlay {
-  opacity: 0;
-  backdrop-filter: blur(0);
-  animation: a2a-modal-overlay-in 160ms ease-out forwards;
+	opacity: 0;
+	backdrop-filter: blur(0);
+	animation: a2a-modal-overlay-in 160ms ease-out forwards;
 }
 
 .a2a-modal-shell {
-  opacity: 0;
-  transform: translateY(30px) scale(0.95);
-  animation: a2a-modal-shell-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	opacity: 0;
+	transform: translateY(30px) scale(0.95);
+	animation: a2a-modal-shell-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .a2a-modal-section,
 .a2a-modal-header-item {
-  opacity: 0;
-  transform: translateY(15px);
-  animation: a2a-modal-section-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	opacity: 0;
+	transform: translateY(15px);
+	animation: a2a-modal-section-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .a2a-modal-header-item {
-  filter: blur(4px);
+	filter: blur(4px);
 }
 
 .a2a-fade-blur-in {
-  opacity: 0;
-  filter: blur(3px);
-  animation: a2a-fade-blur-in 160ms ease-out forwards;
+	opacity: 0;
+	filter: blur(3px);
+	animation: a2a-fade-blur-in 160ms ease-out forwards;
 }
 
 .a2a-connector-icon-in {
-  opacity: 0;
-  transform: rotate(-90deg) scale(0.5);
-  animation: a2a-connector-icon-in 180ms ease-out forwards;
+	opacity: 0;
+	transform: rotate(-90deg) scale(0.5);
+	animation: a2a-connector-icon-in 180ms ease-out forwards;
 }
 
 .a2a-footer-button-in {
-  opacity: 0;
-  transform: translateY(4px);
-  animation: a2a-footer-button-in 140ms ease-out forwards;
+	opacity: 0;
+	transform: translateY(4px);
+	animation: a2a-footer-button-in 140ms ease-out forwards;
 }
 
 .a2a-stagger-list > * {
-  opacity: 0;
-  transform: translateY(10px);
-  animation: a2a-row-in 180ms ease-out forwards;
+	opacity: 0;
+	transform: translateY(10px);
+	animation: a2a-row-in 180ms ease-out forwards;
 }
 
-.a2a-stagger-list > *:nth-child(1) { animation-delay: 0ms; }
-.a2a-stagger-list > *:nth-child(2) { animation-delay: 50ms; }
-.a2a-stagger-list > *:nth-child(3) { animation-delay: 100ms; }
-.a2a-stagger-list > *:nth-child(4) { animation-delay: 150ms; }
-.a2a-stagger-list > *:nth-child(5) { animation-delay: 200ms; }
-.a2a-stagger-list > *:nth-child(6) { animation-delay: 250ms; }
-.a2a-stagger-list > *:nth-child(n + 7) { animation-delay: 300ms; }
+.a2a-stagger-list > *:nth-child(1) {
+	animation-delay: 0ms;
+}
 
-.a2a-delay-50 { animation-delay: 50ms; }
-.a2a-delay-100 { animation-delay: 100ms; }
-.a2a-delay-120 { animation-delay: 120ms; }
-.a2a-delay-140 { animation-delay: 140ms; }
-.a2a-delay-150 { animation-delay: 150ms; }
+.a2a-stagger-list > *:nth-child(2) {
+	animation-delay: 50ms;
+}
+
+.a2a-stagger-list > *:nth-child(3) {
+	animation-delay: 100ms;
+}
+
+.a2a-stagger-list > *:nth-child(4) {
+	animation-delay: 150ms;
+}
+
+.a2a-stagger-list > *:nth-child(5) {
+	animation-delay: 200ms;
+}
+
+.a2a-stagger-list > *:nth-child(6) {
+	animation-delay: 250ms;
+}
+
+.a2a-stagger-list > *:nth-child(n + 7) {
+	animation-delay: 300ms;
+}
+
+.a2a-delay-50 {
+	animation-delay: 50ms;
+}
+
+.a2a-delay-100 {
+	animation-delay: 100ms;
+}
+
+.a2a-delay-120 {
+	animation-delay: 120ms;
+}
+
+.a2a-delay-140 {
+	animation-delay: 140ms;
+}
+
+.a2a-delay-150 {
+	animation-delay: 150ms;
+}
 
 @keyframes a2a-modal-overlay-in {
-  from {
-    opacity: 0;
-    backdrop-filter: blur(0);
-  }
-  to {
-    opacity: 1;
-    backdrop-filter: blur(8px);
-  }
+	from {
+		opacity: 0;
+		backdrop-filter: blur(0);
+	}
+
+	to {
+		opacity: 1;
+		backdrop-filter: blur(8px);
+	}
 }
 
 @keyframes a2a-modal-shell-in {
-  from {
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+	from {
+		opacity: 0;
+		transform: translateY(30px) scale(0.95);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
 }
 
 @keyframes a2a-modal-section-in {
-  from {
-    opacity: 0;
-    filter: blur(4px);
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
-  }
+	from {
+		opacity: 0;
+		filter: blur(4px);
+		transform: translateY(15px);
+	}
+
+	to {
+		opacity: 1;
+		filter: blur(0);
+		transform: translateY(0);
+	}
 }
 
 @keyframes a2a-fade-blur-in {
-  from {
-    opacity: 0;
-    filter: blur(3px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
+	from {
+		opacity: 0;
+		filter: blur(3px);
+	}
+
+	to {
+		opacity: 1;
+		filter: blur(0);
+	}
 }
 
 @keyframes a2a-connector-icon-in {
-  from {
-    opacity: 0;
-    transform: rotate(-90deg) scale(0.5);
-  }
-  to {
-    opacity: 1;
-    transform: rotate(0) scale(1);
-  }
+	from {
+		opacity: 0;
+		transform: rotate(-90deg) scale(0.5);
+	}
+
+	to {
+		opacity: 1;
+		transform: rotate(0) scale(1);
+	}
 }
 
 @keyframes a2a-footer-button-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 @keyframes a2a-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .a2a-modal-overlay,
-  .a2a-modal-shell,
-  .a2a-modal-section,
-  .a2a-modal-header-item,
-  .a2a-fade-blur-in,
-  .a2a-connector-icon-in,
-  .a2a-footer-button-in,
-  .a2a-stagger-list > * {
-    animation: none;
-    opacity: 1;
-    filter: none;
-    transform: none;
-  }
+	.a2a-modal-overlay,
+	.a2a-modal-shell,
+	.a2a-modal-section,
+	.a2a-modal-header-item,
+	.a2a-fade-blur-in,
+	.a2a-connector-icon-in,
+	.a2a-footer-button-in,
+	.a2a-stagger-list > * {
+		animation: none;
+		opacity: 1;
+		filter: none;
+		transform: none;
+	}
 }

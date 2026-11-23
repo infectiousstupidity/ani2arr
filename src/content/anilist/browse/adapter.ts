@@ -1,9 +1,9 @@
+import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** AniList browse surface adapter for card parsing and portal placement. */
 // src/content/anilist/browse/adapter.ts
 
 import {
-  parseAniListIdOrNull,
-  parseAniListMediaFormatLabel,
+	parseAniListIdOrNull,
 } from '@/anilist/types';
 import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
@@ -54,11 +54,17 @@ const parseAniListCard = (card: Element): HostMediaTarget | null => {
   const anilistId = parseAniListIdOrNull(idMatch ? Number(idMatch[1]) : Number.NaN);
   if (!anilistId) return null;
 
-  const format = parseAniListMediaFormatLabel(
+  const format = parseAnimeFormatLabel(
     card.querySelector<HTMLSpanElement>('.hover-data .info span')?.textContent,
   );
 
-  return { anilistId, title, format, mountTarget: cover };
+  return {
+    source: { source: 'anilist', id: anilistId },
+    anilistId,
+    title,
+    format,
+    mountTarget: cover,
+  };
 };
 
 export const anilistBrowseAdapter: BrowseAdapter = {

@@ -54,6 +54,24 @@ export function normalizeError(error: unknown): ExtensionError {
 	);
 }
 
+export function getUserErrorMessage(
+	error: unknown,
+	fallback: string,
+): string {
+	if (
+		error &&
+		typeof error === "object" &&
+		"userMessage" in error &&
+		typeof error.userMessage === "string" &&
+		error.userMessage.trim()
+	) {
+		return error.userMessage;
+	}
+	if (error instanceof Error && error.message.trim()) return error.message;
+	if (typeof error === "string" && error.trim()) return error;
+	return fallback;
+}
+
 export function logError(error: ExtensionError, context?: string): void {
 	const contextLabel = context ? `${context} | ` : "";
 	errorLogger.error(`${contextLabel}[${error.code}] - ${error.message}`, {

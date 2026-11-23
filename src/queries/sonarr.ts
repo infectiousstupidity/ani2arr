@@ -7,7 +7,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	AddSonarrInput,
@@ -19,7 +19,11 @@ import type {
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { invalidateAfterProviderMediaChange } from "@/queries/invalidation";
-import { queryKeys } from "@/queries/query-keys";
+import {
+	normalizeProviderLookupRequest,
+	normalizeSonarrStatusRequest,
+	queryKeys,
+} from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 
@@ -29,7 +33,7 @@ const hasQueryKeyPrefix = (
 ): boolean => prefix.every((part, index) => queryKey[index] === part);
 
 const keepPreviousSeriesStatusForSameMedia =
-	(anilistId: AniListId) =>
+	(source: SourceIdentity) =>
 	(
 		previousData: GetSeriesStatusOutput | undefined,
 		previousQuery: { queryKey: QueryKey } | undefined,
@@ -38,7 +42,7 @@ const keepPreviousSeriesStatusForSameMedia =
 
 		return hasQueryKeyPrefix(
 			previousQuery.queryKey,
-			queryKeys.providerMediaStatusItem("sonarr", anilistId),
+			queryKeys.providerMediaStatusItem("sonarr", source),
 		)
 			? previousData
 			: undefined;
@@ -69,7 +73,7 @@ export const useSonarrFormResources = (options?: {
 };
 
 export const useSeriesStatus = (
-	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
+	payload: Pick<StatusInput, "source" | "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
 		force_verify?: boolean;
@@ -79,28 +83,21 @@ export const useSeriesStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
-	const statusKeyInput = {
-		anilistId: payload.anilistId,
-		...(payload.title === undefined ? {} : { title: payload.title }),
-		...(payload.metadata === undefined ? {} : { metadata: payload.metadata }),
-	};
+	const source = payload.source;
+	const request = normalizeSonarrStatusRequest(payload);
 
 	return useQuery<GetSeriesStatusOutput, ExtensionError>({
-		queryKey: queryKeys.providerMediaStatus("sonarr", statusKeyInput),
-		queryFn: async () => {
-			const request: StatusInput = { ...statusKeyInput };
-			if (options?.force_verify === true) {
-				request.force_verify = true;
-			}
-			if (options?.force_mapping_retry === true) {
-				request.force_mapping_retry = true;
-			}
-			return getAni2arrApi().getSeriesStatus(request);
-		},
-		enabled: !!payload.anilistId && (options?.enabled ?? true),
+		queryKey: queryKeys.providerMediaStatus("sonarr", request),
+		queryFn: () =>
+			getAni2arrApi().getSeriesStatus({
+				...request,
+				...(forceVerify ? { force_verify: true } : {}),
+				...(forceMappingRetry ? { force_mapping_retry: true } : {}),
+			}),
+		enabled: options?.enabled ?? true,
 		staleTime: forceStatusRefresh ? 0 : 5 * 60 * 1000,
 		...(forceStatusRefresh ? { refetchOnMount: "always" } : {}),
-		placeholderData: keepPreviousSeriesStatusForSameMedia(payload.anilistId),
+		placeholderData: keepPreviousSeriesStatusForSameMedia(source),
 		refetchOnWindowFocus: false,
 	});
 };
@@ -109,12 +106,12 @@ export const useSonarrLookupSearch = (input: {
 	term: string;
 	enabled: boolean;
 }) => {
-	const term = input.term.trim();
+	const request = normalizeProviderLookupRequest(input);
 
 	return useQuery<SonarrLookupOutput>({
-		queryKey: queryKeys.providerLookup("sonarr", term),
-		queryFn: async () => getAni2arrApi().searchSonarr({ term }),
-		enabled: input.enabled && term.length > 0,
+		queryKey: queryKeys.providerLookup("sonarr", request),
+		queryFn: () => getAni2arrApi().searchSonarr(request),
+		enabled: input.enabled && request.term.length > 0,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: 1,
@@ -126,9 +123,9 @@ export const useAddSeries = () => {
 	return useMutation<SonarrSeries, ExtensionError, AddSonarrInput>({
 		mutationFn: (input: AddSonarrInput) => getAni2arrApi().addToSonarr(input),
 		onSuccess: (_createdSeries, variables) => {
-			invalidateAfterProviderMediaChange(queryClient, {
-				provider: "sonarr",
-				anilistId: variables.anilistId,
+				invalidateAfterProviderMediaChange(queryClient, {
+					provider: "sonarr",
+					source: variables.source,
 			});
 		},
 	});
@@ -140,9 +137,9 @@ export const useUpdateSeries = () => {
 		mutationFn: (input: UpdateSonarrInput) =>
 			getAni2arrApi().updateSonarrSeries(input),
 		onSuccess: (_updatedSeries, variables) => {
-			invalidateAfterProviderMediaChange(queryClient, {
-				provider: "sonarr",
-				anilistId: variables.anilistId,
+				invalidateAfterProviderMediaChange(queryClient, {
+					provider: "sonarr",
+					source: variables.source,
 			});
 		},
 	});

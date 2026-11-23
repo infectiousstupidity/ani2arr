@@ -2,14 +2,15 @@
 // src/features/seerr-request/seerr-action-state.test.ts
 
 import { describe, expect, it } from "vitest";
-import { getSeerrActionState } from "./seerr-action-state";
+import {
+	getSeerrActionState,
+	getSeerrVisualStatus,
+} from "./seerr-action-state";
 
 const baseInput = {
 	isConfigured: true,
-	isRequesting: false,
 	isChecking: false,
-	requestSucceeded: false,
-	requestFailed: false,
+	hasUsableTarget: true,
 	status: undefined,
 };
 
@@ -23,7 +24,6 @@ describe("getSeerrActionState", () => {
 		).toMatchObject({
 			label: "Available in Seerr",
 			disabled: false,
-			settled: true,
 		});
 	});
 
@@ -61,7 +61,6 @@ describe("getSeerrActionState", () => {
 		).toMatchObject({
 			state: "in-library",
 			disabled: false,
-			settled: true,
 		});
 	});
 
@@ -75,11 +74,10 @@ describe("getSeerrActionState", () => {
 			state: "checking",
 			label: "Checking Seerr...",
 			disabled: true,
-			settled: false,
 		});
 	});
 
-	it("keeps requestable state for unknown status and failed status checks", () => {
+	it("keeps requestable state for unknown status", () => {
 		expect(
 			getSeerrActionState({
 				...baseInput,
@@ -87,16 +85,6 @@ describe("getSeerrActionState", () => {
 			}),
 		).toMatchObject({
 			label: "Request in Seerr",
-			disabled: false,
-		});
-
-		expect(
-			getSeerrActionState({
-				...baseInput,
-				requestFailed: true,
-			}),
-		).toMatchObject({
-			label: "Retry Seerr request",
 			disabled: false,
 		});
 	});
@@ -110,7 +98,6 @@ describe("getSeerrActionState", () => {
 		).toMatchObject({
 			label: "Request again in Seerr",
 			disabled: false,
-			settled: false,
 		});
 	});
 
@@ -124,7 +111,26 @@ describe("getSeerrActionState", () => {
 			state: "error",
 			label: "Unavailable in Seerr",
 			disabled: true,
-			settled: true,
 		});
+	});
+});
+
+describe("getSeerrVisualStatus", () => {
+	it("lets target available win", () => {
+		expect(
+			getSeerrVisualStatus({ target: "available", overall: "partial" }),
+		).toBe("available");
+	});
+
+	it("lets target pending win", () => {
+		expect(
+			getSeerrVisualStatus({ target: "pending", overall: "partial" }),
+		).toBe("pending");
+	});
+
+	it("shows overall partial when the target is not requested", () => {
+		expect(
+			getSeerrVisualStatus({ target: "not-requested", overall: "partial" }),
+		).toBe("partial");
 	});
 });

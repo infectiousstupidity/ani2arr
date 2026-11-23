@@ -137,7 +137,7 @@ body:
     id: version
     attributes:
       label: ani2arr version
-      placeholder: "2.1.0"
+      placeholder: "2.2.0"
     validations:
       required: true
 

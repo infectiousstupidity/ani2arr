@@ -1,7 +1,8 @@
 # Workspace-level pnpm settings for dependency resolution and install targets.
 # pnpm-workspace.yaml
 overrides:
-  shell-quote: 1.8.4
+  shell-quote: 1.12.0
+  adm-zip: 0.6.1
   tmp: 0.2.7
 
 allowBuilds:

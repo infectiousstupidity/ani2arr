@@ -1,21 +1,20 @@
 /** Focused tests for provider ID schema boundaries. */
-// src/providers/schemas.test.ts
 
-import { describe, expect, it } from "vitest";
 import * as v from "valibot";
+import { describe, expect, it } from "vitest";
 import {
 	ProviderQualityProfileIdSchema,
 	ProviderTagIdSchema,
-	RadarrMovieIdSchema,
-	SonarrSeriesIdSchema,
-	TmdbIdSchema,
 	parseTmdbId,
 	parseTmdbIdOrNull,
 	parseTvdbId,
 	parseTvdbIdOrNull,
-	TvdbIdSchema,
+	RadarrMovieIdSchema,
+	SonarrSeriesIdSchema,
 	type TmdbId,
+	TmdbIdSchema,
 	type TvdbId,
+	TvdbIdSchema,
 } from "./schemas";
 
 describe("provider ID helpers", () => {
@@ -30,6 +29,7 @@ describe("provider ID helpers", () => {
 	it("rejects invalid concrete provider external IDs", () => {
 		expect(parseTvdbIdOrNull("100")).toBeNull();
 		expect(parseTmdbIdOrNull(0)).toBeNull();
+		expect(parseTvdbIdOrNull(Number.MAX_SAFE_INTEGER + 1)).toBeNull();
 		expect(() => parseTvdbId(1.5)).toThrow(/Invalid TVDB ID/);
 		expect(() => parseTmdbId("200")).toThrow(/Invalid TMDB ID/);
 	});

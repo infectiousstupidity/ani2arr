@@ -6,14 +6,17 @@ import {
 	type ProxyServiceKey,
 } from "@webext-core/proxy-service";
 import type { AniListId, AniListMedia } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MyAnimeListId } from "@/myanimelist/types";
 import { normalizeError } from "@/shared/errors/error-utils";
 import type { ProviderFormResources } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	GetAniListMetadataOutput,
+	GetMyAnimeListMetadataOutput,
 	GetMappingInspectionOutput,
-	GetMappingsOutput,
+	MappingListGroup,
 	MappingIdentity,
 	RadarrLookupOutput,
 	SonarrLookupOutput,
@@ -35,11 +38,12 @@ import type {
 	ClearMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	ClearMappingRejectedCandidateInput,
-	GetMappingsInput,
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
 	ProviderConnectionTestInput,
-	NotifyProviderConnectionChangedInput,
+	SaveProviderConnectionInput,
+	SavePublicOptionsInput,
+	SaveSeerrConnectionInput,
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
 	OpenSeerrPageInput,
@@ -50,6 +54,7 @@ import type {
 	GetSeerrMediaStatusOutput,
 	GetSeerrMediaDetailsInput,
 	GetSeerrMediaDetailsOutput,
+	GetSeerrPublicSettingsOutput,
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrLinkedAniListEntriesOutput,
 	GetSeerrTargetInput,
@@ -59,6 +64,9 @@ import type {
 	ClearManualSeerrTargetInput,
 	SearchSeerrMediaInput,
 	SearchSeerrMediaOutput,
+	CheckSeerrSessionInput,
+	TestSeerrApiKeyConnectionInput,
+	SeerrConnectionCheckOutput,
 } from "./types";
 
 export interface Ani2arrApi {
@@ -70,18 +78,25 @@ export interface Ani2arrApi {
 	updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
 	fetchAniListMedia(anilistId: AniListId): Promise<AniListMedia | null>;
 	getMappingIdentities(ids: AniListId[]): Promise<MappingIdentity[]>;
-	notifyProviderConnectionChanged(
-		input?: NotifyProviderConnectionChangedInput,
+	savePublicOptions(input: SavePublicOptionsInput): Promise<{ ok: true }>;
+	saveProviderConnection(
+		input: SaveProviderConnectionInput,
 	): Promise<{ ok: true }>;
+	saveSeerrConnection(input: SaveSeerrConnectionInput): Promise<{ ok: true }>;
 	testSonarrConnection(
 		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
 	testRadarrConnection(
 		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
-	testSeerrConnection(
-		input: ProviderConnectionTestInput,
-	): Promise<{ ok: true }>;
+	checkSeerrSession(
+		input: CheckSeerrSessionInput,
+	): Promise<SeerrConnectionCheckOutput>;
+	testSeerrApiKeyConnection(
+		input: TestSeerrApiKeyConnectionInput,
+	): Promise<SeerrConnectionCheckOutput>;
+	checkConfiguredSeerrConnection(): Promise<SeerrConnectionCheckOutput>;
+	checkConfiguredSeerrCsrfSupport(): Promise<{ ok: true }>;
 	requestInSeerr(input: RequestInSeerrInput): Promise<RequestInSeerrOutput>;
 	getSeerrMediaStatus(
 		input: GetSeerrMediaStatusInput,
@@ -89,6 +104,7 @@ export interface Ani2arrApi {
 	getSeerrMediaDetails(
 		input: GetSeerrMediaDetailsInput,
 	): Promise<GetSeerrMediaDetailsOutput>;
+	getSeerrPublicSettings(): Promise<GetSeerrPublicSettingsOutput>;
 	getSeerrLinkedAniListEntries(
 		input: GetSeerrLinkedAniListEntriesInput,
 	): Promise<GetSeerrLinkedAniListEntriesOutput>;
@@ -113,7 +129,6 @@ export interface Ani2arrApi {
 	getRadarrFormResources(
 		input?: GetProviderFormResourcesInput,
 	): Promise<ProviderFormResources>;
-	initMappings(): Promise<void>;
 	setManualMapping(input: SetManualMappingInput): Promise<{ ok: true }>;
 	clearManualMapping(input: ClearManualMappingInput): Promise<{ ok: true }>;
 	setMappingIgnore(input: SetMappingIgnoreInput): Promise<{ ok: true }>;
@@ -134,13 +149,19 @@ export interface Ani2arrApi {
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
 	resetExtensionState(): Promise<{ ok: true }>;
-	getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
+	getMappings(): Promise<MappingListGroup[]>;
 	getMappingInspection(
 		input: GetMappingInspectionInput,
 	): Promise<GetMappingInspectionOutput>;
 	getAniListMetadata(
 		input: GetAniListMetadataInput,
 	): Promise<GetAniListMetadataOutput>;
+	getMyAnimeListMetadata(
+		malId: MyAnimeListId,
+	): Promise<GetMyAnimeListMetadataOutput>;
+	resolveAniListIdsForSources(
+		sources: SourceIdentity[],
+	): Promise<Record<string, AniListId | null>>;
 }
 
 const ANI2ARR_API_KEY = "Ani2arrApi" as ProxyServiceKey<Ani2arrApi>;

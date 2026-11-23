@@ -2,16 +2,16 @@
 // src/features/media-modal/seerr/seerr-change-target-view.tsx
 
 import {
-	useMemo,
-	useState,
 	type Dispatch,
 	type ReactNode,
 	type SetStateAction,
+	useMemo,
+	useState,
 } from "react";
-import type { AniListId } from "@/anilist/types";
-import type { GetSeerrMediaDetailsInput, SetManualSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type {
 	SeerrMediaDetails,
+	SeerrMediaType,
 	SeerrSearchResult,
 } from "@/providers/seerr/types";
 import {
@@ -20,18 +20,24 @@ import {
 	useSeerrSearch,
 	useSetManualSeerrTarget,
 } from "@/queries/seerr";
-import type { AniListHeaderData, MediaModalContainer } from "../types";
+import type {
+	GetSeerrMediaDetailsInput,
+	SeerrRequestTarget,
+	SetManualSeerrTargetInput,
+} from "@/rpc/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ModalShell } from "../chrome/modal-shell";
+import type { MediaModalContainer } from "../types";
 import { SeerrChangeTargetInfoPane } from "./seerr-change-target-info-pane";
 import { SeerrChangeTargetMainPane } from "./seerr-change-target-main-pane";
 import { SeerrFooter } from "./seerr-footer";
 import {
 	getDefaultSelectedSeasons,
+	getRequestableSeasonNumbers,
 	getSeerrDetailsSeasonKey,
 	getSeerrTargetSeasonKey,
-	getRequestableSeasonNumbers,
-	toggleSeasonSelection,
 	type SeerrSeasonDraft,
+	toggleSeasonSelection,
 } from "./seerr-selection";
 
 function currentTargetDefaultSeasons(input: {
@@ -42,8 +48,6 @@ function currentTargetDefaultSeasons(input: {
 
 	return getDefaultSelectedSeasons({
 		mappedSeasons: input.currentTarget.seasons,
-		tmdbMappedSeasons: input.currentTarget.tmdbSeasons,
-		tvdbMappedSeasons: input.currentTarget.tvdbSeasons,
 		seasons: input.selectedDetails.seasons,
 	});
 }
@@ -63,37 +67,31 @@ function canSaveTvTarget(
 }
 
 function buildTvManualTargetInput(input: {
-	anilistId: AniListId;
-	selectedDetails: SeerrMediaDetails | null;
+	source: SourceIdentity;
 	selectedResult: SeerrSearchResult | null;
 	draftSeasons: readonly number[];
 }): SetManualSeerrTargetInput | null {
-	if (input.selectedResult?.mediaType !== "tv" || input.draftSeasons.length === 0) {
+	if (
+		input.selectedResult?.mediaType !== "tv" ||
+		input.draftSeasons.length === 0
+	) {
 		return null;
 	}
 
 	return {
-		anilistId: input.anilistId,
+		source: input.source,
 		mediaType: "tv",
 		tmdbId: input.selectedResult.tmdbId,
-		...(input.selectedDetails?.tvdbId === undefined
-			? {}
-			: { tvdbId: input.selectedDetails.tvdbId }),
 		seasons: [...input.draftSeasons],
 	};
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
-}
-
 export function SeerrChangeTargetView(props: {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	defaultQuery: string;
-	format: AniListHeaderData["format"];
+	mediaType: SeerrMediaType;
 	header: ReactNode;
 	isConfigured: boolean;
 	onBackToRequest: () => void;
@@ -103,11 +101,11 @@ export function SeerrChangeTargetView(props: {
 	target: SeerrRequestTarget | null;
 }): React.JSX.Element {
 	const {
-		anilistId,
+		source,
 		container,
 		contentContainer,
 		defaultQuery,
-		format,
+		mediaType,
 		header,
 		isConfigured,
 		onBackToRequest,
@@ -116,6 +114,7 @@ export function SeerrChangeTargetView(props: {
 		setSelectedResult,
 		target,
 	} = props;
+	const anilistId = target?.anilistId;
 	const [searchQueryDraft, setSearchQueryDraft] = useState<string | null>(null);
 	const [submittedQuery, setSubmittedQuery] = useState("");
 	const [manualTargetSeasonDraft, setManualTargetSeasonDraft] =
@@ -160,10 +159,10 @@ export function SeerrChangeTargetView(props: {
 			: defaultManualTargetSeasons;
 	const searchQuery = searchQueryDraft ?? defaultQuery;
 	const searchError = search.error
-		? getErrorMessage(search.error, "Failed to search Seerr.")
+		? getUserErrorMessage(search.error, "Failed to search Seerr.")
 		: null;
 	const saveError = setManualTarget.error
-		? getErrorMessage(setManualTarget.error, "Failed to save Seerr target.")
+		? getUserErrorMessage(setManualTarget.error, "Failed to save Seerr target.")
 		: null;
 	const saveTvTargetEnabled = canSaveTvTarget(selectedResult, draftSeasons);
 
@@ -175,7 +174,7 @@ export function SeerrChangeTargetView(props: {
 	const saveMovieTarget = (result: SeerrSearchResult): void => {
 		setManualTarget.mutate(
 			{
-				anilistId,
+				source,
 				mediaType: "movie",
 				tmdbId: result.tmdbId,
 			},
@@ -192,17 +191,13 @@ export function SeerrChangeTargetView(props: {
 	};
 	const saveTvTarget = (): void => {
 		const input = buildTvManualTargetInput({
-			anilistId,
-			selectedDetails,
+			source,
 			selectedResult,
 			draftSeasons,
 		});
 		if (!input) return;
 
-		setManualTarget.mutate(
-			input,
-			{ onSuccess: onBackToRequest },
-		);
+		setManualTarget.mutate(input, { onSuccess: onBackToRequest });
 	};
 	const handleEscapeKeyDown = (event: KeyboardEvent): void => {
 		event.preventDefault();
@@ -217,7 +212,7 @@ export function SeerrChangeTargetView(props: {
 				<SeerrChangeTargetMainPane
 					defaultQuery={defaultQuery}
 					currentTarget={target}
-					format={format}
+					mediaType={mediaType}
 					isConfigured={isConfigured}
 					selectedResult={selectedResult}
 					searchQuery={searchQuery}
@@ -256,18 +251,10 @@ export function SeerrChangeTargetView(props: {
 			footer={
 				<SeerrFooter
 					view="change-target"
-					isManualTarget={false}
 					canSaveTvTarget={saveTvTargetEnabled}
-					canRequest={false}
 					isBusy={setManualTarget.isPending}
-					isRequesting={false}
-					requestLabel="Request selected"
-					onClose={onClose}
-					onChangeTarget={() => {}}
 					onBackToRequest={onBackToRequest}
-					onClearManualTarget={() => {}}
 					onSaveTvTarget={saveTvTarget}
-					onRequest={() => {}}
 				/>
 			}
 			onOpenChange={(open) => !open && onClose()}

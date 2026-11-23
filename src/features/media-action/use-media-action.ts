@@ -1,7 +1,8 @@
 /** Shared media-action hook for provider-neutral action state, URLs, and commands. */
 // src/features/media-action/use-media-action.ts
 
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MappingResult } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import { getProviderOpenTarget } from "@/providers/provider-links";
@@ -9,8 +10,8 @@ import { openProviderPage } from "@/rpc/provider-page";
 import type { StatusInput } from "@/rpc/types";
 import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
-export interface MediaActionInputBase<TForm> {
-	anilistId: AniListId;
+export type MediaActionInputBase<TForm> = {
+	source: SourceIdentity;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -22,7 +23,7 @@ export interface MediaActionInputBase<TForm> {
 	forceMappingRetry?: boolean;
 	onConfigure(): void;
 	onOpenMapping(): void;
-}
+};
 
 export interface MediaAction {
 	status: MediaActionStatus;
@@ -57,14 +58,14 @@ interface MediaActionMutationState {
 	reset(): void;
 }
 
-interface UseMediaActionInput<TForm> extends MediaActionInputBase<TForm> {
+type UseMediaActionInput<TForm> = MediaActionInputBase<TForm> & {
 	provider: Provider;
 	statusQuery: MediaActionStatusQuery;
 	addMutation: MediaActionMutationState;
 	hasProviderId: boolean;
 	providerRouteSlug: string | null;
 	runQuickAdd(): void;
-}
+};
 
 function isQueryChecking(input: {
 	isLoading: boolean;
@@ -81,11 +82,11 @@ function shouldEnableStatus(input: MediaActionInputBase<unknown>): boolean {
 export function buildMediaActionStatusQuery(
 	input: MediaActionInputBase<unknown>,
 ): {
-	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">;
+	payload: Pick<StatusInput, "source" | "metadata" | "title">;
 	options: MediaActionStatusOptions;
 } {
-	const payload: Pick<StatusInput, "anilistId" | "title" | "metadata"> = {
-		anilistId: input.anilistId,
+	const payload: Pick<StatusInput, "source" | "metadata" | "title"> = {
+		source: input.source,
 		metadata: input.metadata,
 	};
 	if (input.providerTitle !== null) {

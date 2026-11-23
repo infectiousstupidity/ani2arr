@@ -1,0 +1,578 @@
+import type { AnimeFormat } from "@/shared/types/anime-format";
+/** Focused behavior tests for source-native Seerr automatic resolution. */
+// src/mapping/resolve/seerr-auto-resolver.test.ts
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { browser } from "wxt/browser";
+import { parseAniListId } from "@/anilist/types";
+import {
+	captureAutomaticWriteToken,
+	clearAutoResults,
+	getSeerrAutoResult,
+	setSeerrAutoResult,
+	type SeerrAutoResult,
+} from "@/mapping/auto.store";
+import { parseMyAnimeListId } from "@/myanimelist/types";
+import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
+import { createSeerrAutoResolver } from "./seerr-auto-resolver";
+
+const source = {
+	source: "anilist",
+	id: parseAniListId(21_003),
+} as const;
+
+const tmdb = parseTmdbId;
+const tvdb = parseTvdbId;
+
+function movie(tmdbId = 10_494, title = "Perfect Blue", year = 1998) {
+	return {
+		mediaType: "movie" as const,
+		tmdbId: tmdb(tmdbId),
+		title,
+		year,
+	};
+}
+
+function tv(tmdbId: number, title: string, year: number) {
+	return {
+		mediaType: "tv" as const,
+		tmdbId: tmdb(tmdbId),
+		title,
+		year,
+	};
+}
+
+function tvDetails(input: {
+	tmdbId: number;
+	title: string;
+	tvdbId?: number;
+	seasons?: number[];
+}) {
+	return {
+		mediaType: "tv" as const,
+		tmdbId: tmdb(input.tmdbId),
+		...(input.tvdbId === undefined ? {} : { tvdbId: tvdb(input.tvdbId) }),
+		title: input.title,
+		status: "unknown" as const,
+		seasons: (input.seasons ?? []).map((seasonNumber) => ({
+			seasonNumber,
+			status: "not-requested" as const,
+			requestable: true,
+		})),
+	};
+}
+
+function request(
+	title?: string,
+	metadata?: {
+		format: AnimeFormat;
+		startYear?: number;
+	},
+	mediaType: "movie" | "tv" = metadata?.format === "MOVIE" ? "movie" : "tv",
+) {
+	return {
+		source,
+		anilistId: source.id,
+		mediaType,
+		...(title === undefined ? {} : { title }),
+		...(metadata === undefined ? {} : { metadata }),
+	};
+}
+
+const createDeferred = <T>() => {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	const promise = new Promise<T>((complete) => {
+		resolve = complete;
+	});
+	return { promise, resolve };
+};
+
+function requireMappedResult(
+	result: SeerrAutoResult | null,
+): Extract<SeerrAutoResult, { kind: "mapped" }> {
+	if (result?.kind !== "mapped") {
+		throw new Error("Expected a mapped result.");
+	}
+	return result;
+}
+
+describe("Seerr automatic resolver", () => {
+	let cached: SeerrAutoResult | null;
+	const getEffectiveTarget = vi.fn();
+	const getAutoResult = vi.fn();
+	const setAutoResult = vi.fn();
+	const loadAniListMedia = vi.fn();
+	const loadMyAnimeListMetadata = vi.fn();
+	const searchMedia = vi.fn();
+	const getTvDetails = vi.fn();
+
+	const resolve = createSeerrAutoResolver({
+		getEffectiveTarget,
+		getAutoResult,
+		setAutoResult,
+		loadAniListMedia,
+		loadMyAnimeListMetadata,
+		searchMedia,
+		getTvDetails,
+	});
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		cached = null;
+		getEffectiveTarget.mockResolvedValue({ kind: "missing" });
+		getAutoResult.mockImplementation(async () => cached);
+		setAutoResult.mockImplementation(
+			async (
+				_token: unknown,
+				_source: unknown,
+				_mediaType: unknown,
+				result: SeerrAutoResult,
+			) => {
+				cached = result;
+				return true;
+			},
+		);
+		loadAniListMedia.mockRejectedValue(new Error("not needed"));
+		loadMyAnimeListMetadata.mockRejectedValue(new Error("not needed"));
+	});
+
+	it("short-circuits conflicts before cache, search, or write", async () => {
+		getEffectiveTarget.mockResolvedValue({ kind: "conflict" });
+
+		await expect(
+			resolve(request("Perfect Blue", { format: "MOVIE" })),
+		).resolves.toBeNull();
+
+		expect(getAutoResult).not.toHaveBeenCalled();
+		expect(searchMedia).not.toHaveBeenCalled();
+		expect(setAutoResult).not.toHaveBeenCalled();
+	});
+
+	it("stores one confident movie search result", async () => {
+		searchMedia.mockResolvedValue([tv(100, "Perfect Blue", 1998), movie()]);
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toEqual({
+			anilistId: source.id,
+			source: "automatic",
+			mediaType: "movie",
+			tmdbId: tmdb(10_494),
+		});
+
+		expect(cached).toEqual({
+			kind: "mapped",
+			target: {
+				mediaType: "movie",
+				tmdbId: tmdb(10_494),
+			},
+			matchedTitle: "Perfect Blue",
+		});
+		expect(getTvDetails).not.toHaveBeenCalled();
+	});
+
+	it("does not search the same title again after metadata enrichment", async () => {
+		searchMedia.mockResolvedValue([]);
+		loadAniListMedia.mockResolvedValue({
+			id: source.id,
+			format: "MOVIE",
+			title: { english: "Perfect Blue" },
+			synonyms: [],
+			seasonYear: 1998,
+		});
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toBeNull();
+
+		expect(searchMedia).toHaveBeenCalledOnce();
+		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
+	});
+
+	it("returns null when a mapped automatic write is rejected", async () => {
+		searchMedia.mockResolvedValue([movie()]);
+		setAutoResult.mockResolvedValue(false);
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toBeNull();
+	});
+
+	it("reads linked and unlinked MAL results from distinct real storage keys", async () => {
+		await clearAutoResults();
+		const linkedSource = {
+			source: "mal",
+			id: parseMyAnimeListId(5114),
+		} as const;
+		const unlinkedSource = {
+			source: "mal",
+			id: parseMyAnimeListId(999),
+		} as const;
+		const linkedAniListId = parseAniListId(21);
+		await setSeerrAutoResult(
+			captureAutomaticWriteToken(),
+			{ source: "anilist", id: linkedAniListId },
+			"movie",
+			{ kind: "mapped", target: movie(10_494) },
+		);
+		await setSeerrAutoResult(
+			captureAutomaticWriteToken(),
+			unlinkedSource,
+			"movie",
+			{ kind: "mapped", target: movie(11_111) },
+		);
+		const getAutoResultReal = vi.fn(getSeerrAutoResult);
+		const setAutoResultReal = vi.fn(setSeerrAutoResult);
+		const realResolve = createSeerrAutoResolver({
+			getEffectiveTarget: vi.fn().mockResolvedValue({ kind: "missing" }),
+			getAutoResult: getAutoResultReal,
+			setAutoResult: setAutoResultReal,
+			loadAniListMedia,
+			loadMyAnimeListMetadata,
+			searchMedia,
+			getTvDetails,
+		});
+
+		await expect(
+			realResolve({
+				source: linkedSource,
+				anilistId: linkedAniListId,
+				mediaType: "movie",
+			}),
+		).resolves.toMatchObject({ tmdbId: tmdb(10_494) });
+		await expect(
+			realResolve({
+				source: unlinkedSource,
+				anilistId: null,
+				mediaType: "movie",
+			}),
+		).resolves.toMatchObject({ tmdbId: tmdb(11_111) });
+
+		expect(getAutoResultReal.mock.calls).toEqual([
+			[linkedSource, "movie", linkedAniListId],
+			[unlinkedSource, "movie", undefined],
+		]);
+		expect(setAutoResultReal).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		{
+			name: "linked",
+			malId: parseMyAnimeListId(5114),
+			anilistId: parseAniListId(21),
+			expectedKey: "anilist:21",
+		},
+		{
+			name: "unlinked",
+			malId: parseMyAnimeListId(999),
+			anilistId: null,
+			expectedKey: "mal:999",
+		},
+	])(
+		"uses real automatic storage for a $name MAL source",
+		async ({ malId, anilistId, expectedKey }) => {
+			await clearAutoResults();
+			const malSource = { source: "mal", id: malId } as const;
+			const getEffectiveTargetReal = vi
+				.fn()
+				.mockResolvedValue({ kind: "missing" });
+			const getAutoResultReal = vi.fn(getSeerrAutoResult);
+			const setAutoResultReal = vi.fn(setSeerrAutoResult);
+			const realResolve = createSeerrAutoResolver({
+				getEffectiveTarget: getEffectiveTargetReal,
+				getAutoResult: getAutoResultReal,
+				setAutoResult: setAutoResultReal,
+				loadAniListMedia,
+				loadMyAnimeListMetadata,
+				searchMedia,
+				getTvDetails,
+			});
+			searchMedia.mockResolvedValue([movie()]);
+
+			await expect(
+				realResolve({
+					source: malSource,
+					anilistId,
+					mediaType: "movie",
+					title: "Perfect Blue",
+					metadata: { format: "MOVIE", startYear: 1998 },
+				}),
+			).resolves.toMatchObject({
+				source: "automatic",
+				mediaType: "movie",
+				tmdbId: tmdb(10_494),
+			});
+
+			expect(getEffectiveTargetReal).toHaveBeenCalledWith({
+				identity: malSource,
+				mediaType: "movie",
+				anilistId,
+			});
+			expect(getAutoResultReal).toHaveBeenCalledWith(
+				malSource,
+				"movie",
+				anilistId ?? undefined,
+			);
+			expect(setAutoResultReal).toHaveBeenCalledWith(
+				expect.any(Number),
+				malSource,
+				"movie",
+				expect.objectContaining({ kind: "mapped" }),
+				anilistId ?? undefined,
+			);
+			const stored = await browser.storage.local.get("mapping:auto");
+			const automatic = stored["mapping:auto"] as {
+				records: Record<string, unknown>;
+			};
+			expect(Object.keys(automatic.records)).toEqual([expectedKey]);
+		},
+	);
+
+	it("captures before effective-target reads and rejects a stale real-store write", async () => {
+		await clearAutoResults();
+		const effectiveRead = createDeferred<{ kind: "missing" }>();
+		const realResolve = createSeerrAutoResolver({
+			getEffectiveTarget: () => effectiveRead.promise,
+			getAutoResult: getSeerrAutoResult,
+			setAutoResult: setSeerrAutoResult,
+			loadAniListMedia,
+			loadMyAnimeListMetadata,
+			searchMedia,
+			getTvDetails,
+		});
+		searchMedia.mockResolvedValue([movie()]);
+		const pending = realResolve(
+			request("Perfect Blue", {
+				format: "MOVIE",
+				startYear: 1998,
+			}),
+		);
+
+		await clearAutoResults();
+		effectiveRead.resolve({ kind: "missing" });
+
+		await expect(pending).resolves.toBeNull();
+		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
+	});
+
+	it("rejects a Seerr provider result completed after a full clear", async () => {
+		await clearAutoResults();
+		const providerResult = createDeferred<ReturnType<typeof movie>[]>();
+		const realResolve = createSeerrAutoResolver({
+			getEffectiveTarget: vi.fn().mockResolvedValue({ kind: "missing" }),
+			getAutoResult: getSeerrAutoResult,
+			setAutoResult: setSeerrAutoResult,
+			loadAniListMedia,
+			loadMyAnimeListMetadata,
+			searchMedia: () => providerResult.promise,
+			getTvDetails,
+		});
+		const pending = realResolve(
+			request("Perfect Blue", {
+				format: "MOVIE",
+				startYear: 1998,
+			}),
+		);
+
+		await clearAutoResults();
+		providerResult.resolve([movie()]);
+
+		await expect(pending).resolves.toBeNull();
+		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
+	});
+
+	it("uses TV details only to validate the inferred TMDB season", async () => {
+		searchMedia.mockResolvedValue([
+			tv(209_867, "Frieren: Beyond Journey's End", 2023),
+		]);
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 209_867,
+				tvdbId: 424_536,
+				title: "Frieren: Beyond Journey's End",
+			}),
+		);
+
+		await expect(
+			resolve(
+				request("Frieren: Beyond Journey's End", {
+					format: "TV",
+					startYear: 2023,
+				}),
+			),
+		).resolves.toMatchObject({
+			mediaType: "tv",
+			tmdbId: tmdb(209_867),
+		});
+
+		expect(getTvDetails).toHaveBeenCalledWith(tmdb(209_867));
+		expect(cached).toMatchObject({
+			kind: "mapped",
+			target: { mediaType: "tv", tmdbId: tmdb(209_867) },
+		});
+	});
+
+	it("retains an explicit season only when TV details contain it", async () => {
+		searchMedia.mockResolvedValue([tv(31_911, "Fullmetal Alchemist", 2003)]);
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 31_911,
+				title: "Fullmetal Alchemist",
+				seasons: [1, 3],
+			}),
+		);
+
+		await resolve(
+			request("Fullmetal Alchemist S3", {
+				format: "TV",
+				startYear: 2003,
+			}),
+		);
+
+		expect(cached).toMatchObject({
+			kind: "mapped",
+			target: { seasons: [3] },
+		});
+
+		cached = null;
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 31_911,
+				title: "Fullmetal Alchemist",
+				seasons: [1],
+			}),
+		);
+
+		await resolve({
+			...request("Fullmetal Alchemist Season 3", {
+				format: "TV",
+				startYear: 2003,
+			}),
+			source: {
+				source: "anilist",
+				id: parseAniListId(21_004),
+			},
+			anilistId: parseAniListId(21_004),
+		});
+
+		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
+	});
+
+	it("stores an unclear part title as a show-only target", async () => {
+		searchMedia.mockResolvedValue([tv(1429, "Attack on Titan", 2013)]);
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 1429,
+				title: "Attack on Titan",
+				seasons: [2],
+			}),
+		);
+
+		await resolve(
+			request("Attack on Titan Part 2", {
+				format: "TV",
+				startYear: 2013,
+			}),
+		);
+
+		expect(cached).toMatchObject({
+			kind: "mapped",
+			target: {
+				mediaType: "tv",
+				tmdbId: tmdb(1429),
+			},
+		});
+		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
+	});
+
+	it("returns fresh mapped results without another search", async () => {
+		cached = {
+			kind: "mapped",
+			target: {
+				mediaType: "movie",
+				tmdbId: tmdb(10_494),
+			},
+		};
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+				}),
+			),
+		).resolves.toEqual({
+			anilistId: source.id,
+			source: "automatic",
+			mediaType: "movie",
+			tmdbId: tmdb(10_494),
+		});
+
+		expect(searchMedia).not.toHaveBeenCalled();
+	});
+
+	it("retries after metadata enrichment changes an earlier null result", async () => {
+		searchMedia.mockResolvedValue([]);
+
+		await expect(resolve(request("Unknown anime"))).resolves.toBeNull();
+		expect(cached).toEqual({ kind: "unmapped" });
+
+		searchMedia.mockResolvedValue([movie()]);
+
+		await expect(
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toMatchObject({
+			tmdbId: tmdb(10_494),
+		});
+		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
+	});
+
+	it("uses forceRetry to retry a cached null result without new hints", async () => {
+		cached = { kind: "unmapped" };
+		loadAniListMedia.mockResolvedValue({
+			id: source.id,
+			format: "MOVIE",
+			title: { english: "Perfect Blue" },
+			synonyms: [],
+			seasonYear: 1998,
+		});
+		searchMedia.mockResolvedValue([movie()]);
+
+		await expect(
+			resolve(request(undefined, undefined, "movie")),
+		).resolves.toBeNull();
+		expect(loadAniListMedia).not.toHaveBeenCalled();
+		expect(searchMedia).not.toHaveBeenCalled();
+
+		await expect(
+			resolve({
+				...request(undefined, undefined, "movie"),
+				forceRetry: true,
+			}),
+		).resolves.toMatchObject({
+			tmdbId: tmdb(10_494),
+		});
+
+		expect(loadAniListMedia).toHaveBeenCalledOnce();
+		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
+	});
+});

@@ -8,12 +8,18 @@ import type {
 	RadarrAlternateTitleSchema,
 	RadarrImageSchema,
 	RadarrLookupMovieSchema,
+	RadarrMinimumAvailability,
+	RadarrMovieMonitor,
 	RadarrMovieSchema,
 	RadarrMovieSnapshotSchema,
 	RadarrQualityProfileSchema,
 	RadarrRootFolderSchema,
 	RadarrTagSchema,
 } from "./schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+} from "../schemas";
 
 export type RadarrImage = v.InferOutput<typeof RadarrImageSchema>;
 export type RadarrAlternateTitle = v.InferOutput<
@@ -32,14 +38,25 @@ export type RadarrTag = v.InferOutput<typeof RadarrTagSchema>;
 export type RadarrAddPayloadOptions = v.InferOutput<
 	typeof RadarrAddPayloadOptionsSchema
 >;
+export type RadarrAddMoviePayload = Omit<
+	RadarrLookupMovie,
+	| "addOptions"
+	| "id"
+	| "minimumAvailability"
+	| "monitored"
+	| "qualityProfileId"
+	| "rootFolderPath"
+	| "tags"
+> & {
+	id: 0;
+	rootFolderPath: string;
+	qualityProfileId: ProviderQualityProfileId;
+	monitored: boolean;
+	minimumAvailability: RadarrMinimumAvailability;
+	tags: ProviderTagId[];
+	addOptions: { monitor: RadarrMovieMonitor; searchForMovie: boolean };
+};
 
 export type RadarrMovieSnapshot = v.InferOutput<
 	typeof RadarrMovieSnapshotSchema
 >;
-
-export {
-	type ProviderQualityProfileId as RadarrQualityProfileId,
-	type ProviderTagId as RadarrTagId,
-	type RadarrMovieId,
-	type TmdbId,
-} from "../schemas";

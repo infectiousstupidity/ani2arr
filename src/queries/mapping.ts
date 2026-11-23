@@ -1,11 +1,7 @@
 /** React Query hooks for mapping-related RPC reads and mutations. */
 // src/queries/mapping.ts
 
-import {
-	useMutation,
-	useQuery,
-	useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import { invalidateAfterMappingChange } from "@/queries/invalidation";
 import { getAni2arrApi } from "@/rpc";
@@ -13,17 +9,21 @@ import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
-	GetMappingsInput,
 	GetMappingIdentitiesOutput,
 	GetMappingInspectionOutput,
-	GetMappingsOutput,
+	MappingListGroup,
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
 } from "@/rpc/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
-import { normalizeMetadataIds, queryKeys } from "./query-keys";
+import {
+	normalizeMappingInspectionRequest,
+	normalizeMetadataIds,
+	queryKeys,
+} from "./query-keys";
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
@@ -103,10 +103,10 @@ export const useClearMappingRejectedCandidate = () => {
 	});
 };
 
-export const useMappings = (input?: GetMappingsInput) =>
-	useQuery<GetMappingsOutput, ExtensionError>({
-		queryKey: queryKeys.mappings(input),
-		queryFn: () => getAni2arrApi().getMappings(input),
+export const useMappings = () =>
+	useQuery<MappingListGroup[], ExtensionError>({
+		queryKey: queryKeys.mappings(),
+		queryFn: () => getAni2arrApi().getMappings(),
 		staleTime: 45 * 60 * 1000,
 		gcTime: 2 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
@@ -127,18 +127,30 @@ export const useMappingIdentities = (
 	});
 };
 
+export const useSourceAniListIdMap = (
+	sources: readonly SourceIdentity[],
+	options?: { enabled?: boolean },
+) => {
+	return useQuery<Record<string, AniListId | null>, ExtensionError>({
+		queryKey: queryKeys.sourceAniListIds(sources),
+		queryFn: () => getAni2arrApi().resolveAniListIdsForSources([...sources]),
+		enabled: (options?.enabled ?? true) && sources.length > 0,
+		staleTime: 10 * 60 * 1000,
+		gcTime: 60 * 60 * 1000,
+		refetchOnWindowFocus: false,
+	});
+};
+
 export const useMappingInspection = (
 	provider: Provider,
-	anilistId: AniListId,
-) =>
-	useQuery<GetMappingInspectionOutput, ExtensionError>({
-		queryKey: queryKeys.mappingInspection(provider, anilistId),
-		queryFn: () =>
-			getAni2arrApi().getMappingInspection({
-				provider,
-				anilistId,
-			}),
+	source: SourceIdentity,
+) => {
+	const request = normalizeMappingInspectionRequest(provider, source);
+	return useQuery<GetMappingInspectionOutput, ExtensionError>({
+		queryKey: queryKeys.mappingInspection(request),
+		queryFn: () => getAni2arrApi().getMappingInspection(request),
 		staleTime: 15 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
+};

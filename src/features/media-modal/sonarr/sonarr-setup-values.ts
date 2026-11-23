@@ -1,7 +1,6 @@
 /** Pure Sonarr setup target and default-value helpers for the media modal. */
 // src/features/media-modal/sonarr/sonarr-setup-values.ts
 
-import type { AniListId } from "@/anilist/types";
 import * as v from "valibot";
 import {
 	parseTvdbIdOrNull,
@@ -43,7 +42,7 @@ export type SonarrSetupTarget = {
 );
 
 type CreateSonarrSetupTargetInput = {
-	anilistId: AniListId;
+	identityKey: string;
 	status: GetSeriesStatusOutput | null | undefined;
 	targetTitle: string;
 	storedDefaults: Partial<SonarrFormState> | null | undefined;
@@ -144,7 +143,7 @@ export function canShowSonarrSetup(input: {
 }
 
 export function getSonarrSetupTarget({
-	anilistId,
+	identityKey,
 	providerFolderName,
 	status,
 	storedDefaults,
@@ -156,7 +155,7 @@ export function getSonarrSetupTarget({
 
 		return {
 			mode: "edit",
-			key: `sonarr:edit:${anilistId}:${series.id}`,
+			key: `sonarr:edit:${identityKey}:${series.id}`,
 			tvdbId: series.tvdbId,
 			title: series.title,
 			series,
@@ -182,7 +181,7 @@ export function getSonarrSetupTarget({
 
 	return {
 		mode: "add",
-		key: `sonarr:add:${anilistId}:${tvdbId}`,
+		key: `sonarr:add:${identityKey}:${tvdbId}`,
 		tvdbId,
 		title: targetTitle,
 		initialFormValues: getSonarrAddDefaults(storedDefaults),

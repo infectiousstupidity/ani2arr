@@ -1,37 +1,58 @@
 /** Seerr options page section for request-backend connection settings. */
 // src/options-page/pages/seerr-page.tsx
 
-import { SeerrIcon } from "../components/icons";
+import { Info } from "lucide-react";
 import { SeerrConnectionForm } from "../components/seerr-connection-form";
 import { SettingsSection } from "../components/settings-section";
+import type { SeerrConnectionFailure } from "../hooks/seerr-connection-actions";
 
 interface SeerrPageProps {
-	connectSeerr: (url: string, apiKey: string) => Promise<boolean>;
+	checkSeerrSession: (url: string) => Promise<void>;
+	connectSeerrApiKey: (url: string, apiKey: string) => Promise<void>;
+	enableSeerrCsrfSupport: () => Promise<void>;
+	openSeerrLogin: (url: string) => Promise<void>;
 	isConnecting: boolean;
-	connectionError: string | null;
+	isCsrfSupportEnabled: boolean;
+	showCsrfSupport: boolean;
+	connectionFailure: SeerrConnectionFailure | null;
 }
 
 export const SeerrPage = ({
-	connectSeerr,
-	connectionError,
+	checkSeerrSession,
+	connectSeerrApiKey,
+	connectionFailure,
+	enableSeerrCsrfSupport,
 	isConnecting,
+	isCsrfSupportEnabled,
+	openSeerrLogin,
+	showCsrfSupport,
 }: SeerrPageProps) => (
 	<div className="space-y-10 md:space-y-12">
 		<SeerrConnectionForm
-			onConnect={connectSeerr}
-			error={connectionError}
+			failure={connectionFailure}
 			isConnecting={isConnecting}
+			isCsrfSupportEnabled={isCsrfSupportEnabled}
+			onCheckSession={checkSeerrSession}
+			onConnectApiKey={connectSeerrApiKey}
+			onEnableCsrfSupport={enableSeerrCsrfSupport}
+			onOpenLogin={openSeerrLogin}
+			showCsrfSupport={showCsrfSupport}
 		/>
 		<SettingsSection
 			title="Request behavior"
-			description="ani2arr sends the smallest Seerr request and lets Seerr use its own Sonarr/Radarr defaults."
-			icon={<SeerrIcon className="h-4 w-4" />}
+			icon={<Info className="h-4 w-4" />}
 			divider="top"
 		>
-			<p className="py-5 text-sm text-text-secondary">
-				Seerr actions appear only when Seerr is connected and ani2arr already
-				has a TMDB movie ID.
-			</p>
+			<div className="-mt-4 max-w-4xl space-y-2 text-sm leading-relaxed text-text-secondary md:-mt-5">
+				<p>
+					ani2arr sends the smallest Seerr request and lets Seerr use its own
+					Sonarr/Radarr defaults.
+				</p>
+				<p>
+					Seerr actions appear only when Seerr is connected and ani2arr already
+					has a TMDb movie ID.
+				</p>
+			</div>
 		</SettingsSection>
 	</div>
 );
