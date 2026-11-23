@@ -23,8 +23,12 @@ Released: Unreleased
 - Mapping and settings storage now key entries by source identity (AniList or
   MyAnimeList) instead of AniList IDs only. Existing v2.1 data migrates on the
   first run after the update.
+- Consolidated manual movie mappings: when v2.1.0 stored different Radarr and
+  Seerr movie overrides for one title, only the Radarr override is kept.
 - Flattened the mapping lists and normalized media format and routing handling.
 - Kept released Seerr TV seasons that were previously dropped.
+- Seerr now preselects no seasons for a TV title when no season mapping exists,
+  so the season is chosen explicitly; mapped seasons still preselect.
 - Skipped unchanged storage writes and decoded only the upstream mapping records
   that were requested.
 - Updated dependencies to pass the security audit, and updated the build

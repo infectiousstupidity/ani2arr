@@ -37,6 +37,15 @@ describe("Seerr season selection helpers", () => {
 		).toEqual([1, 2]);
 	});
 
+	it("preselects nothing when no season evidence exists", () => {
+		expect(
+			getDefaultSelectedSeasons({
+				mappedSeasons: [],
+				seasons: [season(1, "unknown"), season(2, "partial")],
+			}),
+		).toEqual([]);
+	});
+
 	it("selects all selectable seasons only", () => {
 		expect(
 			getRequestableSeasonNumbers([

@@ -200,8 +200,10 @@ export function getDefaultSelectedSeasons(input: {
 	);
 	const mappedSeasons = getMappedSeasonsForDetails(input);
 
+	// No season evidence means AniBridge cannot claim which season represents
+	// this title, so nothing is preselected and the user picks one.
 	if (mappedSeasons.length === 0) {
-		return requestableSeasons;
+		return [];
 	}
 
 	const requestable = new Set(requestableSeasons);
