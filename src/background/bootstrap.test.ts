@@ -97,6 +97,21 @@ describe("bootstrapBackground", () => {
 		migration.resolve();
 	});
 
+	it("schedules and refreshes after deleting a legacy upstream cache", async () => {
+		initializeSettingsStorageMock.mockImplementation(async () => {});
+		migrateMappingStorageMock.mockResolvedValue(true);
+		hasConfiguredProviderCredentialsMock.mockReturnValue(true);
+		const alarmGet = vi.spyOn(browser.alarms, "get").mockResolvedValue();
+		const alarmCreate = vi.spyOn(browser.alarms, "create");
+
+		bootstrapBackground();
+
+		await vi.waitFor(() => expect(refreshMappingPipelineMock).toHaveBeenCalledOnce());
+		expect(alarmCreate).toHaveBeenCalledWith("a2a:refresh-static-mappings", { periodInMinutes: 360 });
+		alarmGet.mockRestore();
+		alarmCreate.mockRestore();
+	});
+
 	it("runs the background mapping refresh workflow on startup", async () => {
 		initializeSettingsStorageMock.mockImplementation(async () => {});
 		hasConfiguredProviderCredentialsMock.mockReturnValue(true);

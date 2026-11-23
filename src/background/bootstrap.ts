@@ -74,7 +74,13 @@ export const bootstrapBackground = (): void => {
 	});
 
 	registerAni2arrApi(apiHandlers);
-	void migrateMappingStorage().catch((error) => {
+	const mappingInitialization = migrateMappingStorage();
+	void mappingInitialization.then(async (deletedUpstream) => {
+		if (!deletedUpstream) return;
+		await ensurePeriodicRefresh();
+		await settingsInitialization;
+		if (await shouldWarmMappingsCache()) await refreshMappingPipeline();
+	}).catch((error) => {
 		logError(normalizeError(error), "Background:migrateMappingStorage");
 	});
 
@@ -84,6 +90,7 @@ export const bootstrapBackground = (): void => {
 				browser.runtime.openOptionsPage().catch(() => {});
 			}
 			await settingsInitialization;
+			await mappingInitialization;
 			if (await shouldWarmMappingsCache()) {
 				await refreshMappingPipeline();
 			}
@@ -96,6 +103,7 @@ export const bootstrapBackground = (): void => {
 	browser.runtime.onStartup.addListener(async () => {
 		try {
 			await settingsInitialization;
+			await mappingInitialization;
 			if (await shouldWarmMappingsCache()) {
 				await refreshMappingPipeline();
 			}

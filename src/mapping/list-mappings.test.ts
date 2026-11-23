@@ -59,7 +59,7 @@ describe("list mappings", () => {
 		expect(storageRead.mock.calls).toEqual([
 			[expect.arrayContaining(["mapping:manual"])],
 			["mapping:upstream"],
-			[expect.arrayContaining(["mapping:auto"])],
+			["mapping:auto"],
 		]);
 		storageRead.mockRestore();
 		expect(

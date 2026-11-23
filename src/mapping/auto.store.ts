@@ -18,7 +18,6 @@ import {
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import {
-	createMappingRecord,
 	type AutomaticAttemptLane,
 	type AutomaticMappingRecord,
 	type AutomaticSlotMeta,
@@ -28,7 +27,6 @@ import {
 import { selectSeerrMapping } from "./effective-mapping";
 import { normalizeSeasonNumbers } from "./season-numbers";
 import {
-	normalizeLegacySeerrTarget,
 	normalizeSeerrTarget,
 	type AutoResult,
 	type SeerrTarget,
@@ -210,7 +208,13 @@ export async function setSeerrAutoResult(
 }
 
 export async function migrateAutomaticStore(): Promise<void> {
-	await updateAutomaticStore(() => {});
+	await enqueueAutomaticStoreUpdate(async () => {
+		const stored = await browser.storage.local.get([AUTO_KEY, LEGACY_SEERR_AUTO_KEY]);
+		const keys: string[] = [];
+		if (stored[AUTO_KEY] != null && !isMappingStore(stored[AUTO_KEY])) keys.push(AUTO_KEY);
+		if (stored[LEGACY_SEERR_AUTO_KEY] !== undefined) keys.push(LEGACY_SEERR_AUTO_KEY);
+		if (keys.length > 0) await browser.storage.local.remove(keys);
+	});
 }
 
 export async function consolidateAutomaticAliases(
@@ -245,6 +249,7 @@ export async function consolidateAutomaticAliases(
 
 export async function clearAutoResults(): Promise<void> {
 	automaticWriteToken += 1;
+	await migrateAutomaticStore();
 	await updateAutomaticStore((store) => {
 		store.records = {};
 	});
@@ -254,13 +259,15 @@ async function updateAutomaticStore(
 	update: (store: MappingStore<AutomaticMappingRecord>) => void,
 ): Promise<void> {
 	await enqueueAutomaticStoreUpdate(async () => {
-		const { store, hasLegacyData } = await readAutomaticStore();
+		const { store: stored } = await readAutomaticStore();
+		const store = structuredClone(stored);
 		const before = JSON.stringify(store);
 		update(store);
+		if (JSON.stringify(store) === before) return;
 		for (const [key, record] of Object.entries(store.records)) {
 			if (isEmptyRecord(record)) delete store.records[key];
 		}
-		if (!hasLegacyData && JSON.stringify(store) === before) return;
+		if (JSON.stringify(store) === before) return;
 		await persistAutomaticStore(store);
 	});
 }
@@ -270,14 +277,16 @@ async function updateAutomaticStoreGuarded(
 	update: (store: MappingStore<AutomaticMappingRecord>) => void,
 ): Promise<boolean> {
 	return enqueueAutomaticStoreUpdate(async () => {
-		const { store, hasLegacyData } = await readAutomaticStore();
+		const { store: stored } = await readAutomaticStore();
+		const store = structuredClone(stored);
 		const before = JSON.stringify(store);
 		if (token !== automaticWriteToken) return false;
 		update(store);
+		if (JSON.stringify(store) === before) return true;
 		for (const [key, record] of Object.entries(store.records)) {
 			if (isEmptyRecord(record)) delete store.records[key];
 		}
-		if (hasLegacyData || JSON.stringify(store) !== before) {
+		if (JSON.stringify(store) !== before) {
 			await persistAutomaticStore(store);
 		}
 		return true;
@@ -299,130 +308,13 @@ async function persistAutomaticStore(
 	store: MappingStore<AutomaticMappingRecord>,
 ): Promise<void> {
 	await autoMappings.setValue(store);
-	await browser.storage.local.remove(LEGACY_SEERR_AUTO_KEY);
 }
 
 async function readAutomaticStore(): Promise<{
 	store: MappingStore<AutomaticMappingRecord>;
-	hasLegacyData: boolean;
 }> {
-	const stored = await browser.storage.local.get([
-		AUTO_KEY,
-		LEGACY_SEERR_AUTO_KEY,
-	]);
-	return {
-		store: decodeAutomaticStore(stored[AUTO_KEY], stored[LEGACY_SEERR_AUTO_KEY]),
-		hasLegacyData:
-			!isMappingStore(stored[AUTO_KEY]) ||
-			stored[LEGACY_SEERR_AUTO_KEY] !== undefined,
-	};
-}
-
-/** LEGACY: direct-upgrade decoder for released Arr and pre-cutover Seerr caches. */
-function decodeAutomaticStore(
-	current: unknown,
-	legacySeerr: unknown,
-): MappingStore<AutomaticMappingRecord> {
-	if (isMappingStore(current)) return cloneStore(current);
-	const records: Record<string, AutomaticMappingRecord> = {};
-	decodeProviderBuckets(current, records);
-	decodeLegacySeerrResults(legacySeerr, records);
-	return { version: 1, records };
-}
-
-function decodeProviderBuckets(
-	value: unknown,
-	records: Record<string, AutomaticMappingRecord>,
-): void {
-	if (!isObject(value)) return;
-	for (const provider of ["sonarr", "radarr"] as const) {
-		const bucket = value[provider];
-		if (!isObject(bucket)) continue;
-		for (const [rawKey, rawResult] of Object.entries(bucket)) {
-			const key = legacySourceKey(rawKey);
-			if (!key || !isObject(rawResult) || rawResult.kind === "ambiguous")
-				continue;
-			const expiresAt = validExpiry(rawResult.expiresAt);
-			if (expiresAt === null) continue;
-			const record = (records[key] ??= emptyRecord());
-			decodeLegacyArrResult(provider, rawResult, expiresAt, record);
-		}
-	}
-}
-
-function decodeLegacyArrResult(
-	provider: Provider,
-	rawResult: Record<string, unknown>,
-	expiresAt: number,
-	record: AutomaticMappingRecord,
-): void {
-	const slot = provider === "sonarr" ? "tvdbShow" : "tmdbMovie";
-	const lane = provider === "sonarr" ? "sonarrTvdb" : "radarrTmdbMovie";
-	if (rawResult.kind === "unmapped") {
-		setAttempt(record, lane, expiresAt);
-		return;
-	}
-	if (rawResult.kind !== "mapped") return;
-	if (provider === "sonarr") {
-		const id = parseTvdbIdOrNull(rawResult.providerId);
-		if (id === null) return;
-		record.facts.tvdbShow = id;
-		setShowScope(record, "tvdbShow", id, validSeason(rawResult.season));
-	} else {
-		const id = parseTmdbIdOrNull(rawResult.providerId);
-		if (id === null) return;
-		record.facts.tmdbMovie = id;
-	}
-	setSlotMeta(record, slot, {
-		expiresAt,
-		...(typeof rawResult.matchedTitle === "string" &&
-		rawResult.matchedTitle.trim()
-			? { matchedTitle: rawResult.matchedTitle.trim() }
-			: {}),
-	});
-}
-
-function decodeLegacySeerrResults(
-	value: unknown,
-	records: Record<string, AutomaticMappingRecord>,
-): void {
-	if (!isObject(value)) return;
-	for (const [rawKey, rawResult] of Object.entries(value)) {
-		const key = legacySourceKey(rawKey);
-		if (!key || !isObject(rawResult)) continue;
-		const expiresAt = validExpiry(rawResult.expiresAt);
-		if (expiresAt === null) continue;
-		const record = (records[key] ??= emptyRecord());
-		if (rawResult.kind === "unmapped") {
-			// Old Seerr attempts had no media type and blocked both resolver paths.
-			setAttempt(record, "seerrTmdbMovie", expiresAt);
-			setAttempt(record, "seerrTmdbShow", expiresAt);
-			continue;
-		}
-		if (rawResult.kind !== "mapped" || !isObject(rawResult.target)) continue;
-		const target = normalizeLegacySeerrTarget(rawResult.target as SeerrTarget);
-		if (!target) continue;
-		const matchedTitle =
-			typeof rawResult.matchedTitle === "string" &&
-			rawResult.matchedTitle.trim()
-				? rawResult.matchedTitle.trim()
-				: undefined;
-		if (target.mediaType === "movie") {
-			if (record.facts.tmdbMovie !== undefined) continue;
-			record.facts.tmdbMovie = target.tmdbId;
-			setSlotMeta(record, "tmdbMovie", {
-				expiresAt,
-				...(matchedTitle ? { matchedTitle } : {}),
-			});
-		} else {
-			record.facts.tmdbShow = target.tmdbId;
-			setTmdbShowScope(record, target);
-			setSlotMeta(record, "tmdbShow", {
-				expiresAt,
-				...(matchedTitle ? { matchedTitle } : {}),
-			});
-		}
-	}
+	const { [AUTO_KEY]: stored } = await browser.storage.local.get(AUTO_KEY);
+	return { store: isMappingStore(stored) ? stored : { version: 1, records: {} } };
 }
 
 function activeRecord(
@@ -615,147 +507,6 @@ function isMappingStore(
 	value: unknown,
 ): value is MappingStore<AutomaticMappingRecord> {
 	return isObject(value) && value.version === 1 && isObject(value.records);
-}
-
-function cloneStore(
-	store: MappingStore<AutomaticMappingRecord>,
-): MappingStore<AutomaticMappingRecord> {
-	const records: Record<string, AutomaticMappingRecord> = {};
-	for (const [key, record] of Object.entries(store.records)) {
-		if (parseSourceIdentityKey(key) === null || !isObject(record)) continue;
-		records[key] = normalizeAutomaticRecord(record as AutomaticMappingRecord);
-	}
-	return { version: 1, records };
-}
-
-function normalizeAutomaticRecord(
-	record: AutomaticMappingRecord,
-): AutomaticMappingRecord {
-	const facts = isObject(record.facts) ? record.facts : {};
-	const conflicts = isObject(record.conflicts) ? record.conflicts : {};
-	const scopes = isObject(record.scopes) ? record.scopes : {};
-	const hasTmdbMovieConflict = Object.hasOwn(conflicts, "tmdbMovie");
-	const hasTvdbShowConflict = Object.hasOwn(conflicts, "tvdbShow");
-	const tmdbMovie = hasTmdbMovieConflict
-		? []
-		: [facts.tmdbMovie].flatMap((value) => {
-				const id = parseTmdbIdOrNull(value);
-				return id === null ? [] : [id];
-			});
-	const layer = createMappingRecord({
-		tmdbMovie,
-		tmdbShow: decodeShowCandidates(
-			facts.tmdbShow,
-			conflicts.tmdbShow,
-			scopes.tmdbShow,
-			parseTmdbIdOrNull,
-		),
-		tvdbShow: hasTvdbShowConflict
-			? []
-			: decodeShowCandidates(
-					facts.tvdbShow,
-					undefined,
-					scopes.tvdbShow,
-					parseTvdbIdOrNull,
-				),
-	});
-	const slotMeta = decodeSlotMeta(record.slotMeta);
-	if (hasTmdbMovieConflict) delete slotMeta.tmdbMovie;
-	if (hasTvdbShowConflict) delete slotMeta.tvdbShow;
-	const attempts = decodeAttempts(record.attempts);
-	return {
-		...layer,
-		...(Object.keys(slotMeta).length > 0 ? { slotMeta } : {}),
-		...(Object.keys(attempts).length > 0 ? { attempts } : {}),
-	};
-}
-
-function decodeShowCandidates<TId extends number>(
-	fact: unknown,
-	conflict: unknown,
-	scope: unknown,
-	parseId: (value: unknown) => TId | null,
-): Array<{ id: TId; seasons?: number[] }> {
-	return [fact, ...(Array.isArray(conflict) ? conflict : [])].flatMap(
-		(value) => {
-			const candidate: Record<string, unknown> = isObject(value)
-				? value
-				: { id: value };
-			const id = parseId(candidate.id);
-			if (id === null) return [];
-			const matchedScope: Record<string, unknown> =
-				isObject(scope) && parseId(scope.id) === id ? scope : candidate;
-			const seasons = validSeasons(matchedScope.seasons);
-			return [{ id, ...(seasons?.length ? { seasons } : {}) }];
-		},
-	);
-}
-
-function decodeSlotMeta(
-	value: unknown,
-): NonNullable<AutomaticMappingRecord["slotMeta"]> {
-	if (!isObject(value)) return {};
-	const result: NonNullable<AutomaticMappingRecord["slotMeta"]> = {};
-	for (const slot of ["tmdbMovie", "tmdbShow", "tvdbShow"] as const) {
-		const raw = value[slot];
-		if (!isObject(raw)) continue;
-		const expiresAt = validExpiry(raw.expiresAt);
-		if (expiresAt === null) continue;
-		result[slot] = {
-			expiresAt,
-			...(typeof raw.matchedTitle === "string" && raw.matchedTitle.trim()
-				? { matchedTitle: raw.matchedTitle.trim() }
-				: {}),
-		};
-	}
-	return result;
-}
-
-function decodeAttempts(
-	value: unknown,
-): NonNullable<AutomaticMappingRecord["attempts"]> {
-	if (!isObject(value)) return {};
-	const result: NonNullable<AutomaticMappingRecord["attempts"]> = {};
-	for (const lane of [
-		"sonarrTvdb",
-		"radarrTmdbMovie",
-		"seerrTmdbMovie",
-		"seerrTmdbShow",
-	] as const) {
-		const raw = value[lane];
-		if (!isObject(raw)) continue;
-		const expiresAt = validExpiry(raw.expiresAt);
-		if (expiresAt !== null) result[lane] = { expiresAt };
-	}
-	return result;
-}
-
-function legacySourceKey(rawKey: string): string | null {
-	const identity = parseSourceIdentityKey(rawKey);
-	if (identity) return sourceIdentityKey(identity);
-	const id = Number(rawKey);
-	return Number.isSafeInteger(id) && id > 0 && rawKey === String(id)
-		? `anilist:${id}`
-		: null;
-}
-
-function validSeasons(value: unknown): number[] | undefined {
-	return Array.isArray(value)
-		? value.flatMap((season) => {
-				const valid = validSeason(season);
-				return valid === undefined ? [] : [valid];
-			})
-		: undefined;
-}
-
-function validSeason(value: unknown): number | undefined {
-	return Number.isSafeInteger(value) && (value as number) >= 0
-		? (value as number)
-		: undefined;
-}
-
-function validExpiry(value: unknown): number | null {
-	return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

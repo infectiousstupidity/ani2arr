@@ -8,7 +8,6 @@ import {
 	clearAutoResults,
 	consolidateAutomaticAliases,
 	getAutomaticLayerRecord,
-	listAniListAutomaticLayers,
 	migrateAutomaticStore,
 	setAutoResult,
 	setSeerrAutoResult,
@@ -86,62 +85,7 @@ describe("auto mapping store", () => {
 		await expect(getAutomaticLayerRecord(identity)).resolves.toBeNull();
 	});
 
-	it("decodes malformed current-v1 nested automatic fields safely", async () => {
-		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: {
-				version: 1,
-				records: {
-					"anilist:1": {
-						facts: { tmdbMovie: "bad", tvdbShow: tvdb(20) },
-						scopes: { tvdbShow: { id: tvdb(20), seasons: [-1, 2] } },
-						slotMeta: {
-							tvdbShow: { expiresAt: Date.now() + 1000 },
-							tmdbMovie: { expiresAt: "later" },
-						},
-						attempts: { seerrTmdbShow: { expiresAt: "later" } },
-					},
-				},
-			},
-		});
 
-		await expect(getAutomaticLayerRecord(aid(1))).resolves.toEqual({
-			facts: { tvdbShow: tvdb(20) },
-			scopes: { tvdbShow: { id: tvdb(20), seasons: [2] } },
-			slotMeta: { tvdbShow: { expiresAt: Date.now() + 1000 } },
-		});
-	});
-
-	it("lists only AniList results from mixed-source storage", async () => {
-		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: {
-				sonarr: {},
-				radarr: {
-					"anilist:1": {
-						kind: "mapped",
-						providerId: tmdb(300),
-						expiresAt: Date.now() + 1000,
-					},
-					"mal:5114": {
-						kind: "mapped",
-						providerId: tmdb(400),
-						expiresAt: Date.now() + 1000,
-					},
-				},
-			},
-		});
-
-		await expect(listAniListAutomaticLayers()).resolves.toEqual([
-			{
-				anilistId: aid(1),
-				record: {
-					facts: { tmdbMovie: tmdb(300) },
-					slotMeta: {
-						tmdbMovie: { expiresAt: Date.now() + 1000 },
-					},
-				},
-			},
-		]);
-	});
 
 	it("round-trips MAL results under a source-aware key", async () => {
 		const identity = { source: "mal", id: mal(63_816) } as const;
@@ -264,23 +208,23 @@ describe("auto mapping store", () => {
 		});
 	});
 
-	it("reads legacy raw AniList keys", async () => {
-		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: {
-				sonarr: {},
-				radarr: {
-					1: {
-						kind: "mapped",
-						providerId: tmdb(300),
-						expiresAt: Date.now() + 1000,
-					},
-				},
-			},
-		});
 
-		await expect(
-			getAutomaticLayerRecord({ source: "anilist", id: aid(1) }),
-		).resolves.toMatchObject({ facts: { tmdbMovie: tmdb(300) } });
+	it("deletes legacy cache keys while preserving current records", async () => {
+		await browser.storage.local.set({
+			[AUTO_STORAGE_KEY]: { radarr: { 1: { kind: "mapped" } } },
+			"mapping:seerr-auto": { 1: { kind: "unmapped" } },
+		});
+		await migrateAutomaticStore();
+		expect(await browser.storage.local.get([AUTO_STORAGE_KEY, "mapping:seerr-auto"])).toEqual({});
+		await browser.storage.local.set({
+			[AUTO_STORAGE_KEY]: { version: 1, records: { "anilist:1": { facts: {} } } },
+			"mapping:seerr-auto": {},
+		});
+		await migrateAutomaticStore();
+		expect(await browser.storage.local.get(AUTO_STORAGE_KEY)).toEqual({
+			[AUTO_STORAGE_KEY]: { version: 1, records: { "anilist:1": { facts: {} } } },
+		});
+		expect(await browser.storage.local.get("mapping:seerr-auto")).toEqual({});
 	});
 
 	it("skips writes when migrating unchanged automatic data", async () => {
@@ -297,166 +241,8 @@ describe("auto mapping store", () => {
 		expect(setSpy).not.toHaveBeenCalled();
 	});
 
-	it("drops legacy provider-bucket ambiguity without recording an attempt", async () => {
-		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: {
-				sonarr: {
-					1: {
-						kind: "ambiguous",
-						targets: [
-							{ provider: "sonarr", providerId: tvdb(10) },
-							{ provider: "sonarr", providerId: tvdb(20) },
-						],
-						expiresAt: Date.now() + 10_000,
-					},
-				},
-				radarr: {},
-			},
-		});
 
-		await migrateAutomaticStore();
 
-		await expect(getAutomaticLayerRecord(aid(1))).resolves.toBeNull();
-		await expect(browser.storage.local.get(AUTO_STORAGE_KEY)).resolves.toEqual({
-			[AUTO_STORAGE_KEY]: { version: 1, records: {} },
-		});
-	});
-
-	it("drops current automatic Arr conflicts and their slot state", async () => {
-		const expiresAt = Date.now() + 10_000;
-		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: {
-				version: 1,
-				records: {
-					"anilist:1": {
-						facts: {
-							tmdbMovie: tmdb(10),
-							tmdbShow: tmdb(30),
-							tvdbShow: tvdb(40),
-						},
-						conflicts: {
-							tmdbMovie: [tmdb(10), tmdb(20)],
-							tvdbShow: [
-								{ id: tvdb(40), seasons: [1] },
-								{ id: tvdb(50), seasons: [2] },
-							],
-						},
-						scopes: { tvdbShow: { id: tvdb(40), seasons: [1] } },
-						slotMeta: {
-							tmdbMovie: { expiresAt },
-							tmdbShow: { expiresAt },
-							tvdbShow: { expiresAt },
-						},
-						attempts: { seerrTmdbMovie: { expiresAt } },
-					},
-					"anilist:2": {
-						facts: {},
-						conflicts: { tmdbMovie: [tmdb(60), tmdb(70)] },
-						slotMeta: { tmdbMovie: { expiresAt } },
-					},
-				},
-			},
-		});
-
-		await migrateAutomaticStore();
-
-		await expect(getAutomaticLayerRecord(aid(1))).resolves.toEqual({
-			facts: { tmdbShow: tmdb(30) },
-			slotMeta: { tmdbShow: { expiresAt } },
-			attempts: { seerrTmdbMovie: { expiresAt } },
-		});
-		await expect(getAutomaticLayerRecord(aid(2))).resolves.toBeNull();
-		await expect(browser.storage.local.get(AUTO_STORAGE_KEY)).resolves.toEqual({
-			[AUTO_STORAGE_KEY]: {
-				version: 1,
-				records: {
-					"anilist:1": {
-						facts: { tmdbShow: tmdb(30) },
-						slotMeta: { tmdbShow: { expiresAt } },
-						attempts: { seerrTmdbMovie: { expiresAt } },
-					},
-				},
-			},
-		});
-	});
-
-	it("migrates Arr and Seerr TTLs with independent facts and attempt lanes", async () => {
-		const sonarrExpiry = Date.now() + 1000;
-		const radarrExpiry = Date.now() + 2000;
-		const seerrExpiry = Date.now() + 3000;
-		const negativeExpiry = Date.now() + 4000;
-		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: {
-				sonarr: {
-					1: {
-						kind: "mapped",
-						providerId: tvdb(100),
-						expiresAt: sonarrExpiry,
-					},
-				},
-				radarr: {
-					1: {
-						kind: "mapped",
-						providerId: tmdb(200),
-						expiresAt: radarrExpiry,
-					},
-					3: {
-						kind: "mapped",
-						providerId: tmdb(500),
-						expiresAt: radarrExpiry,
-					},
-				},
-			},
-			"mapping:seerr-auto": {
-				1: {
-					kind: "mapped",
-					target: {
-						mediaType: "tv",
-						tmdbId: tmdb(300),
-						tvdbId: tvdb(400),
-						seasons: [2],
-						tmdbSeasons: [3],
-					},
-					expiresAt: seerrExpiry,
-				},
-				2: { kind: "unmapped", expiresAt: negativeExpiry },
-				3: {
-					kind: "mapped",
-					target: { mediaType: "movie", tmdbId: tmdb(600) },
-					expiresAt: seerrExpiry,
-				},
-			},
-		});
-
-		await migrateAutomaticStore();
-
-		await expect(getAutomaticLayerRecord(aid(1))).resolves.toEqual({
-			facts: {
-				tmdbMovie: tmdb(200),
-				tmdbShow: tmdb(300),
-				tvdbShow: tvdb(100),
-			},
-			scopes: { tmdbShow: { id: tmdb(300), seasons: [3] } },
-			slotMeta: {
-				tmdbMovie: { expiresAt: radarrExpiry },
-				tmdbShow: { expiresAt: seerrExpiry },
-				tvdbShow: { expiresAt: sonarrExpiry },
-			},
-		});
-		await expect(getAutomaticLayerRecord(aid(2))).resolves.toEqual({
-			facts: {},
-			attempts: {
-				seerrTmdbMovie: { expiresAt: negativeExpiry },
-				seerrTmdbShow: { expiresAt: negativeExpiry },
-			},
-		});
-		await expect(getAutomaticLayerRecord(aid(3))).resolves.toMatchObject({
-			facts: { tmdbMovie: tmdb(500) },
-		});
-		await expect(
-			browser.storage.local.get("mapping:seerr-auto"),
-		).resolves.toEqual({});
-	});
 
 	it("updates one slot without refreshing another slot or attempt lane", async () => {
 		const identity = { source: "anilist", id: aid(1) } as const;

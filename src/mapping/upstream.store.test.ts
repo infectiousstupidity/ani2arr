@@ -4,11 +4,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
-import { sourceIdentityKey } from "@/mapping/source-identity";
 import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
-import { createMappingRecord } from "./mapping-record";
 import { migrateMappingStorage } from "./migrate";
 import {
 	clearUpstreamMappings,
@@ -19,11 +17,6 @@ import {
 	migrateUpstreamStore,
 	refreshUpstreamMappings,
 } from "./upstream.store";
-
-vi.mock("./mapping-record", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./mapping-record")>();
-	return { ...actual, createMappingRecord: vi.fn(actual.createMappingRecord) };
-});
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
@@ -52,38 +45,6 @@ function createAniBridgeResponse(
 
 function mockAniBridgeResponse(response: Response): void {
 	vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValueOnce(response));
-}
-
-async function seedSnapshot(
-	targetsBySource: Record<string, unknown[]>,
-	overrides: SnapshotOverrides = {},
-): Promise<void> {
-	const records = Object.fromEntries(
-		Object.entries(targetsBySource).map(([sourceKey, targets]) => [
-			sourceKey,
-			{
-				...(overrides.linkedAniListIds?.[sourceKey] === undefined
-					? {}
-					: { linkedAniListId: overrides.linkedAniListIds[sourceKey] }),
-				targets,
-			},
-		]),
-	);
-	for (const [sourceKey, linkedAniListId] of Object.entries(
-		overrides.linkedAniListIds ?? {},
-	)) {
-		records[sourceKey] ??= { linkedAniListId, targets: [] };
-	}
-	await browser.storage.local.set({
-		[UPSTREAM_STORAGE_KEY]: {
-			records,
-			fetchedAt: Date.now(),
-			...(overrides.fetchedAt === undefined
-				? {}
-				: { fetchedAt: overrides.fetchedAt }),
-			...(overrides.etag === undefined ? {} : { etag: overrides.etag }),
-		},
-	});
 }
 
 async function seedLayerSnapshot(
@@ -137,6 +98,7 @@ describe("version-1 upstream lookups", () => {
 			"mapping:auto": {
 				version: 1,
 				records: {
+					"anilist:2": { facts: {} },
 					"anilist:1": {
 						facts: { tmdbMovie: tmdb(10) },
 						slotMeta: { tmdbMovie: { expiresAt: Date.now() + 10_000 } },
@@ -170,25 +132,6 @@ describe("version-1 upstream lookups", () => {
 		).resolves.toBeNull();
 	});
 
-	it("decodes at most two records for a single layer lookup", async () => {
-		await seedLayerSnapshot(
-			Object.fromEntries(
-				Array.from({ length: 1000 }, (_, index) => [
-					`anilist:${index + 1}`,
-					canonical,
-				]),
-			),
-		);
-		const createMappingRecordSpy = vi.mocked(createMappingRecord);
-		createMappingRecordSpy.mockClear();
-
-		await expect(getSourceUpstreamLayers(anilistSource(5))).resolves.toEqual({
-			anilistId: aid(5),
-			direct: canonical,
-			canonical,
-		});
-		expect(createMappingRecordSpy.mock.calls.length).toBeLessThanOrEqual(2);
-	});
 
 	it("groups only linked MAL aliases in source-key order", async () => {
 		await seedLayerSnapshot({
@@ -210,27 +153,6 @@ describe("refreshUpstreamMappings", () => {
 		await clearUpstreamMappings();
 	});
 
-	it("decodes malformed current-v1 nested upstream fields safely", async () => {
-		await seedLayerSnapshot({
-			"anilist:1": {
-				facts: { tmdbMovie: "bad", tmdbShow: tmdb(10) },
-				scopes: { tmdbShow: { id: tmdb(10), seasons: [-1, 3] } },
-				linkedAniListId: 0,
-			},
-		});
-
-		await expect(getSourceUpstreamLayers(anilistSource(1))).resolves.toEqual({
-			anilistId: aid(1),
-			direct: {
-				facts: { tmdbShow: tmdb(10) },
-				scopes: { tmdbShow: { id: tmdb(10), seasons: [3] } },
-			},
-			canonical: {
-				facts: { tmdbShow: tmdb(10) },
-				scopes: { tmdbShow: { id: tmdb(10), seasons: [3] } },
-			},
-		});
-	});
 
 	it.each([
 		{
@@ -256,6 +178,7 @@ describe("refreshUpstreamMappings", () => {
 
 		await expect(refreshUpstreamMappings()).rejects.toThrow(error);
 	});
+
 
 	it("persists normalized source records and refresh metadata", async () => {
 		mockAniBridgeResponse(
@@ -292,59 +215,7 @@ describe("refreshUpstreamMappings", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("decodes released split snapshots without writing during reads", async () => {
-		await browser.storage.local.set({
-			[UPSTREAM_STORAGE_KEY]: {
-				entries: {
-					"anilist:21": [{ kind: "tvdb-show", id: tvdb(81_797) }],
-					"mal:5114": [{ kind: "tmdb-movie", id: tmdb(300) }],
-				},
-				aniListCrosswalks: { "mal:5114": aid(21) },
-				fetchedAt: Date.now(),
-			},
-		});
-		const setSpy = vi.spyOn(browser.storage.local, "set");
 
-		await expect(
-			getSourceUpstreamLayers({ source: "mal", id: mal(5114) }),
-		).resolves.toMatchObject({
-			anilistId: aid(21),
-			canonical: { facts: { tvdbShow: tvdb(81_797) } },
-		});
-		expect(setSpy).not.toHaveBeenCalled();
-		setSpy.mockRestore();
-	});
-
-	it("uses only released v2 TMDB-specific Seerr seasons", async () => {
-		await browser.storage.local.set({
-			[UPSTREAM_STORAGE_KEY]: {
-				mappings: { 1: [] },
-				seerrTargets: {
-					1: {
-						mediaType: "tv",
-						tmdbId: tmdb(400),
-						tvdbId: tvdb(500),
-						seasons: [2],
-						tmdbSeasons: [3],
-					},
-				},
-				fetchedAt: Date.now(),
-			},
-		});
-
-		await migrateUpstreamStore();
-
-		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
-		expect(stored[UPSTREAM_STORAGE_KEY]).toMatchObject({
-			version: 1,
-			records: {
-				"anilist:1": {
-					facts: { tmdbShow: tmdb(400) },
-					scopes: { tmdbShow: { id: tmdb(400), seasons: [3] } },
-				},
-			},
-		});
-	});
 
 	it("forces a full refresh for fresh legacy snapshots", async () => {
 		await browser.storage.local.set({
@@ -365,6 +236,8 @@ describe("refreshUpstreamMappings", () => {
 		});
 		vi.stubGlobal("fetch", fetchMock);
 
+		await expect(migrateUpstreamStore()).resolves.toBe(true);
+		await expect(browser.storage.local.get(UPSTREAM_STORAGE_KEY)).resolves.toEqual({});
 		await expect(refreshUpstreamMappings()).resolves.toBe(true);
 
 		expect(fetchMock).toHaveBeenCalledOnce();
@@ -476,54 +349,12 @@ describe("refreshUpstreamMappings", () => {
 		});
 	});
 
-	it("uses direct MAL targets before provider-specific AniList fallbacks", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		const lowerAlias = { source: "mal", id: mal(100) } as const;
-		await seedSnapshot(
-			{
-				"anilist:21": [
-					{ kind: "tvdb-show", id: tvdb(78_874), season: 1 },
-					{ kind: "tmdb-show", id: tmdb(1396), season: 1 },
-				],
-				"mal:5114": [{ kind: "tmdb-movie", id: tmdb(300) }],
-			},
-			{
-				linkedAniListIds: {
-					[sourceIdentityKey(source)]: aid(21),
-					[sourceIdentityKey(lowerAlias)]: aid(21),
-				},
-			},
-		);
 
-		await expect(getSourceUpstreamLayers(source)).resolves.toMatchObject({
-			anilistId: aid(21),
-			direct: { facts: { tmdbMovie: tmdb(300) } },
-			canonical: { facts: { tvdbShow: tvdb(78_874) } },
-		});
-		await expect(
-			getUniqueAniListIdForSource({ source: "mal", id: mal(5114) }),
-		).resolves.toBe(aid(21));
-		await expect(getSourceAliasesByAniListId()).resolves.toEqual(
-			new Map([[aid(21), [lowerAlias, source]]]),
-		);
-	});
-
-	it("returns a direct MAL target without an AniList alias", async () => {
-		const source = { source: "mal", id: mal(59_571) } as const;
-		await seedSnapshot({
-			"mal:59571": [{ kind: "tmdb-movie", id: tmdb(1_333_100) }],
-		});
-
-		await expect(getSourceUpstreamLayers(source)).resolves.toMatchObject({
-			anilistId: null,
-			direct: { facts: { tmdbMovie: tmdb(1_333_100) } },
-		});
-	});
 
 	it("resolves a deduplicated alias batch with one pure storage read", async () => {
 		const mapped = { source: "mal", id: mal(5114) } as const;
 		const missing = { source: "mal", id: mal(59_571) } as const;
-		await seedSnapshot({}, { linkedAniListIds: { "mal:5114": aid(21) } });
+		await seedLayerSnapshot({ "mal:5114": { facts: {}, linkedAniListId: aid(21) } });
 		const getSpy = vi.spyOn(browser.storage.local, "get");
 		const setSpy = vi.spyOn(browser.storage.local, "set");
 

@@ -13,14 +13,15 @@ import {
 	migrateUpstreamStore,
 } from "./upstream.store";
 
-export async function migrateMappingStorage(): Promise<void> {
-	await migrateUpstreamStore();
+export async function migrateMappingStorage(): Promise<boolean> {
+	const deletedUpstream = await migrateUpstreamStore();
 	await Promise.all([migrateManualStore(), migrateAutomaticStore()]);
 	const aliases = await getSourceAliasesByAniListId();
 	await Promise.all([
 		consolidateManualAliases(aliases),
 		consolidateAutomaticAliases(aliases),
 	]);
+	return deletedUpstream;
 }
 
 export async function consolidateMappingAliases(): Promise<void> {
