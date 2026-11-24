@@ -532,12 +532,15 @@ describe("Seerr automatic resolver", () => {
 		expect(searchMedia).not.toHaveBeenCalled();
 	});
 
-	it("retries after metadata enrichment changes an earlier null result", async () => {
+	it("honours a cached miss even with new title and metadata hints", async () => {
 		searchMedia.mockResolvedValue([]);
 
-		await expect(resolve(request("Unknown anime"))).resolves.toBeNull();
+		await expect(
+			resolve(request("Unknown anime", undefined, "movie")),
+		).resolves.toBeNull();
 		expect(cached).toEqual({ kind: "unmapped" });
 
+		vi.clearAllMocks();
 		searchMedia.mockResolvedValue([movie()]);
 
 		await expect(
@@ -547,10 +550,11 @@ describe("Seerr automatic resolver", () => {
 					startYear: 1998,
 				}),
 			),
-		).resolves.toMatchObject({
-			tmdbId: tmdb(10_494),
-		});
-		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
+		).resolves.toBeNull();
+		expect(searchMedia).not.toHaveBeenCalled();
+		expect(loadAniListMedia).not.toHaveBeenCalled();
+		expect(loadMyAnimeListMetadata).not.toHaveBeenCalled();
+		expect(getTvDetails).not.toHaveBeenCalled();
 	});
 
 	it("uses forceRetry to retry a cached null result without new hints", async () => {

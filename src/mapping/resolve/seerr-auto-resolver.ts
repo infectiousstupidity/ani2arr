@@ -245,12 +245,7 @@ export function createSeerrAutoResolver(
 		if (cached?.kind === "mapped" && input.forceRetry !== true) {
 			return toEffectiveTarget(input, cached.target);
 		}
-		if (
-			cached?.kind === "unmapped" &&
-			input.forceRetry !== true &&
-			input.title === undefined &&
-			input.metadata === undefined
-		) {
+		if (cached?.kind === "unmapped" && input.forceRetry !== true) {
 			return null;
 		}
 
