@@ -73,7 +73,7 @@ describe("browse batch background cost", () => {
 	beforeEach(async () => {
 		await saveProviderConnectionSnapshot("sonarr", {
 			url: "https://sonarr.local:8989",
-			apiKey: "0123456789abcdef0123456789abcdef",
+			apiKey: "sonarr-key",
 		});
 		await seedUpstream();
 		await seedAutomaticStore(1500);
