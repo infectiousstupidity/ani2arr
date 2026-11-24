@@ -28,7 +28,7 @@ export type MediaModalTargetSummary = {
 	provider: Provider;
 	providerId: TvdbId | TmdbId;
 	title: string;
-	isInLibrary: boolean;
+	isInLibrary: boolean | null;
 	providerFolderName?: string;
 	year?: number;
 	typeLabel?: string;

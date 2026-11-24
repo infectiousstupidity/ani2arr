@@ -43,7 +43,7 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 		? getPreviewHeading(provider)
 		: "Current Mapping Details";
 	const activeTarget = isInMappingMode ? previewMapping : effectiveMapping;
-	const activeProviderTarget = activeTarget
+	const activeProviderTarget = activeTarget && activeTarget.isInLibrary !== null
 		? getProviderOpenTarget({
 				isInLibrary: activeTarget.isInLibrary,
 				providerRouteSlug: activeTarget.providerRouteSlug,

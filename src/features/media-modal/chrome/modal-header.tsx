@@ -192,9 +192,7 @@ function ProviderCardContent(props: {
 		providerIdLine,
 		openProvider,
 	} = props;
-	const hasProviderMeta =
-		providerMetaLine !== null ||
-		(providerIdLine !== null && openProvider !== null);
+	const hasProviderMeta = providerMetaLine !== null || providerIdLine !== null;
 
 	return (
 		<div
@@ -219,16 +217,20 @@ function ProviderCardContent(props: {
 						</p>
 					) : null}
 
-					{providerIdLine && openProvider ? (
+					{providerIdLine ? (
 						<div className="mt-0.5 flex min-w-0 justify-end">
-							<button
-								type="button"
-								onClick={openProvider}
-								className="group ml-auto flex w-fit max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary"
-								aria-label={`Open in ${providerLabel}`}
-							>
+							{openProvider ? (
+								<button
+									type="button"
+									onClick={openProvider}
+									className="group ml-auto flex w-fit max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary"
+									aria-label={`Open in ${providerLabel}`}
+								>
+									<MappingIdPill>{providerIdLine}</MappingIdPill>
+								</button>
+							) : (
 								<MappingIdPill>{providerIdLine}</MappingIdPill>
-							</button>
+							)}
 						</div>
 					) : null}
 				</div>
@@ -258,7 +260,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 		? `${getProviderExternalIdLabel(target.provider)} ID: ${target.providerId}`
 		: null;
 
-	const providerOpenTarget = target
+	const providerOpenTarget = target && target.isInLibrary !== null
 		? getProviderOpenTarget({
 				isInLibrary: target.isInLibrary,
 				providerRouteSlug: target.providerRouteSlug,

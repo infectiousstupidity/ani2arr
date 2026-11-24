@@ -37,7 +37,8 @@ import type {
 	UpdateSonarrInput,
 	ValidateTvdbInput,
 } from "@/rpc/types";
-import { normalizeError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
+import { createError, logError, normalizeError } from "@/shared/errors/error-utils";
 import { maintainArrMutationCache } from "./arr-mutation-cache";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -134,15 +135,30 @@ export const sonarrHandlers = {
 
 		const [results, library] = await Promise.all([
 			sonarrClient.lookupSeries(input.term, credentials),
-			sonarrLibrary.getSeriesSnapshots(credentials),
+			sonarrLibrary.getSeriesSnapshots(credentials).catch((error: unknown) => {
+				const { code } = normalizeError(error);
+				const message =
+					"Library membership unavailable during manual mapping search.";
+				logError(
+					createError(
+						Object.values(ErrorCode).includes(code)
+							? code
+							: ErrorCode.UNKNOWN_ERROR,
+						message,
+						message,
+					),
+					"sonarr lookup",
+				);
+				return null;
+			}),
 		]);
 
-		const libraryTvdbIds = library.map((s) => s.tvdbId);
+		const libraryTvdbIds = library?.map((s) => s.tvdbId) ?? null;
 		const statsMap: Record<
 			number,
 			NonNullable<SonarrSeriesSnapshot["statistics"]>
 		> = {};
-		for (const s of library) {
+		for (const s of library ?? []) {
 			if (s.statistics) {
 				statsMap[s.tvdbId] = s.statistics;
 			}

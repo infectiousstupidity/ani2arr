@@ -35,6 +35,8 @@ import type {
 	ValidateTmdbInput,
 } from "@/rpc/types";
 import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
+import { ErrorCode } from "@/shared/errors/error.types";
+import { createError, logError, normalizeError } from "@/shared/errors/error-utils";
 import { maintainArrMutationCache } from "./arr-mutation-cache";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -123,10 +125,25 @@ export const radarrHandlers = {
 
 		const [results, library] = await Promise.all([
 			radarrClient.lookupMovies(input.term, credentials),
-			radarrLibrary.getMovieSnapshots(credentials),
+			radarrLibrary.getMovieSnapshots(credentials).catch((error: unknown) => {
+				const { code } = normalizeError(error);
+				const message =
+					"Library membership unavailable during manual mapping search.";
+				logError(
+					createError(
+						Object.values(ErrorCode).includes(code)
+							? code
+							: ErrorCode.UNKNOWN_ERROR,
+						message,
+						message,
+					),
+					"radarr lookup",
+				);
+				return null;
+			}),
 		]);
 
-		const libraryTmdbIds = library.map((movie) => movie.tmdbId);
+		const libraryTmdbIds = library?.map((movie) => movie.tmdbId) ?? null;
 		const linkedAniListIdsByTmdbId: Record<number, number[]> = {};
 		const uniqueTmdbIds = new Set<TmdbId>();
 

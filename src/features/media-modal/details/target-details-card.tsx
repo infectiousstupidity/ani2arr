@@ -74,6 +74,10 @@ function getLibraryPillLabel(
 	mapping: MediaModalTargetSummary,
 	providerLabel: string,
 ): string {
+	if (mapping.isInLibrary === null) {
+		return `${providerLabel} library status unknown`;
+	}
+
 	if (!mapping.isInLibrary) {
 		return `Not in ${providerLabel}`;
 	}

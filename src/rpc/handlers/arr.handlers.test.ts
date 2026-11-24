@@ -18,14 +18,17 @@ import { sonarrHandlers } from "./sonarr.handlers";
 const apiServicesMock = vi.hoisted(() => ({
 	mappingService: {
 		resolveMapping: vi.fn(),
+		getLinkedAniListIdsByProviderIds: vi.fn(),
 	},
-	radarrClient: {},
+	radarrClient: { lookupMovies: vi.fn() },
 	radarrLibrary: {
+		getMovieSnapshots: vi.fn(),
 		upsertMovieSnapshot: vi.fn(),
 	},
 	scheduleLibraryRefresh: vi.fn(),
-	sonarrClient: {},
+	sonarrClient: { lookupSeries: vi.fn() },
 	sonarrLibrary: {
+		getSeriesSnapshots: vi.fn(),
 		upsertSeriesSnapshot: vi.fn(),
 	},
 }));
@@ -137,6 +140,61 @@ describe("Arr RPC handlers", () => {
 
 		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(true);
 		apiServicesMock.radarrLibrary.upsertMovieSnapshot.mockResolvedValue(true);
+	});
+
+	const searches = [
+		{
+			provider: "sonarr",
+			result: createdSeries,
+			id: createdSeries.tvdbId,
+			idsKey: "libraryTvdbIds",
+			linkedKey: "linkedAniListIdsByTvdbId",
+			lookup: apiServicesMock.sonarrClient.lookupSeries,
+			library: apiServicesMock.sonarrLibrary.getSeriesSnapshots,
+			run: () => sonarrHandlers.searchSonarr({ term: "Series" }),
+		},
+		{
+			provider: "radarr",
+			result: createdMovie,
+			id: createdMovie.tmdbId,
+			idsKey: "libraryTmdbIds",
+			linkedKey: "linkedAniListIdsByTmdbId",
+			lookup: apiServicesMock.radarrClient.lookupMovies,
+			library: apiServicesMock.radarrLibrary.getMovieSnapshots,
+			run: () => radarrHandlers.searchRadarr({ term: "Movie" }),
+		},
+	];
+
+	it.each(searches)(
+		"preserves $provider results and linked IDs when the library is unavailable",
+		async ({ provider, result, id, idsKey, linkedKey, lookup, library, run }) => {
+			providerConfigMock.requireProviderCredentials.mockResolvedValue(credentials);
+			lookup.mockResolvedValue([result]);
+			library.mockRejectedValue(new Error(`library failure ${credentials.apiKey}`));
+			apiServicesMock.mappingService.getLinkedAniListIdsByProviderIds.mockResolvedValue(
+				new Map([[id, [aid(100)]]]),
+			);
+			const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+			await expect(run()).resolves.toEqual({
+				results: [result],
+				[idsKey]: null,
+				[linkedKey]: { [id]: [100] },
+			});
+			expect(apiServicesMock.mappingService.getLinkedAniListIdsByProviderIds)
+				.toHaveBeenCalledWith(provider, new Set([id]));
+			expect(log).toHaveBeenCalled();
+			expect(JSON.stringify(log.mock.calls)).not.toContain(credentials.apiKey);
+		},
+	);
+
+	it.each(searches)("propagates $provider lookup errors", async ({ lookup, library, run }) => {
+		providerConfigMock.requireProviderCredentials.mockResolvedValue(credentials);
+		const error = new Error("lookup failed");
+		lookup.mockRejectedValue(error);
+		library.mockResolvedValue([]);
+
+		await expect(run()).rejects.toBe(error);
 	});
 
 	it.each([

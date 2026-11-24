@@ -35,11 +35,11 @@ const PROVIDER = "radarr" as const;
 
 function buildCandidate(input: {
 	movie: RadarrLookupMovie;
-	libraryTmdbIds: number[];
+	libraryTmdbIds: number[] | null;
 	linkedAniListIdsByTmdbId: Record<number, number[]> | undefined;
 }): RadarrMappingCandidate {
 	const tmdbId = parseTmdbId(input.movie.tmdbId);
-	const isInLibrary = input.libraryTmdbIds.includes(tmdbId);
+	const isInLibrary = input.libraryTmdbIds?.includes(tmdbId) ?? null;
 	const providerRouteSlug = isInLibrary
 		? (getProviderRouteSlug(PROVIDER, input.movie) ?? undefined)
 		: undefined;
@@ -105,16 +105,17 @@ export function RadarrMappingPanel(
 	});
 	const providerLabel = getProviderLabel(PROVIDER);
 	const providerIdLabel = getProviderExternalIdLabel(PROVIDER);
+	const { data } = search;
 	const candidates = useMemo(
 		() =>
-			search.data?.results.map((movie) =>
+			data?.results.map((movie) =>
 				buildCandidate({
 					movie,
-					libraryTmdbIds: search.data?.libraryTmdbIds ?? [],
-					linkedAniListIdsByTmdbId: search.data?.linkedAniListIdsByTmdbId,
+					libraryTmdbIds: data.libraryTmdbIds,
+					linkedAniListIdsByTmdbId: data.linkedAniListIdsByTmdbId,
 				}),
 			) ?? [],
-		[search.data],
+		[data],
 	);
 	const candidatePosterUrls = useMemo(
 		() =>
@@ -143,6 +144,7 @@ export function RadarrMappingPanel(
 		>
 			{candidates.map((candidate) => {
 				const summary = candidate.summary;
+				const { isInLibrary } = summary;
 				const externalLabel = `Open in ${providerLabel}`;
 				const isSelected = selectedCandidate?.tmdbId === candidate.tmdbId;
 
@@ -154,16 +156,20 @@ export function RadarrMappingPanel(
 						providerId={summary.providerId}
 						contentContainer={contentContainer}
 						externalLabel={externalLabel}
-						openProvider={() => {
-							openProviderPage({
-								provider: PROVIDER,
-								target: getProviderOpenTarget({
-									isInLibrary: summary.isInLibrary,
-									providerRouteSlug: summary.providerRouteSlug,
-									searchTerm: summary.title,
-								}),
-							});
-						}}
+						openProvider={
+							isInLibrary === null
+								? undefined
+								: () => {
+										openProviderPage({
+											provider: PROVIDER,
+											target: getProviderOpenTarget({
+												isInLibrary,
+												providerRouteSlug: summary.providerRouteSlug,
+												searchTerm: summary.title,
+											}),
+										});
+									}
+						}
 						isCurrent={currentTarget?.providerId === candidate.tmdbId}
 						isSelected={isSelected}
 						libraryLabel={getLibraryLabel({ candidate, providerLabel })}

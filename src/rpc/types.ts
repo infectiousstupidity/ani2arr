@@ -336,7 +336,7 @@ export type GetMappingInspectionOutput = MappingDetailsPayload;
 
 export interface SonarrLookupOutput {
 	results: SonarrLookupSeries[];
-	libraryTvdbIds: number[];
+	libraryTvdbIds: number[] | null;
 	linkedAniListIdsByTvdbId?: Record<number, number[]>;
 	statsMap?: Record<
 		number,
@@ -350,7 +350,7 @@ export interface SonarrLookupOutput {
 
 export interface RadarrLookupOutput {
 	results: RadarrLookupMovie[];
-	libraryTmdbIds: number[];
+	libraryTmdbIds: number[] | null;
 	linkedAniListIdsByTmdbId?: Record<number, number[]>;
 }
 

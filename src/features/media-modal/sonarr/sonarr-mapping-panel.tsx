@@ -51,7 +51,7 @@ function resolveStats(input: {
 		  >
 		| undefined;
 	tvdbId: TvdbId;
-	isInLibrary: boolean;
+	isInLibrary: boolean | null;
 }): SonarrResultStats {
 	const lookupStats = input.series.statistics;
 	const hasLookupStats = (lookupStats?.episodeFileCount ?? 0) > 0;
@@ -71,7 +71,7 @@ function resolveStats(input: {
 
 function buildCandidate(input: {
 	series: SonarrLookupSeries;
-	libraryTvdbIds: number[];
+	libraryTvdbIds: number[] | null;
 	linkedAniListIdsByTvdbId: Record<number, number[]> | undefined;
 	statsMap:
 		| Record<
@@ -85,7 +85,7 @@ function buildCandidate(input: {
 		| undefined;
 }): SonarrMappingCandidate {
 	const tvdbId = parseTvdbId(input.series.tvdbId);
-	const isInLibrary = input.libraryTvdbIds.includes(tvdbId);
+	const isInLibrary = input.libraryTvdbIds?.includes(tvdbId) ?? null;
 	const { episodeCount, episodeFileCount } = resolveStats({
 		series: input.series,
 		statsMap: input.statsMap,
@@ -154,17 +154,18 @@ export function SonarrMappingPanel(
 	});
 	const providerLabel = getProviderLabel(PROVIDER);
 	const providerIdLabel = getProviderExternalIdLabel(PROVIDER);
+	const { data } = search;
 	const candidates = useMemo(
 		() =>
-			search.data?.results.map((series) =>
+			data?.results.map((series) =>
 				buildCandidate({
 					series,
-					libraryTvdbIds: search.data?.libraryTvdbIds ?? [],
-					linkedAniListIdsByTvdbId: search.data?.linkedAniListIdsByTvdbId,
-					statsMap: search.data?.statsMap,
+					libraryTvdbIds: data.libraryTvdbIds,
+					linkedAniListIdsByTvdbId: data.linkedAniListIdsByTvdbId,
+					statsMap: data.statsMap,
 				}),
 			) ?? [],
-		[search.data],
+		[data],
 	);
 	const candidatePosterUrls = useMemo(
 		() =>
@@ -193,6 +194,7 @@ export function SonarrMappingPanel(
 		>
 			{candidates.map((candidate) => {
 				const summary = candidate.summary;
+				const { isInLibrary } = summary;
 				const externalLabel = `Open in ${providerLabel}`;
 				const isSelected = selectedCandidate?.tvdbId === candidate.tvdbId;
 
@@ -204,16 +206,20 @@ export function SonarrMappingPanel(
 						providerId={summary.providerId}
 						contentContainer={contentContainer}
 						externalLabel={externalLabel}
-						openProvider={() => {
-							openProviderPage({
-								provider: PROVIDER,
-								target: getProviderOpenTarget({
-									isInLibrary: summary.isInLibrary,
-									providerRouteSlug: summary.providerRouteSlug,
-									searchTerm: summary.title,
-								}),
-							});
-						}}
+						openProvider={
+							isInLibrary === null
+								? undefined
+								: () => {
+										openProviderPage({
+											provider: PROVIDER,
+											target: getProviderOpenTarget({
+												isInLibrary,
+												providerRouteSlug: summary.providerRouteSlug,
+												searchTerm: summary.title,
+											}),
+										});
+									}
+						}
 						isCurrent={currentTarget?.providerId === candidate.tvdbId}
 						isSelected={isSelected}
 						libraryLabel={getLibraryLabel({ candidate, providerLabel })}
