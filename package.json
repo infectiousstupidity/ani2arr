@@ -25,7 +25,8 @@
 		"test:watch": "vitest",
 		"prepare": "husky",
 		"security:secrets": "gitleaks detect --source . --redact --verbose --no-git",
-		"security": "pnpm run security:secrets && pnpm run audit"
+		"security": "pnpm run security:secrets && pnpm run audit",
+		"perf": "vitest run --config vitest.perf.config.ts"
 	},
 	"lint-staged": {
 		"src/**/*.{ts,tsx}": "eslint --fix"
