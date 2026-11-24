@@ -137,8 +137,13 @@ export function useMappingActions({
 	};
 
 	const resetMapping = async (): Promise<void> => {
-		await clearManualMapping.mutateAsync({ source, provider });
-		onMappingReset();
+		setActionError(null);
+		try {
+			await clearManualMapping.mutateAsync({ source, provider });
+			onMappingReset();
+		} catch (error) {
+			setActionError(normalizeError(error).userMessage);
+		}
 	};
 
 	const ignoreTitle = async (): Promise<void> => {
@@ -152,23 +157,38 @@ export function useMappingActions({
 
 		if (!didConfirm) return;
 
-		await setIgnore.mutateAsync({ source, provider });
-		onIgnored();
+		setActionError(null);
+		try {
+			await setIgnore.mutateAsync({ source, provider });
+			onIgnored();
+		} catch (error) {
+			setActionError(normalizeError(error).userMessage);
+		}
 	};
 
 	const rejectCandidate = async (): Promise<void> => {
 		if (rejectTarget === null) return;
 
-		await setRejectedCandidate.mutateAsync({ source, ...rejectTarget });
+		setActionError(null);
+		try {
+			await setRejectedCandidate.mutateAsync({ source, ...rejectTarget });
+		} catch (error) {
+			setActionError(normalizeError(error).userMessage);
+		}
 	};
 
 	const clearRejectedCandidateAction = async (): Promise<void> => {
 		if (clearRejectedTarget === null) return;
 
-		await clearRejectedCandidate.mutateAsync({
-			source,
-			...clearRejectedTarget,
-		});
+		setActionError(null);
+		try {
+			await clearRejectedCandidate.mutateAsync({
+				source,
+				...clearRejectedTarget,
+			});
+		} catch (error) {
+			setActionError(normalizeError(error).userMessage);
+		}
 	};
 
 	return {
