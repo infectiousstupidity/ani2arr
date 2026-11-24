@@ -7,12 +7,19 @@ import {
 	captureAutomaticWriteToken,
 	clearAutoResults,
 	consolidateAutomaticAliases,
+	flushAutomaticStore,
 	getAutomaticLayerRecord,
 	listAniListAutomaticLayers,
 	migrateAutomaticStore,
 	setAutoResult,
 	setSeerrAutoResult,
 } from "./auto.store";
+
+// Automatic results persist in the background after a short delay; flush before raw reads.
+async function readPersisted(keys: string | string[]) {
+	await flushAutomaticStore();
+	return browser.storage.local.get(keys);
+}
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
@@ -41,6 +48,23 @@ describe("auto mapping store", () => {
 		vi.useRealTimers();
 	});
 
+	it("persists a burst of automatic results with one storage write", async () => {
+		const writes = vi.spyOn(browser.storage.local, "set");
+		await Promise.all(
+			[1, 2, 3].map((id) =>
+				setAutoResult(captureAutomaticWriteToken(), "sonarr", aid(id), {
+					kind: "unmapped",
+				}),
+			),
+		);
+		// Reads see pending results before they reach storage.
+		await expect(getAutomaticLayerRecord(aid(2))).resolves.not.toBeNull();
+		expect(writes).not.toHaveBeenCalled();
+
+		await flushAutomaticStore();
+		expect(writes).toHaveBeenCalledOnce();
+	});
+
 	it("discards malformed current records on reads and writes", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: { version: 1, records: {
@@ -65,7 +89,7 @@ describe("auto mapping store", () => {
 			providerId: tmdb(10),
 		});
 		await expect(
-			browser.storage.local.get(AUTO_STORAGE_KEY),
+			readPersisted(AUTO_STORAGE_KEY),
 		).resolves.toMatchObject({
 			[AUTO_STORAGE_KEY]: {
 				version: 1,
@@ -116,7 +140,7 @@ describe("auto mapping store", () => {
 			facts: { tmdbMovie: tmdb(1_400_000) },
 		});
 		await expect(
-			browser.storage.local.get(AUTO_STORAGE_KEY),
+			readPersisted(AUTO_STORAGE_KEY),
 		).resolves.toMatchObject({
 			[AUTO_STORAGE_KEY]: {
 				version: 1,
@@ -166,7 +190,7 @@ describe("auto mapping store", () => {
 			},
 			aid(1),
 		);
-		const stored = await browser.storage.local.get(AUTO_STORAGE_KEY);
+		const stored = await readPersisted(AUTO_STORAGE_KEY);
 		const envelope = stored[AUTO_STORAGE_KEY] as {
 			records: Record<string, unknown>;
 		};
@@ -215,7 +239,7 @@ describe("auto mapping store", () => {
 			facts: { tmdbMovie: tmdb(20) },
 			slotMeta: { tmdbMovie: { expiresAt: activeUntil } },
 		});
-		const storedResult = await browser.storage.local.get(AUTO_STORAGE_KEY);
+		const storedResult = await readPersisted(AUTO_STORAGE_KEY);
 		const stored = storedResult[AUTO_STORAGE_KEY] as {
 			records: Record<string, unknown>;
 		};
@@ -233,13 +257,13 @@ describe("auto mapping store", () => {
 			"mapping:seerr-auto": { 1: { kind: "unmapped" } },
 		});
 		await migrateAutomaticStore();
-		expect(await browser.storage.local.get([AUTO_STORAGE_KEY, "mapping:seerr-auto"])).toEqual({});
+		expect(await readPersisted([AUTO_STORAGE_KEY, "mapping:seerr-auto"])).toEqual({});
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: { version: 1, records: { "anilist:1": { facts: {} } } },
 			"mapping:seerr-auto": {},
 		});
 		await migrateAutomaticStore();
-		expect(await browser.storage.local.get(AUTO_STORAGE_KEY)).toEqual({
+		expect(await readPersisted(AUTO_STORAGE_KEY)).toEqual({
 			[AUTO_STORAGE_KEY]: { version: 1, records: { "anilist:1": { facts: {} } } },
 		});
 		expect(await browser.storage.local.get("mapping:seerr-auto")).toEqual({});
@@ -271,7 +295,7 @@ describe("auto mapping store", () => {
 		await setSeerrAutoResult(captureAutomaticWriteToken(), identity, "movie", {
 			kind: "unmapped",
 		});
-		const storedBefore = await browser.storage.local.get(AUTO_STORAGE_KEY);
+		const storedBefore = await readPersisted(AUTO_STORAGE_KEY);
 		const before = storedBefore[AUTO_STORAGE_KEY] as {
 			records: Record<string, unknown>;
 		};
@@ -282,7 +306,7 @@ describe("auto mapping store", () => {
 			target: { mediaType: "tv", tmdbId: tmdb(300) },
 		});
 
-		const storedAfter = await browser.storage.local.get(AUTO_STORAGE_KEY);
+		const storedAfter = await readPersisted(AUTO_STORAGE_KEY);
 		const after = storedAfter[AUTO_STORAGE_KEY] as {
 			records: Record<string, unknown>;
 		};
@@ -347,7 +371,7 @@ describe("auto mapping store", () => {
 			slotMeta: { tvdbShow: { expiresAt } },
 			attempts: { seerrTmdbShow: { expiresAt: expiresAt + 3 } },
 		});
-		const storedResult = await browser.storage.local.get(AUTO_STORAGE_KEY);
+		const storedResult = await readPersisted(AUTO_STORAGE_KEY);
 		const stored = storedResult[AUTO_STORAGE_KEY] as {
 			records: Record<string, unknown>;
 		};
@@ -437,7 +461,7 @@ describe("auto mapping store", () => {
 
 		await clearAutoResults();
 
-		await expect(browser.storage.local.get(AUTO_STORAGE_KEY)).resolves.toEqual({
+		await expect(readPersisted(AUTO_STORAGE_KEY)).resolves.toEqual({
 			[AUTO_STORAGE_KEY]: { version: 1, records: {} },
 		});
 		await expect(

@@ -151,8 +151,10 @@ describe("MappingService", () => {
 		const service = new MappingService(resolver);
 		const pending = service.resolveMapping("sonarr", source, source.id);
 
-		await clearAutoResults();
+		// The clear bumps the write token synchronously while the state read is held.
+		const cleared = clearAutoResults();
 		releaseStateRead();
+		await cleared;
 
 		await expect(pending).resolves.toEqual({
 			kind: "unmapped",

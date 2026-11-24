@@ -63,7 +63,7 @@ describe("query invalidation", () => {
 				normalizeRadarrStatusRequest({ source, title: "Title B" }),
 			),
 			queryKeys.mappings(),
-			queryKeys.mappingIdentities([aid(21)]),
+			queryKeys.mappingIdentity(aid(21)),
 			queryKeys.mappingInspection(
 				normalizeMappingInspectionRequest("radarr", source),
 			),
@@ -111,7 +111,7 @@ describe("query invalidation", () => {
 					id: aid(1),
 				}),
 			),
-			queryKeys.mappingIdentities([aid(1)]),
+			queryKeys.mappingIdentity(aid(1)),
 			queryKeys.seerrTargetsRoot(),
 			queryKeys.seerrLinkedAniListEntries({
 				mediaType: "tv",
@@ -214,5 +214,29 @@ describe("query invalidation", () => {
 
 		expect(affected.every((key) => isInvalidated(client, key))).toBe(true);
 		expect(unaffected.some((key) => isInvalidated(client, key))).toBe(false);
+	});
+
+	it("limits an automatic mappings revision to the changed AniList entries", () => {
+		const client = createClient();
+		const changed = { source: "anilist", id: aid(1) } as const;
+		const unchanged = { source: "anilist", id: aid(2) } as const;
+		const malCard = { source: "mal", id: mal(3) } as const;
+		const affected = [
+			queryKeys.mappingIdentity(aid(1)),
+			queryKeys.providerMediaStatus("sonarr", normalizeSonarrStatusRequest({ source: changed })),
+			queryKeys.providerMediaStatus("radarr", normalizeRadarrStatusRequest({ source: malCard })),
+			queryKeys.mappingInspection(normalizeMappingInspectionRequest("sonarr", changed)),
+		];
+		const unaffected = [
+			queryKeys.mappingIdentity(aid(2)),
+			queryKeys.providerMediaStatus("sonarr", normalizeSonarrStatusRequest({ source: unchanged })),
+			queryKeys.mappingInspection(normalizeMappingInspectionRequest("sonarr", unchanged)),
+		];
+		seed(client, [...affected, ...unaffected]);
+
+		invalidateAfterMappingsRevision(client, [aid(1)]);
+
+		for (const key of affected) expect(isInvalidated(client, key)).toBe(true);
+		for (const key of unaffected) expect(isInvalidated(client, key)).toBe(false);
 	});
 });

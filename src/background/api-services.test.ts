@@ -172,6 +172,11 @@ describe("api services", () => {
 		expect(bumpMappingsRevision).not.toHaveBeenCalled();
 		await vi.advanceTimersByTimeAsync(1);
 		expect(bumpMappingsRevision).toHaveBeenCalledOnce();
+		// The bump names the changed entries so tabs refetch only those cards.
+		expect(bumpMappingsRevision).toHaveBeenCalledWith([
+			parseAniListId(1),
+			parseAniListId(2),
+		]);
 	});
 
 	it("does not bump the revision for stored Arr and Seerr misses", async () => {

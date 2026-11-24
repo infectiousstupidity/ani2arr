@@ -251,8 +251,8 @@ export const queryKeys = {
 	mappingRoot: mappingRootKey,
 	mappings: () => [...mappingRootKey(), "list"] as const,
 	mappingIdentitiesRoot: () => [...mappingRootKey(), "identities"] as const,
-	mappingIdentities: (ids: readonly AniListId[]) =>
-		[...mappingRootKey(), "identities", normalizeMetadataIds(ids)] as const,
+	mappingIdentity: (id: AniListId) =>
+		[...mappingRootKey(), "identities", id] as const,
 	sourceAniListIds: (sources: readonly SourceIdentity[]) =>
 		[
 			...mappingRootKey(),

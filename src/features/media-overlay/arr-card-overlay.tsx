@@ -27,6 +27,8 @@ export interface ArrCardOverlayProps<TForm> {
 	tooltipContainer?: FloatingPortalContainer;
 	extraAction?: ReactNode;
 	presentation?: "status-column" | "action-row" | undefined;
+	/** Hold the status fetch while the card's provider route is still loading. */
+	statusBlocked?: boolean | undefined;
 }
 
 export function ArrCardOverlay<TForm>({
@@ -43,6 +45,7 @@ export function ArrCardOverlay<TForm>({
 	tooltipContainer,
 	extraAction,
 	presentation,
+	statusBlocked,
 	provider,
 	useAction,
 }: ArrCardOverlayProps<TForm> & {
@@ -59,6 +62,7 @@ export function ArrCardOverlay<TForm>({
 		isConfigured,
 		defaultForm,
 		enabled: isInViewport,
+		statusBlocked: statusBlocked === true,
 		onConfigure: () => openOptionsPage({ sectionId: provider }),
 		onOpenMapping,
 	});

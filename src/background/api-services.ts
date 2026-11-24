@@ -6,6 +6,7 @@ import {
 	AniListMediaService,
 } from "@/anilist/media.service";
 import { AniListMetadataStore } from "@/anilist/metadata.store";
+import type { AniListId } from "@/anilist/types";
 import {
 	clearAutoResults,
 	getSeerrAutoResult,
@@ -13,6 +14,7 @@ import {
 } from "@/mapping/auto.store";
 import { clearManualFacts } from "@/mapping/manual.store";
 import { MappingService } from "@/mapping/mapping.service";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
 import { createSeerrAutoResolver } from "@/mapping/resolve/seerr-auto-resolver";
 import { clearUpstreamMappings } from "@/mapping/upstream.store";
@@ -131,8 +133,29 @@ const resolveAutomaticMapping = createAutomaticResolver({
 });
 
 // Batch bursts of new mappings. Broadcasting plain misses can make active queries
-// retry and store the same miss again.
+// retry and store the same miss again. The bump names the changed AniList IDs so
+// tabs refetch only those cards; an unknown ID widens it to everything.
 const debounceAutomaticMappingsRevision = createDebouncer(1000);
+let automaticRevisionScope: Set<AniListId> | "all" | null = null;
+
+function queueAutomaticMappingsRevision(
+	identity: SourceIdentity,
+	anilistId: AniListId | null | undefined,
+): void {
+	const changedId = identity.source === "anilist" ? identity.id : anilistId;
+	if (changedId == null) automaticRevisionScope = "all";
+	else if (automaticRevisionScope !== "all") {
+		automaticRevisionScope ??= new Set();
+		automaticRevisionScope.add(changedId);
+	}
+	debounceAutomaticMappingsRevision(async () => {
+		const scope = automaticRevisionScope;
+		automaticRevisionScope = null;
+		await bumpMappingsRevision(
+			scope === "all" || scope === null ? undefined : [...scope],
+		);
+	});
+}
 
 export const mappingService = new MappingService(
 	async (input): Promise<boolean> => {
@@ -143,7 +166,7 @@ export const mappingService = new MappingService(
 			input.anilistId,
 		);
 		if (mapping.kind === "mapped") {
-			debounceAutomaticMappingsRevision(bumpMappingsRevision);
+			queueAutomaticMappingsRevision(input.identity, input.anilistId);
 		}
 		return true;
 	},
@@ -161,7 +184,7 @@ export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
 				: null;
 		const stored = await setSeerrAutoResult(...args);
 		if (stored && (result.kind === "mapped" || previous?.kind === "mapped")) {
-			debounceAutomaticMappingsRevision(bumpMappingsRevision);
+			queueAutomaticMappingsRevision(identity, anilistId);
 		}
 		return stored;
 	},

@@ -36,6 +36,8 @@ interface SeerrCardActionProps {
 	mediaType: SeerrMediaType | null;
 	isConfigured: boolean;
 	observeTarget?: Element | null | undefined;
+	/** Hold the status fetch while the card's provider route is still loading. */
+	statusBlocked?: boolean | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
 	onOpenModal: () => void;
 }
@@ -181,6 +183,7 @@ export function SeerrCardStackActions({
 	onOpenModal,
 	stackDirection = "up",
 	presentation,
+	statusBlocked,
 }: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrMediaAction({
@@ -190,6 +193,7 @@ export function SeerrCardStackActions({
 		mediaType,
 		isConfigured,
 		enabled: isInViewport,
+		statusBlocked: statusBlocked === true,
 		onOpenModal,
 	});
 
@@ -268,6 +272,7 @@ export function SeerrStandaloneCardOverlay({
 	onOpenModal,
 	extraAction,
 	presentation,
+	statusBlocked,
 }: SeerrStandaloneCardOverlayProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrMediaAction({
@@ -277,6 +282,7 @@ export function SeerrStandaloneCardOverlay({
 		mediaType,
 		isConfigured,
 		enabled: isInViewport,
+		statusBlocked: statusBlocked === true,
 		onOpenModal,
 	});
 

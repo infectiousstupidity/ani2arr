@@ -3,6 +3,7 @@
 import { browser } from "wxt/browser";
 import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import { createStorageReadCache } from "@/shared/storage-read-cache";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import { isUpstreamMappingRecord, type MappingRecord, type UpstreamMappingRecord } from "./mapping-record";
 import {
@@ -31,6 +32,14 @@ const upstreamMappings = storage.defineItem<UpstreamSnapshot | null>(
 	"local:mapping:upstream",
 	{ fallback: null },
 );
+
+const snapshotCache = createStorageReadCache<UpstreamSnapshot | null>({
+	keys: { local: [UPSTREAM_KEY] },
+	load: async () => {
+		const stored = await browser.storage.local.get(UPSTREAM_KEY);
+		return currentSnapshot(stored[UPSTREAM_KEY]);
+	},
+});
 
 let writes: Promise<void> = Promise.resolve();
 
@@ -122,8 +131,12 @@ export async function migrateUpstreamStore(): Promise<boolean> {
 		.then(async () => {
 			const { [UPSTREAM_KEY]: raw } =
 				await browser.storage.local.get(UPSTREAM_KEY);
-			if (raw == null || (isObject(raw) && raw.version === 1)) return false;
+			if (raw == null || (isObject(raw) && raw.version === 1)) {
+				snapshotCache.prime(currentSnapshot(raw));
+				return false;
+			}
 			await browser.storage.local.remove(UPSTREAM_KEY);
+			snapshotCache.prime(null);
 			return true;
 		});
 	writes = next.then(
@@ -137,39 +150,36 @@ export async function refreshUpstreamMappings(): Promise<boolean> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const stored = await browser.storage.local.get(UPSTREAM_KEY);
-			const rawStored = stored[UPSTREAM_KEY];
-			const previous = currentSnapshot(rawStored);
-			const hasVersionedSnapshot =
-				isObject(rawStored) && rawStored.version === 1;
+			const previous = await readSnapshot();
 			if (
-				hasVersionedSnapshot &&
 				previous &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
 				return false;
 			}
 			const result = await downloadAniBridgeMappings({
-				...(hasVersionedSnapshot && previous?.etag
-					? { etag: previous.etag }
-					: {}),
+				...(previous?.etag ? { etag: previous.etag } : {}),
 			});
 			if (result.status === "not-modified") {
 				if (!previous)
 					throw new Error("AniBridge returned 304 without stored entries.");
-				await upstreamMappings.setValue({ ...previous, fetchedAt: Date.now() });
+				const refreshed = { ...previous, fetchedAt: Date.now() };
+				await upstreamMappings.setValue(refreshed);
+				snapshotCache.prime(refreshed);
 				return false;
 			}
 
 			const records = result.parsed.records;
 			const changed =
 				JSON.stringify(previous?.records ?? {}) !== JSON.stringify(records);
-			await upstreamMappings.setValue({
+			const snapshot: UpstreamSnapshot = {
 				version: 1,
 				records,
 				fetchedAt: Date.now(),
 				...(result.etag ? { etag: result.etag } : {}),
-			});
+			};
+			await upstreamMappings.setValue(snapshot);
+			snapshotCache.prime(snapshot);
 			return changed;
 		});
 	writes = next.then(
@@ -182,7 +192,10 @@ export async function refreshUpstreamMappings(): Promise<boolean> {
 export async function clearUpstreamMappings(): Promise<void> {
 	const next = writes
 		.catch(() => {})
-		.then(() => upstreamMappings.setValue(null));
+		.then(async () => {
+			await upstreamMappings.setValue(null);
+			snapshotCache.prime(null);
+		});
 	writes = next.then(
 		() => {},
 		() => {},
@@ -190,9 +203,8 @@ export async function clearUpstreamMappings(): Promise<void> {
 	await next;
 }
 
-async function readSnapshot(): Promise<UpstreamSnapshot | null> {
-	const stored = await browser.storage.local.get(UPSTREAM_KEY);
-	return currentSnapshot(stored[UPSTREAM_KEY]);
+function readSnapshot(): Promise<UpstreamSnapshot | null> {
+	return snapshotCache.read();
 }
 
 export async function readSnapshotRecords(): Promise<

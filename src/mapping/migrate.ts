@@ -2,10 +2,12 @@
 
 import {
 	consolidateAutomaticAliases,
+	hasAutomaticAliasRecords,
 	migrateAutomaticStore,
 } from "./auto.store";
 import {
 	consolidateManualAliases,
+	hasManualAliasRecords,
 	migrateManualStore,
 } from "./manual.store";
 import {
@@ -16,18 +18,20 @@ import {
 export async function migrateMappingStorage(): Promise<boolean> {
 	const deletedUpstream = await migrateUpstreamStore();
 	await Promise.all([migrateManualStore(), migrateAutomaticStore()]);
-	const aliases = await getSourceAliasesByAniListId();
-	await Promise.all([
-		consolidateManualAliases(aliases),
-		consolidateAutomaticAliases(aliases),
-	]);
+	await consolidateMappingAliases();
 	return deletedUpstream;
 }
 
 export async function consolidateMappingAliases(): Promise<void> {
+	const [manual, automatic] = await Promise.all([
+		hasManualAliasRecords(),
+		hasAutomaticAliasRecords(),
+	]);
+	// Building the alias map walks every upstream record; skip it when no store has aliases.
+	if (!manual && !automatic) return;
 	const aliases = await getSourceAliasesByAniListId();
 	await Promise.all([
-		consolidateManualAliases(aliases),
-		consolidateAutomaticAliases(aliases),
+		manual ? consolidateManualAliases(aliases) : undefined,
+		automatic ? consolidateAutomaticAliases(aliases) : undefined,
 	]);
 }

@@ -17,6 +17,8 @@ import {
 	type TvdbId,
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
+import { createStorageReadCache } from "@/shared/storage-read-cache";
 import {
 	isAutomaticMappingRecord,
 	type AutomaticAttemptLane,
@@ -53,6 +55,38 @@ const autoMappings = storage.defineItem<MappingStore<AutomaticMappingRecord>>(
 	"local:mapping:auto",
 	{ fallback: { version: 1, records: {} } },
 );
+
+type AutomaticStoreState = {
+	/** Valid records only. Read-only: writers copy it from `json`. */
+	store: MappingStore<AutomaticMappingRecord>;
+	/** `JSON.stringify(store)`, kept so each write serializes the store once. */
+	json: string;
+	/** Storage still holds malformed records that the next write drops. */
+	hasMalformedRecords: boolean;
+};
+
+const automaticStateCache = createStorageReadCache<AutomaticStoreState>({
+	keys: { local: [AUTO_KEY] },
+	load: async () => {
+		const { [AUTO_KEY]: stored } = await browser.storage.local.get(AUTO_KEY);
+		const store: MappingStore<AutomaticMappingRecord> = isMappingStore(stored)
+			? stored
+			: { version: 1, records: {} };
+		const hasMalformedRecords = discardMalformedRecords(store);
+		return { store, json: JSON.stringify(store), hasMalformedRecords };
+	},
+	onListenerLost: () => {
+		dirtyState = null;
+		cancelScheduledFlush();
+	},
+});
+
+// Every storage.local write sends the whole old and new store to every tab with a
+// storage.onChanged listener. Resolver bursts therefore keep the latest state here
+// and persist it at most once per AUTOMATIC_FLUSH_DELAY_MS.
+const AUTOMATIC_FLUSH_DELAY_MS = 1000;
+let dirtyState: AutomaticStoreState | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 let writes: Promise<void> = Promise.resolve();
 let automaticWriteToken = 0;
@@ -230,8 +264,16 @@ export async function migrateAutomaticStore(): Promise<void> {
 		const keys: string[] = [];
 		if (stored[AUTO_KEY] != null && !isMappingStore(stored[AUTO_KEY])) keys.push(AUTO_KEY);
 		if (stored[LEGACY_SEERR_AUTO_KEY] !== undefined) keys.push(LEGACY_SEERR_AUTO_KEY);
-		if (keys.length > 0) await browser.storage.local.remove(keys);
+		if (keys.length === 0) return;
+		await browser.storage.local.remove(keys);
+		automaticStateCache.clear();
 	});
+}
+
+/** True when some record is keyed by a non-AniList source and may need consolidation. */
+export async function hasAutomaticAliasRecords(): Promise<boolean> {
+	const { store } = await readAutomaticStore();
+	return Object.keys(store.records).some((key) => !key.startsWith("anilist:"));
 }
 
 export async function consolidateAutomaticAliases(
@@ -270,24 +312,20 @@ export async function clearAutoResults(): Promise<void> {
 	await updateAutomaticStore((store) => {
 		store.records = {};
 	});
+	await flushAutomaticStore();
 }
 
 async function updateAutomaticStore(
 	update: (store: MappingStore<AutomaticMappingRecord>) => void,
 ): Promise<void> {
 	await enqueueAutomaticStoreUpdate(async () => {
-		const { store: stored } = await readAutomaticStore();
-		const store = structuredClone(stored);
-		const before = JSON.stringify(store);
-		discardMalformedRecords(store);
-		update(store);
-		if (JSON.stringify(store) === before) return;
-		for (const [key, record] of Object.entries(store.records)) {
-			if (isEmptyRecord(record)) delete store.records[key];
-		}
-		if (JSON.stringify(store) === before) return;
-		await persistAutomaticStore(store);
+		await applyAutomaticStoreUpdate(await readAutomaticStore(), update);
 	});
+}
+
+/** Persists pending automatic results now. Clears and resets use this path. */
+export async function flushAutomaticStore(): Promise<void> {
+	await enqueueAutomaticStoreUpdate(persistDirtyState);
 }
 
 async function updateAutomaticStoreGuarded(
@@ -295,27 +333,75 @@ async function updateAutomaticStoreGuarded(
 	update: (store: MappingStore<AutomaticMappingRecord>) => void,
 ): Promise<boolean> {
 	return enqueueAutomaticStoreUpdate(async () => {
-		const { store: stored } = await readAutomaticStore();
-		const store = structuredClone(stored);
-		const before = JSON.stringify(store);
+		const state = await readAutomaticStore();
 		if (token !== automaticWriteToken) return false;
-		discardMalformedRecords(store);
-		update(store);
-		if (JSON.stringify(store) === before) return true;
-		for (const [key, record] of Object.entries(store.records)) {
-			if (isEmptyRecord(record)) delete store.records[key];
-		}
-		if (JSON.stringify(store) !== before) {
-			await persistAutomaticStore(store);
-		}
+		await applyAutomaticStoreUpdate(state, update);
 		return true;
 	});
 }
 
-function discardMalformedRecords(store: MappingStore<AutomaticMappingRecord>): void {
+// Serializes the store once per write instead of cloning and stringifying it repeatedly.
+async function applyAutomaticStoreUpdate(
+	state: AutomaticStoreState,
+	update: (store: MappingStore<AutomaticMappingRecord>) => void,
+): Promise<void> {
+	const store = JSON.parse(state.json) as MappingStore<AutomaticMappingRecord>;
+	update(store);
+	let after = JSON.stringify(store);
+	if (after === state.json && !state.hasMalformedRecords) return;
+	let removedEmpty = false;
 	for (const [key, record] of Object.entries(store.records)) {
-		if (!isAutomaticMappingRecord(record)) delete store.records[key];
+		if (!isEmptyRecord(record)) continue;
+		delete store.records[key];
+		removedEmpty = true;
 	}
+	if (removedEmpty) after = JSON.stringify(store);
+	if (after === state.json && !state.hasMalformedRecords) return;
+	// Parse the JSON so in-memory state matches a fresh read (storage drops undefined).
+	dirtyState = {
+		store: JSON.parse(after) as MappingStore<AutomaticMappingRecord>,
+		json: after,
+		hasMalformedRecords: false,
+	};
+	scheduleFlush();
+}
+
+function scheduleFlush(): void {
+	if (flushTimer !== null) return;
+	flushTimer = setTimeout(() => {
+		flushTimer = null;
+		flushAutomaticStore().catch((error) => {
+			logError(normalizeError(error), "AutomaticStore:flush");
+		});
+	}, AUTOMATIC_FLUSH_DELAY_MS);
+}
+
+function cancelScheduledFlush(): void {
+	if (flushTimer === null) return;
+	clearTimeout(flushTimer);
+	flushTimer = null;
+}
+
+// Runs inside the write queue, so no update can interleave.
+async function persistDirtyState(): Promise<void> {
+	const state = dirtyState;
+	if (!state) return;
+	cancelScheduledFlush();
+	await autoMappings.setValue(state.store);
+	dirtyState = null;
+	automaticStateCache.prime(state);
+}
+
+function discardMalformedRecords(
+	store: MappingStore<AutomaticMappingRecord>,
+): boolean {
+	let discarded = false;
+	for (const [key, record] of Object.entries(store.records)) {
+		if (isAutomaticMappingRecord(record)) continue;
+		delete store.records[key];
+		discarded = true;
+	}
+	return discarded;
 }
 
 async function enqueueAutomaticStoreUpdate<Result>(
@@ -329,17 +415,10 @@ async function enqueueAutomaticStoreUpdate<Result>(
 	return next;
 }
 
-async function persistAutomaticStore(
-	store: MappingStore<AutomaticMappingRecord>,
-): Promise<void> {
-	await autoMappings.setValue(store);
-}
-
-async function readAutomaticStore(): Promise<{
-	store: MappingStore<AutomaticMappingRecord>;
-}> {
-	const { [AUTO_KEY]: stored } = await browser.storage.local.get(AUTO_KEY);
-	return { store: isMappingStore(stored) ? stored : { version: 1, records: {} } };
+async function readAutomaticStore(): Promise<AutomaticStoreState> {
+	// Read first: it detects a reset browser and drops stale pending state.
+	const stored = await automaticStateCache.read();
+	return dirtyState ?? stored;
 }
 
 function activeRecord(

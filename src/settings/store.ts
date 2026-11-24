@@ -2,6 +2,7 @@
 
 import { storage } from "wxt/utils/storage";
 import * as v from "valibot";
+import { createStorageReadCache } from "@/shared/storage-read-cache";
 import { stripSonarrFormStateForDefaults } from "@/providers/sonarr/form-state";
 import { stripRadarrFormStateForDefaults } from "@/providers/radarr/form-state";
 import type { SeerrConnection } from "@/providers/seerr/types";
@@ -116,6 +117,27 @@ const privateConnectionsStorage = storage.defineItem<PrivateConnections>(
 	},
 );
 
+// Background reads settings several times per status RPC; decode once per change.
+// Callers must not mutate the returned snapshot.
+const extensionOptionsCache = createStorageReadCache<ExtensionOptions>({
+	keys: {
+		local: [
+			PUBLIC_OPTIONS_STORAGE_KEY.replace(/^local:/, ""),
+			PRIVATE_CONNECTIONS_STORAGE_KEY.replace(/^local:/, ""),
+		],
+	},
+	load: async () => {
+		const [storedPublicOptions, storedPrivateConnections] = await Promise.all([
+			publicOptions.getValue(),
+			privateConnectionsStorage.getValue(),
+		]);
+		return combineExtensionOptions(
+			parsePublicOptions(storedPublicOptions),
+			parsePrivateConnections(storedPrivateConnections),
+		);
+	},
+});
+
 function parsePublicOptions(raw: unknown): PublicOptions {
 	return v.parse(PublicOptionsSchema, raw);
 }
@@ -145,7 +167,9 @@ function preparePublicOptionsForStorage(options: PublicOptions): PublicOptions {
 }
 
 async function writePublicOptions(options: PublicOptions): Promise<void> {
+	extensionOptionsCache.clear();
 	await publicOptions.setValue(preparePublicOptionsForStorage(options));
+	extensionOptionsCache.clear();
 }
 
 function hasMatchingConnectionStatus(
@@ -175,7 +199,9 @@ async function syncPublicConnectionStatus(
 async function writeConnectionState(
 	connections: PrivateConnections,
 ): Promise<void> {
+	extensionOptionsCache.clear();
 	await privateConnectionsStorage.setValue(connections);
+	extensionOptionsCache.clear();
 	await syncPublicConnectionStatus(connections);
 }
 
@@ -306,16 +332,8 @@ export async function initializeSettingsStorage(): Promise<void> {
 	await removeLegacyConnectionStorage();
 }
 
-export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
-	const [storedPublicOptions, storedPrivateConnections] = await Promise.all([
-		publicOptions.getValue(),
-		privateConnectionsStorage.getValue(),
-	]);
-
-	return combineExtensionOptions(
-		parsePublicOptions(storedPublicOptions),
-		parsePrivateConnections(storedPrivateConnections),
-	);
+export function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
+	return extensionOptionsCache.read();
 }
 
 export async function savePublicOptionsSnapshot(
@@ -374,6 +392,8 @@ export function watchExtensionOptionsSnapshot(
 	callback: (snapshot: ExtensionOptions) => void | Promise<void>,
 ): () => void {
 	const refresh = () => {
+		// This listener can run before the cache's own change listener.
+		extensionOptionsCache.clear();
 		void getExtensionOptionsSnapshot().then(callback);
 	};
 	const unsubscribes = [

@@ -1,7 +1,7 @@
 /** React Query hooks for AniList media and metadata RPC reads. */
 // src/queries/anilist.ts
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { AniListId, AniListMedia } from "@/anilist/types";
 import { getAni2arrApi } from "@/rpc";
 import type { ExtensionError } from "@/shared/errors/error.types";
@@ -45,6 +45,8 @@ export const useAniListMetadataBatch = (
 			});
 		},
 		enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
+		// Keep metadata for already-rendered cards while a grown ID list loads.
+		placeholderData: keepPreviousData,
 		staleTime: 12 * 60 * 60 * 1000,
 		gcTime: 24 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

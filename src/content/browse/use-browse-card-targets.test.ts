@@ -11,6 +11,7 @@ import {
 } from "./types";
 import {
 	cleanupBrowseCardTargets,
+	isRelevantBrowseMutation,
 	scanBrowseCardTargets,
 } from "./use-browse-card-targets";
 
@@ -132,5 +133,44 @@ describe("scanBrowseCardTargets", () => {
 
 		expect([...statusCell.children]).toEqual([nativeButton]);
 		expect(statusCell.dataset.a2aProcessed).toBeUndefined();
+	});
+
+	it("rescans only for mutations that can change parsed cards", async () => {
+		const card = createCard(1);
+		const [target] = scanBrowseCardTargets({ adapter: createAdapter() });
+		if (!target) throw new Error("Expected target");
+		const outside = document.createElement("div");
+		document.body.append(outside);
+
+		const records: MutationRecord[] = [];
+		const observer = new MutationObserver((batch) => records.push(...batch));
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["href"],
+			characterData: true,
+		});
+		const relevantAfter = async (mutate: () => void): Promise<boolean> => {
+			records.length = 0;
+			mutate();
+			await Promise.resolve();
+			return records.some((record) => isRelevantBrowseMutation(record, ".card"));
+		};
+
+		// Overlay portal renders and their container never trigger a rescan.
+		expect(await relevantAfter(() => target.container.append("status"))).toBe(false);
+		expect(await relevantAfter(() => getCover(card).append(document.createElement("div")))).toBe(true);
+		expect(
+			await relevantAfter(() => {
+				target.container.remove();
+				getCover(card).append(target.container);
+			}),
+		).toBe(false);
+		// Host changes outside cards are ignored unless they add or remove cards.
+		expect(await relevantAfter(() => outside.append("feed item"))).toBe(false);
+		expect(await relevantAfter(() => createCard(2))).toBe(true);
+		expect(await relevantAfter(() => getCover(card).setAttribute("href", "/anime/3"))).toBe(true);
+		observer.disconnect();
 	});
 });

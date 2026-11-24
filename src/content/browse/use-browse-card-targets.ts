@@ -122,11 +122,17 @@ function ensurePlacementContainer(input: {
 	const existing = findPlacementContainer(input.parsed.mountTarget);
 	const container =
 		existing ?? input.parsed.mountTarget.ownerDocument.createElement("div");
+	const corner = input.adapter.anchorCorner ?? "bottom-left";
+	const presentation = input.parsed.presentation ?? "poster-overlay";
 
-	container.className = BROWSE_OVERLAY_CONTAINER_CLASS;
-	container.dataset.corner = input.adapter.anchorCorner ?? "bottom-left";
-	container.dataset.presentation =
-		input.parsed.presentation ?? "poster-overlay";
+	// Rescans run often; skip same-value writes so they cause no style work.
+	if (container.className !== BROWSE_OVERLAY_CONTAINER_CLASS) {
+		container.className = BROWSE_OVERLAY_CONTAINER_CLASS;
+	}
+	if (container.dataset.corner !== corner) container.dataset.corner = corner;
+	if (container.dataset.presentation !== presentation) {
+		container.dataset.presentation = presentation;
+	}
 
 	if (!existing) {
 		if (input.parsed.presentation === "status-column") {
@@ -199,6 +205,52 @@ function targetsEqual(
 	return true;
 }
 
+const ELEMENT_NODE = 1;
+
+function asElement(node: Node | null): Element | null {
+	return node?.nodeType === ELEMENT_NODE ? (node as Element) : null;
+}
+
+function isOverlayContainer(node: Node): boolean {
+	return (
+		asElement(node)?.classList.contains(BROWSE_OVERLAY_CONTAINER_CLASS) === true
+	);
+}
+
+function containsCards(node: Node, cardSelector: string): boolean {
+	const element = asElement(node);
+	if (!element || isOverlayContainer(element)) return false;
+	return (
+		element.matches(cardSelector) || element.querySelector(cardSelector) !== null
+	);
+}
+
+/**
+ * Whether a mutation can change the parsed cards. Overlay portal renders, tooltips,
+ * and host changes outside cards (feeds, timers) do not, so they skip the rescan.
+ */
+export function isRelevantBrowseMutation(
+	record: MutationRecord,
+	cardSelector: string,
+): boolean {
+	const target = asElement(record.target) ?? record.target.parentElement;
+	if (!target) return false;
+	if (target.closest(`.${BROWSE_OVERLAY_CONTAINER_CLASS}`)) return false;
+
+	const changedNodes = [...record.addedNodes, ...record.removedNodes];
+	if (target.closest(cardSelector)) {
+		return (
+			record.type !== "childList" ||
+			changedNodes.some((node) => !isOverlayContainer(node))
+		);
+	}
+
+	return (
+		record.type === "childList" &&
+		changedNodes.some((node) => containsCards(node, cardSelector))
+	);
+}
+
 export function scanBrowseCardTargets(
 	options: BrowseCardTargetOptions,
 ): BrowseCardTarget[] {
@@ -220,10 +272,10 @@ export function scanBrowseCardTargets(
 			adapter: options.adapter,
 		});
 
-		parsed.mountTarget.setAttribute(
-			BROWSE_PROCESSED_ATTRIBUTE,
-			sourceIdentityKey(parsed.source),
-		);
+		const sourceKey = sourceIdentityKey(parsed.source);
+		if (parsed.mountTarget.getAttribute(BROWSE_PROCESSED_ATTRIBUTE) !== sourceKey) {
+			parsed.mountTarget.setAttribute(BROWSE_PROCESSED_ATTRIBUTE, sourceKey);
+		}
 
 		targetsByMountTarget.set(parsed.mountTarget, {
 			key: getCardSignature(parsed),
@@ -295,7 +347,19 @@ function createBrowseCardTargetStore(
 			}
 
 			const observerRoot = getObserverRoot(options.adapter);
-			const observer = observerRoot ? new MutationObserver(scheduleScan) : null;
+			const cardSelector = options.adapter.cardSelector;
+			const observer = observerRoot
+				? new MutationObserver((records) => {
+						if (frameId !== null || timeoutId !== null) return;
+						if (
+							records.some((record) =>
+								isRelevantBrowseMutation(record, cardSelector),
+							)
+						) {
+							scheduleScan();
+						}
+					})
+				: null;
 
 			observer?.observe(observerRoot as Node, BROWSE_MUTATION_OBSERVER_INIT);
 			scan();

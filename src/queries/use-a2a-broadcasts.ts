@@ -11,6 +11,7 @@ import {
 import {
 	MAPPINGS_REVISION_CHANGE_KEY,
 	RADARR_LIBRARY_REVISION_CHANGE_KEY,
+	readMappingsRevisionScope,
 	SONARR_LIBRARY_REVISION_CHANGE_KEY,
 } from "@/rpc/revision-signals";
 
@@ -31,8 +32,12 @@ export function useA2aBroadcasts(): void {
 				invalidateAfterProviderLibraryChange(queryClient, "radarr");
 			}
 
-			if (changes[MAPPINGS_REVISION_CHANGE_KEY]) {
-				invalidateAfterMappingsRevision(queryClient);
+			const mappingsChange = changes[MAPPINGS_REVISION_CHANGE_KEY];
+			if (mappingsChange) {
+				invalidateAfterMappingsRevision(
+					queryClient,
+					readMappingsRevisionScope(mappingsChange.newValue),
+				);
 			}
 		};
 

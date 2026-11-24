@@ -5,11 +5,17 @@ import {
 	anilistMetadataStore,
 	mappingService,
 } from "@/background/api-services";
-import { setAutoResult } from "@/mapping/auto.store";
+import { flushAutomaticStore, setAutoResult } from "@/mapping/auto.store";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { mappingHandlers } from "./mapping.handlers";
 import { sonarrHandlers } from "./sonarr.handlers";
+
+// Automatic results persist in the background after a short delay; flush before raw reads.
+async function readPersisted(keys: string | string[]) {
+	await flushAutomaticStore();
+	return browser.storage.local.get(keys);
+}
 
 const automaticResolverMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
@@ -266,7 +272,7 @@ describe("source identity mapping boundary", () => {
 			}),
 		);
 
-		const stored = await browser.storage.local.get("mapping:auto");
+		const stored = await readPersisted("mapping:auto");
 		const automatic = stored["mapping:auto"] as {
 			records: Record<string, unknown>;
 		};

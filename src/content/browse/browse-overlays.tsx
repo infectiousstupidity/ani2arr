@@ -108,7 +108,7 @@ export function BrowseOverlays({
 		enabled: overlaysEnabled,
 	});
 	const mappedIdentitiesById = useMemo(
-		() => getMappedIdentitiesByAniListId(mappingIdentities.data ?? []),
+		() => getMappedIdentitiesByAniListId(mappingIdentities.data),
 		[mappingIdentities.data],
 	);
 	const metadataById = useMemo(
@@ -141,6 +141,10 @@ export function BrowseOverlays({
 							target.parsed.anilistId === undefined
 								? null
 								: (metadataById.get(target.parsed.anilistId) ?? null)
+						}
+						routePending={
+							target.parsed.anilistId !== undefined &&
+							mappingIdentities.pendingIds.has(target.parsed.anilistId)
 						}
 						onOpenMediaModal={mediaModal.open}
 						tooltipContainer={null}

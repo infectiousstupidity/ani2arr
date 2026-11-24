@@ -1,7 +1,13 @@
 /** React Query hooks for mapping-related RPC reads and mutations. */
 // src/queries/mapping.ts
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import { invalidateAfterMappingChange } from "@/queries/invalidation";
 import { getAni2arrApi } from "@/rpc";
@@ -9,8 +15,8 @@ import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
-	GetMappingIdentitiesOutput,
 	GetMappingInspectionOutput,
+	MappingIdentity,
 	MappingListGroup,
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
@@ -19,6 +25,7 @@ import type {
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
+import { createBatchLoader } from "@/shared/utils/batch-loader";
 import {
 	normalizeMappingInspectionRequest,
 	normalizeMetadataIds,
@@ -112,19 +119,45 @@ export const useMappings = () =>
 		refetchOnWindowFocus: false,
 	});
 
+// One RPC per render pass: per-ID queries started together share a request.
+const mappingIdentityLoader = createBatchLoader<AniListId, MappingIdentity[]>({
+	keyOf: (id) => id,
+	windowMs: 0,
+	loadMany: async (ids) => {
+		const identities = await getAni2arrApi().getMappingIdentities(ids);
+		return ids.map((id) =>
+			identities.filter((identity) => identity.anilistId === id),
+		);
+	},
+});
+
+/**
+ * Mapping identities cached per AniList ID, so a new browse batch fetches only
+ * its new IDs and already-rendered cards keep their data.
+ */
 export const useMappingIdentities = (
 	ids: readonly AniListId[],
 	options?: { enabled?: boolean },
-) => {
+): { data: MappingIdentity[]; pendingIds: ReadonlySet<AniListId> } => {
 	const normalizedIds = normalizeMetadataIds(ids);
-	return useQuery<GetMappingIdentitiesOutput, ExtensionError>({
-		queryKey: queryKeys.mappingIdentities(normalizedIds),
-		queryFn: () => getAni2arrApi().getMappingIdentities(normalizedIds),
-		enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
-		staleTime: 10 * 60 * 1000,
-		gcTime: 60 * 60 * 1000,
-		refetchOnWindowFocus: false,
+	const enabled = options?.enabled ?? true;
+	const results = useQueries({
+		queries: normalizedIds.map((id) => ({
+			queryKey: queryKeys.mappingIdentity(id),
+			queryFn: () => mappingIdentityLoader.load(id),
+			enabled,
+			staleTime: 10 * 60 * 1000,
+			gcTime: 60 * 60 * 1000,
+			refetchOnWindowFocus: false,
+		})),
 	});
+	const data: MappingIdentity[] = [];
+	const pendingIds = new Set<AniListId>();
+	for (const [index, result] of results.entries()) {
+		if (result.data) data.push(...result.data);
+		else if (enabled && result.isPending) pendingIds.add(normalizedIds[index]!);
+	}
+	return { data, pendingIds };
 };
 
 export const useSourceAniListIdMap = (
@@ -135,6 +168,8 @@ export const useSourceAniListIdMap = (
 		queryKey: queryKeys.sourceAniListIds(sources),
 		queryFn: () => getAni2arrApi().resolveAniListIdsForSources([...sources]),
 		enabled: (options?.enabled ?? true) && sources.length > 0,
+		// Keep resolved cards stable while a grown source list loads.
+		placeholderData: keepPreviousData,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

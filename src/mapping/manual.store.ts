@@ -17,6 +17,7 @@ import {
 	type TvdbId,
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
+import { createStorageReadCache } from "@/shared/storage-read-cache";
 import {
 	createMappingRecord,
 	type MappingStore,
@@ -54,6 +55,25 @@ const manualMappings = storage.defineItem<MappingStore<ManualMappingRecord>>(
 	{ fallback: { version: 1, records: {} } },
 );
 
+type ManualStoreState = {
+	store: MappingStore<ManualMappingRecord>;
+	hasLegacyData: boolean;
+};
+
+// Decoded once per context; treat as read-only and clone before mutating.
+const manualStateCache = createStorageReadCache<ManualStoreState>({
+	keys: {
+		local: [
+			MANUAL_KEY,
+			LEGACY_SEERR_KEY,
+			V1_LOCAL_OVERRIDE_KEY,
+			V1_LOCAL_IGNORE_KEY,
+		],
+		sync: [V1_SYNC_OVERRIDE_KEY, V1_SYNC_IGNORE_KEY],
+	},
+	load: loadManualStoreState,
+});
+
 let writes: Promise<void> = Promise.resolve();
 
 export async function getManualLayerRecord(
@@ -85,18 +105,9 @@ export async function listAniListManualLayers(): Promise<ManualRecord[]> {
 export async function readManualRecords(): Promise<
 	(key: string) => ManualMappingRecord | undefined
 > {
-	const [local, sync] = await readManualStorage();
-	const current = local[MANUAL_KEY];
-	if (!isMappingStore(current)) {
-		const { records } = decodeManualStore(local, sync);
-		return (key) => records[key];
-	}
-	return (key) => {
-		const record = Object.hasOwn(current.records, key)
-			? current.records[key]
-			: undefined;
-		return isObject(record) ? normalizeManualRecord(record) : undefined;
-	};
+	const { store } = await readManualStoreState();
+	return (key) =>
+		Object.hasOwn(store.records, key) ? store.records[key] : undefined;
 }
 
 export async function setManualMapping(
@@ -293,6 +304,12 @@ export async function migrateManualStore(): Promise<void> {
 	await updateManualStore(() => {});
 }
 
+/** True when some record is keyed by a non-AniList source and may need consolidation. */
+export async function hasManualAliasRecords(): Promise<boolean> {
+	const { store } = await readManualStoreState();
+	return Object.keys(store.records).some((key) => !key.startsWith("anilist:"));
+}
+
 export async function consolidateManualAliases(
 	aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>,
 ): Promise<void> {
@@ -321,8 +338,13 @@ export async function clearManualFacts(): Promise<void> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			await manualMappings.setValue({ version: 1, records: {} });
+			const store: MappingStore<ManualMappingRecord> = {
+				version: 1,
+				records: {},
+			};
+			await manualMappings.setValue(store);
 			await removeLegacyManualKeys();
+			manualStateCache.prime({ store, hasLegacyData: false });
 		});
 	writes = next.then(
 		() => {},
@@ -337,12 +359,23 @@ async function updateManualStore(
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const { store, hasLegacyData } = await readManualStoreState();
+			const state = await readManualStoreState();
+			const store = structuredClone(state.store);
 			const before = JSON.stringify(store);
 			update(store);
-			if (!hasLegacyData && JSON.stringify(store) === before) return;
-			await manualMappings.setValue(store);
-			await removeLegacyManualKeys();
+			if (!state.hasLegacyData && JSON.stringify(store) === before) return;
+			try {
+				await manualMappings.setValue(store);
+				await removeLegacyManualKeys();
+			} catch (error) {
+				manualStateCache.clear();
+				throw error;
+			}
+			// Match what a fresh read decodes (normalized records).
+			manualStateCache.prime({
+				store: cloneMappingStore(store),
+				hasLegacyData: false,
+			});
 		});
 	writes = next.then(
 		() => {},
@@ -351,10 +384,11 @@ async function updateManualStore(
 	await next;
 }
 
-async function readManualStoreState(): Promise<{
-	store: MappingStore<ManualMappingRecord>;
-	hasLegacyData: boolean;
-}> {
+function readManualStoreState(): Promise<ManualStoreState> {
+	return manualStateCache.read();
+}
+
+async function loadManualStoreState(): Promise<ManualStoreState> {
 	const [local, sync] = await readManualStorage();
 	return {
 		store: decodeManualStore(local, sync),

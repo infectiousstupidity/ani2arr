@@ -38,6 +38,8 @@ export interface BrowseCardOverlayProps {
 	publicOptions: PublicOptions | undefined;
 	mappedIdentities: readonly MappingIdentity[];
 	metadata: MetadataHint;
+	/** The card's mapping identities are still loading, so its route may change. */
+	routePending: boolean;
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	tooltipContainer: HTMLElement | ShadowRoot | null;
 }
@@ -253,6 +255,7 @@ export function BrowseCardOverlay({
 	publicOptions,
 	mappedIdentities,
 	metadata,
+	routePending,
 	onOpenMediaModal,
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
@@ -358,6 +361,7 @@ export function BrowseCardOverlay({
 			onOpenModal={handleOpenSeerrModal}
 			stackDirection={stackDirection}
 			presentation={parsed.presentation}
+			statusBlocked={routePending}
 		/>
 	) : null;
 
@@ -378,6 +382,7 @@ export function BrowseCardOverlay({
 		stackDirection,
 		tooltipContainer,
 		presentation: parsed.presentation,
+		statusBlocked: routePending,
 	};
 
 	if (showSeerrMain) {
@@ -395,6 +400,7 @@ export function BrowseCardOverlay({
 				onOpenModal={handleOpenSeerrModal}
 				extraAction={arrStackAction}
 				presentation={parsed.presentation}
+				statusBlocked={routePending}
 			/>
 		);
 	}

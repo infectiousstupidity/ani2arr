@@ -46,6 +46,7 @@ function createOverlay(
 		publicOptions,
 		mappedIdentities,
 		metadata: null,
+		routePending: false,
 		onOpenMediaModal: () => {},
 		tooltipContainer: null,
 	});
