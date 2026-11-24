@@ -59,7 +59,9 @@ type LibraryHarness = {
 	refresh(credentials: ProviderCredentials): Promise<unknown[]>;
 	clear(): Promise<void>;
 	nonForcedStatus(): Promise<LibraryStatus>;
-	upsert(): Promise<boolean>;
+	upsert(credentials?: ProviderCredentials): Promise<boolean>;
+	upsertOther(): Promise<boolean>;
+	remove(): Promise<boolean>;
 	status(
 		providerId: number,
 		onCacheChanged: () => void,
@@ -162,8 +164,11 @@ function createSonarrHarness(): LibraryHarness {
 				tvdbId: entity.tvdbId,
 				credentials,
 			}),
-		upsert: () =>
-			library.upsertSeriesSnapshot(toSonarrSeriesSnapshot(entity), credentials),
+		upsert: (inputCredentials = credentials) =>
+			library.upsertSeriesSnapshot(toSonarrSeriesSnapshot(entity), inputCredentials),
+		upsertOther: () =>
+			library.upsertSeriesSnapshot(toSonarrSeriesSnapshot(otherEntity), equivalentCredentials),
+		remove: () => library.removeSeriesSnapshot(entity.tvdbId, credentials),
 		status: (providerId, onCacheChanged) =>
 			library.getSeriesLibraryStatusByTvdbId({
 				tvdbId: parseTvdbId(providerId),
@@ -235,8 +240,11 @@ function createRadarrHarness(): LibraryHarness {
 				tmdbId: entity.tmdbId,
 				credentials,
 			}),
-		upsert: () =>
-			library.upsertMovieSnapshot(toRadarrMovieSnapshot(entity), credentials),
+		upsert: (inputCredentials = credentials) =>
+			library.upsertMovieSnapshot(toRadarrMovieSnapshot(entity), inputCredentials),
+		upsertOther: () =>
+			library.upsertMovieSnapshot(toRadarrMovieSnapshot(otherEntity), equivalentCredentials),
+		remove: () => library.removeMovieSnapshot(entity.tmdbId, credentials),
 		status: (providerId, onCacheChanged) =>
 			library.getMovieLibraryStatusByTmdbId({
 				tmdbId: parseTmdbId(providerId),
@@ -255,7 +263,145 @@ const libraryCases: ReadonlyArray<{
 	{ name: "Radarr", create: createRadarrHarness },
 ];
 
+function pauseNextWrite(cache: MemoryCache) {
+	const started = createDeferred<void>();
+	const finish = createDeferred<void>();
+	vi.mocked(cache.write).mockImplementationOnce(async (...args) => {
+		started.resolve();
+		await finish.promise;
+		await cache.write(...args);
+	});
+	return { started: started.promise, resume: () => finish.resolve() };
+}
+
 describe("Arr library cache contract", () => {
+	describe.each(libraryCases)("$name snapshot races", ({ create }) => {
+		it("keeps both concurrent additions on a warm cache", async () => {
+			const harness = create();
+			await harness.cache.write(harness.cacheKey, [], CACHE_TTL);
+			await harness.getSnapshots(harness.credentials);
+			const write = pauseNextWrite(harness.cache);
+
+			const first = harness.upsert();
+			await write.started;
+			const second = harness.upsertOther();
+			write.resume();
+
+			await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+			const expected = [harness.snapshot, harness.otherSnapshot];
+			expect(harness.cache.value(harness.cacheKey)).toEqual(expected);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(expected);
+		});
+
+		it("does not resurrect an entry removed during an upsert", async () => {
+			const harness = create();
+			await harness.cache.write(harness.cacheKey, [harness.snapshot], CACHE_TTL);
+			await harness.getSnapshots(harness.credentials);
+			const write = pauseNextWrite(harness.cache);
+
+			const upsert = harness.upsertOther();
+			await write.started;
+			const remove = harness.remove();
+			write.resume();
+
+			await expect(Promise.all([upsert, remove])).resolves.toEqual([true, true]);
+			expect(harness.cache.value(harness.cacheKey)).toEqual([harness.otherSnapshot]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
+				harness.otherSnapshot,
+			]);
+		});
+
+		it.each(["successful", "failed"])(
+			"keeps a newer upsert when a %s refresh finishes",
+			async (outcome) => {
+				const harness = create();
+				await harness.cache.write(harness.cacheKey, [harness.snapshot], CACHE_TTL);
+				await harness.getSnapshots(harness.credentials);
+				const started = createDeferred<void>();
+				const finish = createDeferred<void>();
+				harness.fetchAll.mockImplementationOnce(async () => {
+					started.resolve();
+					await finish.promise;
+					if (outcome === "failed") throw new Error("unavailable");
+					return [harness.entity];
+				});
+
+				const refresh = harness.refresh(harness.credentials);
+				await started.promise;
+				await expect(harness.upsertOther()).resolves.toBe(true);
+				finish.resolve();
+				const expected = [harness.snapshot, harness.otherSnapshot];
+				await expect(refresh).resolves.toEqual(expected);
+				expect(harness.cache.value(harness.cacheKey)).toEqual(expected);
+				await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(expected);
+				expect(harness.cache.write).toHaveBeenCalledTimes(2);
+			},
+		);
+
+		it("clears an in-flight write and discards a queued mutation", async () => {
+			const harness = create();
+			await harness.cache.write(harness.cacheKey, [], CACHE_TTL);
+			const write = pauseNextWrite(harness.cache);
+
+			const first = harness.upsert();
+			await write.started;
+			const second = harness.upsertOther();
+			const clear = harness.clear();
+			write.resume();
+
+			await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+			await clear;
+			expect(harness.cache.keys()).toEqual([]);
+			harness.fetchAll.mockResolvedValue([]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([]);
+			expect(harness.fetchAll).toHaveBeenCalledOnce();
+		});
+
+		it("recovers after a write failure without blocking another connection", async () => {
+			const harness = create();
+			await harness.cache.write(harness.cacheKey, [], CACHE_TTL);
+			await harness.cache.write(harness.otherCacheKey, [], CACHE_TTL);
+			const started = createDeferred<void>();
+			const finish = createDeferred<void>();
+			vi.mocked(harness.cache.write).mockImplementationOnce(async () => {
+				started.resolve();
+				await finish.promise;
+				throw new Error("storage unavailable");
+			});
+
+			const failed = expect(harness.upsert()).rejects.toThrow("storage unavailable");
+			await started.promise;
+			const queued = harness.upsertOther();
+			await expect(harness.upsert(harness.otherCredentials)).resolves.toBe(true);
+			finish.resolve();
+
+			await failed;
+			await expect(queued).resolves.toBe(true);
+			expect(harness.cache.value(harness.cacheKey)).toEqual([harness.otherSnapshot]);
+			expect(harness.cache.value(harness.otherCacheKey)).toEqual([harness.snapshot]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
+				harness.otherSnapshot,
+			]);
+		});
+
+		it("lets a refresh callback mutate and refresh the same connection", async () => {
+			const harness = create();
+			harness.fetchAll
+				.mockResolvedValueOnce([harness.entity])
+				.mockResolvedValueOnce([harness.entity, harness.otherEntity]);
+			harness.onChanged.mockImplementationOnce(async () => {
+				await harness.upsertOther();
+				await harness.refresh(harness.credentials);
+			});
+
+			await harness.refresh(harness.credentials);
+			const expected = [harness.snapshot, harness.otherSnapshot];
+			expect(harness.cache.value(harness.cacheKey)).toEqual(expected);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(expected);
+			expect(harness.fetchAll).toHaveBeenCalledTimes(2);
+		});
+	});
+
 	it.each(libraryCases)(
 		"reports unknown after a cold $name refresh failure",
 		async ({ create }) => {

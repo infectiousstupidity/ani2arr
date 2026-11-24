@@ -2,6 +2,7 @@
 // src/providers/radarr/library.ts
 
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
+import { KeyedTaskQueue } from "@/shared/cache/keyed-task-queue";
 import {
 	createTtlCache,
 	type CacheHit,
@@ -46,9 +47,13 @@ export class RadarrLibrary {
 		string,
 		CacheHit<RadarrMovieSnapshot[]>
 	>();
-	private readonly refreshPromises = new Map<
+	private readonly cacheQueue = new KeyedTaskQueue();
+	private readonly refreshes = new Map<
 		string,
-		Promise<RadarrMovieSnapshot[]>
+		{
+			promise: Promise<RadarrMovieSnapshot[]>;
+			latestMutation: RadarrMovieSnapshot[] | undefined;
+		}
 	>();
 	private cacheGeneration = 0;
 	private clearPromise: Promise<void> | null = null;
@@ -65,33 +70,31 @@ export class RadarrLibrary {
 		if (this.clearPromise) await this.clearPromise;
 
 		const scope = getProviderConnectionScope(credentials);
-		const cacheKey = `${CACHE_KEY}:${scope}`;
 		const generation = this.cacheGeneration;
-		const memoryCache = this.memoryCache.get(scope);
-		const now = Date.now();
+		const memory = this.getUnexpiredMemory(scope);
+		const cached =
+			memory ??
+			(await this.cacheQueue.run(scope, async () => {
+				if (generation !== this.cacheGeneration) return null;
+				const current = this.getUnexpiredMemory(scope);
+				if (current) return current;
 
-		if (memoryCache && now < memoryCache.expiresAt) {
-			if (now >= memoryCache.staleAt) {
-				// Stale cache is good enough for status; refresh quietly for the next read.
-				void this.refreshMovieSnapshots(credentials).catch(() => {});
-			}
-
-			return memoryCache.value;
-		}
-
-		this.memoryCache.delete(scope);
-		const cached = await this.cache.read(cacheKey);
+				this.memoryCache.delete(scope);
+				const stored = await this.cache.read(`${CACHE_KEY}:${scope}`);
+				if (stored && generation === this.cacheGeneration) {
+					this.memoryCache.set(scope, stored);
+				}
+				return stored;
+			}));
 		if (generation !== this.cacheGeneration) {
 			return this.getMovieSnapshots(credentials);
 		}
 		if (!cached) return this.refreshMovieSnapshots(credentials);
 
-		this.memoryCache.set(scope, cached);
-		if (cached.stale) {
+		if (Date.now() >= cached.staleAt) {
 			// Stale cache is good enough for status; refresh quietly for the next read.
 			void this.refreshMovieSnapshots(credentials).catch(() => {});
 		}
-
 		return cached.value;
 	}
 
@@ -101,67 +104,79 @@ export class RadarrLibrary {
 		if (this.clearPromise) await this.clearPromise;
 
 		const scope = getProviderConnectionScope(credentials);
-		const existingRefresh = this.refreshPromises.get(scope);
-		if (existingRefresh) return existingRefresh;
+		const existingRefresh = this.refreshes.get(scope);
+		if (existingRefresh) return existingRefresh.promise;
 
 		const cacheKey = `${CACHE_KEY}:${scope}`;
 		const generation = this.cacheGeneration;
-		const refreshPromise = (async () => {
-			const cached = await this.cache.read(cacheKey);
-			const fallback = cached?.value ?? [];
+		let changed = false;
+		const refresh = {
+			latestMutation: undefined as RadarrMovieSnapshot[] | undefined,
+			promise: (async (): Promise<RadarrMovieSnapshot[]> => {
+				const cached = await this.cache.read(cacheKey);
+				const result = await this.client
+					.getAllMovies(credentials)
+					.then((movies) => ({
+						snapshots: movies
+							.filter(
+								(movie) =>
+									typeof movie.tmdbId === "number" && Number.isFinite(movie.tmdbId),
+							)
+							.map((movie) => toRadarrMovieSnapshot(movie)),
+					}))
+					.catch((error: unknown) => ({ error }));
 
-			try {
-				const movies = await this.client.getAllMovies(credentials);
-				const snapshots = movies
-					.filter(
-						(movie) =>
-							typeof movie.tmdbId === "number" && Number.isFinite(movie.tmdbId),
-					)
-					.map((movie) => toRadarrMovieSnapshot(movie));
+				return this.cacheQueue.run(scope, async () => {
+					// A mutation committed while the network request was pending.
+					if (generation === this.cacheGeneration && refresh.latestMutation) {
+						return refresh.latestMutation;
+					}
 
-				if (generation !== this.cacheGeneration) return snapshots;
-				await this.cache.write(cacheKey, snapshots, CACHE_TTL.normal);
-				if (generation !== this.cacheGeneration) return snapshots;
-
-				this.setMemoryCache(scope, snapshots, CACHE_TTL.normal);
-				if (JSON.stringify(fallback) !== JSON.stringify(snapshots)) {
 					try {
-						await this.onSnapshotsChanged?.();
-					} catch (error) {
-						logError(
-							normalizeError(error),
-							"RadarrLibrary:snapshotChanged",
+						if ("error" in result) throw result.error;
+						const { snapshots } = result;
+						const written = await this.writeSnapshots(
+							scope,
+							snapshots,
+							CACHE_TTL.normal,
+							generation,
 						);
+						changed =
+							written &&
+							JSON.stringify(cached?.value ?? []) !== JSON.stringify(snapshots);
+						return snapshots;
+					} catch (error) {
+						const normalized = normalizeError(error);
+						logError(normalized, "RadarrLibrary:refreshMovieSnapshots");
+						if (!cached) throw normalized;
+						const ttl = {
+							...CACHE_TTL.error,
+							meta: { lastErrorCode: normalized.code },
+						};
+						await this.writeSnapshots(scope, cached.value, ttl, generation);
+						return cached.value;
 					}
-				}
+				});
+			})(),
+		};
+		this.refreshes.set(scope, refresh);
 
-				return snapshots;
-			} catch (error) {
-				const normalized = normalizeError(error);
-				logError(normalized, "RadarrLibrary:refreshMovieSnapshots");
-				if (!cached) throw normalized;
-				const ttl = {
-					...CACHE_TTL.error,
-					meta: { lastErrorCode: normalized.code },
-				};
-				if (generation === this.cacheGeneration) {
-					await this.cache.write(cacheKey, fallback, ttl);
-					if (generation === this.cacheGeneration) {
-						this.setMemoryCache(scope, fallback, ttl);
-					}
-				}
-				return fallback;
-			}
-		})();
-		this.refreshPromises.set(scope, refreshPromise);
-
+		let snapshots: RadarrMovieSnapshot[];
 		try {
-			return await refreshPromise;
+			snapshots = await refresh.promise;
 		} finally {
-			if (this.refreshPromises.get(scope) === refreshPromise) {
-				this.refreshPromises.delete(scope);
+			if (this.refreshes.get(scope) === refresh) this.refreshes.delete(scope);
+		}
+
+		// Notify after releasing the queue and coalesced refresh, so callbacks can re-enter.
+		if (changed && generation === this.cacheGeneration) {
+			try {
+				await this.onSnapshotsChanged?.();
+			} catch (error) {
+				logError(normalizeError(error), "RadarrLibrary:snapshotChanged");
 			}
 		}
+		return snapshots;
 	}
 
 	public async getMovieLibraryStatusByTmdbId(input: {
@@ -255,72 +270,28 @@ export class RadarrLibrary {
 		};
 	}
 
-	public async upsertMovieSnapshot(
+	public upsertMovieSnapshot(
 		snapshot: RadarrMovieSnapshot,
 		credentials: ProviderCredentials,
 	): Promise<boolean> {
-		if (this.clearPromise) await this.clearPromise;
-
-		const scope = getProviderConnectionScope(credentials);
-		const cacheKey = `${CACHE_KEY}:${scope}`;
-		const generation = this.cacheGeneration;
-		const memoryCache = this.memoryCache.get(scope);
-		const cached =
-			memoryCache && Date.now() < memoryCache.expiresAt
-				? memoryCache
-				: await this.cache.read(cacheKey);
-		if (generation !== this.cacheGeneration) return false;
-		if (!cached) return false;
-		const current = cached.value;
-		const existingIndex = current.findIndex(
-			(item) => item.tmdbId === snapshot.tmdbId,
-		);
-		const existingSnapshot = current[existingIndex];
-		if (
-			existingSnapshot !== undefined &&
-			JSON.stringify(existingSnapshot) === JSON.stringify(snapshot)
-		) {
-			return false;
-		}
-		const next =
-			existingIndex === -1
-				? [...current, snapshot]
-				: [
-						...current.slice(0, existingIndex),
-						snapshot,
-						...current.slice(existingIndex + 1),
-					];
-
-		await this.cache.write(cacheKey, next, CACHE_TTL.normal);
-		if (generation !== this.cacheGeneration) return false;
-		this.setMemoryCache(scope, next, CACHE_TTL.normal);
-		return true;
+		return this.mutateSnapshots(credentials, (current) => {
+			const index = current.findIndex((item) => item.tmdbId === snapshot.tmdbId);
+			if (index === -1) return [...current, snapshot];
+			if (JSON.stringify(current[index]) === JSON.stringify(snapshot)) {
+				return null;
+			}
+			return current.with(index, snapshot);
+		});
 	}
 
-	public async removeMovieSnapshot(
+	public removeMovieSnapshot(
 		tmdbId: TmdbId,
 		credentials: ProviderCredentials,
 	): Promise<boolean> {
-		if (this.clearPromise) await this.clearPromise;
-
-		const scope = getProviderConnectionScope(credentials);
-		const cacheKey = `${CACHE_KEY}:${scope}`;
-		const generation = this.cacheGeneration;
-		const memoryCache = this.memoryCache.get(scope);
-		const cached =
-			memoryCache && Date.now() < memoryCache.expiresAt
-				? memoryCache
-				: await this.cache.read(cacheKey);
-		if (generation !== this.cacheGeneration) return false;
-		if (!cached) return false;
-
-		const next = cached.value.filter((movie) => movie.tmdbId !== tmdbId);
-		if (next.length === cached.value.length) return false;
-
-		await this.cache.write(cacheKey, next, CACHE_TTL.normal);
-		if (generation !== this.cacheGeneration) return false;
-		this.setMemoryCache(scope, next, CACHE_TTL.normal);
-		return true;
+		return this.mutateSnapshots(credentials, (current) => {
+			const next = current.filter((movie) => movie.tmdbId !== tmdbId);
+			return next.length === current.length ? null : next;
+		});
 	}
 
 	public async clearMovieSnapshotCache(): Promise<void> {
@@ -328,23 +299,66 @@ export class RadarrLibrary {
 
 		this.cacheGeneration += 1;
 		this.memoryCache.clear();
-		this.refreshPromises.clear();
+		this.refreshes.clear();
 
-		const clearPromise = this.cache.clear().finally(() => {
-			this.memoryCache.clear();
-			if (this.clearPromise === clearPromise) {
+		// Finish outstanding storage operations before removing persisted snapshots.
+		const clearPromise = this.cacheQueue
+			.drain()
+			.then(() => this.cache.clear())
+			.finally(() => {
 				this.clearPromise = null;
-			}
-		});
+			});
 		this.clearPromise = clearPromise;
 		return clearPromise;
 	}
 
-	private setMemoryCache(
+	private async mutateSnapshots(
+		credentials: ProviderCredentials,
+		update: (current: readonly RadarrMovieSnapshot[]) => RadarrMovieSnapshot[] | null,
+	): Promise<boolean> {
+		if (this.clearPromise) await this.clearPromise;
+
+		const scope = getProviderConnectionScope(credentials);
+		const cacheKey = `${CACHE_KEY}:${scope}`;
+		const generation = this.cacheGeneration;
+		return this.cacheQueue.run(scope, async () => {
+			if (generation !== this.cacheGeneration) return false;
+			const cached =
+				this.getUnexpiredMemory(scope) ?? (await this.cache.read(cacheKey));
+			if (!cached || generation !== this.cacheGeneration) return false;
+			const next = update(cached.value);
+			if (!next) return false;
+
+			const written = await this.writeSnapshots(
+				scope,
+				next,
+				CACHE_TTL.normal,
+				generation,
+			);
+			if (!written || generation !== this.cacheGeneration) return false;
+			const refresh = this.refreshes.get(scope);
+			if (refresh) refresh.latestMutation = next;
+			return true;
+		});
+	}
+
+	private getUnexpiredMemory(
+		scope: string,
+	): CacheHit<RadarrMovieSnapshot[]> | undefined {
+		const memory = this.memoryCache.get(scope);
+		return memory && Date.now() < memory.expiresAt ? memory : undefined;
+	}
+
+	private async writeSnapshots(
 		scope: string,
 		value: RadarrMovieSnapshot[],
 		options: CacheWriteOptions,
-	): void {
+		generation: number,
+	): Promise<boolean> {
+		if (generation !== this.cacheGeneration) return false;
+		await this.cache.write(`${CACHE_KEY}:${scope}`, value, options);
+		if (generation !== this.cacheGeneration) return false;
+
 		const now = Date.now();
 		this.memoryCache.set(scope, {
 			value,
@@ -353,6 +367,7 @@ export class RadarrLibrary {
 			expiresAt: now + (options.hardMs ?? options.staleMs * 4),
 			...(options.meta ? { meta: options.meta } : {}),
 		});
+		return true;
 	}
 }
 
