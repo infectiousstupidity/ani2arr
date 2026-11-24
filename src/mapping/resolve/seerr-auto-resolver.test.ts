@@ -206,6 +206,22 @@ describe("Seerr automatic resolver", () => {
 		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
 	});
 
+	it("retries a title search after a metadata lookup fails", async () => {
+		const input = request("Perfect Blue", { format: "MOVIE" });
+		searchMedia.mockResolvedValueOnce([]).mockResolvedValue([movie()]);
+		loadAniListMedia.mockRejectedValueOnce(new Error("AniList unavailable"));
+
+		await expect(resolve(input)).resolves.toBeNull();
+		expect(searchMedia).toHaveBeenCalledExactlyOnceWith("Perfect Blue");
+		expect(loadAniListMedia).toHaveBeenCalledExactlyOnceWith(source.id);
+		expect(setAutoResult).not.toHaveBeenCalled();
+
+		await expect(resolve(input)).resolves.toMatchObject({
+			tmdbId: tmdb(10_494),
+		});
+		expect(searchMedia).toHaveBeenCalledTimes(2);
+	});
+
 	it("returns null when a mapped automatic write is rejected", async () => {
 		searchMedia.mockResolvedValue([movie()]);
 		setAutoResult.mockResolvedValue(false);
@@ -534,6 +550,12 @@ describe("Seerr automatic resolver", () => {
 
 	it("honours a cached miss even with new title and metadata hints", async () => {
 		searchMedia.mockResolvedValue([]);
+		loadAniListMedia.mockResolvedValue({
+			id: source.id,
+			format: "MOVIE",
+			title: { english: "Unknown anime" },
+			synonyms: [],
+		});
 
 		await expect(
 			resolve(request("Unknown anime", undefined, "movie")),

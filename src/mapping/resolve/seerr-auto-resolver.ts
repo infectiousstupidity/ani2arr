@@ -153,7 +153,7 @@ function inferExplicitSeason(titles: readonly string[]): number | undefined {
 async function loadEnrichedMedia(
 	input: SeerrAutoResolverInput,
 	dependencies: SeerrAutoResolverDependencies,
-): Promise<SearchMedia | null> {
+): Promise<SearchMedia | null | undefined> {
 	try {
 		if (input.source.source === "mal") {
 			return searchMediaFromHint({
@@ -163,7 +163,8 @@ async function loadEnrichedMedia(
 
 		return await dependencies.loadAniListMedia(input.source.id);
 	} catch {
-		return null;
+		// A failed lookup is not evidence that the title is unmapped.
+		return undefined;
 	}
 }
 
@@ -182,7 +183,8 @@ async function buildMatchedTarget(input: {
 		collectTitles(input.request, enrichedMedia),
 	);
 	if (inferredSeason === undefined && enrichedMedia === null) {
-		enrichedMedia = await loadEnrichedMedia(input.request, input.dependencies);
+		enrichedMedia =
+			(await loadEnrichedMedia(input.request, input.dependencies)) ?? null;
 		inferredSeason = inferExplicitSeason(
 			collectTitles(input.request, enrichedMedia),
 		);
@@ -262,10 +264,11 @@ export function createSeerrAutoResolver(
 					searchMedia: dependencies.searchMedia,
 				})
 			: null;
-		let enrichedMedia: SearchMedia | null = null;
+		let enrichedMedia: SearchMedia | null | undefined = null;
 
 		if (!match) {
 			enrichedMedia = await loadEnrichedMedia(input, dependencies);
+			if (enrichedMedia === undefined) return null;
 			if (enrichedMedia) {
 				match = await searchSeerrCandidate({
 					media: enrichedMedia,

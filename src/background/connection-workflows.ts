@@ -22,7 +22,7 @@ import {
 import type { ExtensionOptions } from "@/settings/types";
 import { logError, normalizeError } from "@/shared/errors/error-utils";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
-import { refreshProviderLibrary } from "./api-services";
+import { refreshProviderLibrary, seerrClient } from "./api-services";
 import { refreshMappingPipeline } from "./mapping-refresh";
 
 async function attempt(effect: () => Promise<unknown>, scope: string) {
@@ -104,6 +104,7 @@ export async function commitSeerrConnection(
 	const savedConnection = getSeerrConnection(savedOptions);
 	if (sameSeerrConnection(previousConnection, savedConnection)) return;
 
+	seerrClient.clearMediaCache();
 	await refreshMappings(savedOptions);
 	await attempt(
 		() =>

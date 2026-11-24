@@ -16,6 +16,7 @@ const cleanupUnusedProviderHostPermissionMock = vi.hoisted(() => vi.fn());
 const removeSeerrCsrfCookiePermissionMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 const refreshProviderLibraryMock = vi.hoisted(() => vi.fn());
+const clearSeerrMediaCacheMock = vi.hoisted(() => vi.fn());
 const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
 const logErrorMock = vi.hoisted(() => vi.fn());
 
@@ -33,6 +34,7 @@ vi.mock("@/settings/provider-permissions", () => ({
 
 vi.mock("./api-services", () => ({
 	refreshProviderLibrary: refreshProviderLibraryMock,
+	seerrClient: { clearMediaCache: clearSeerrMediaCacheMock },
 }));
 
 vi.mock("@/rpc/revision-signals", () => ({
@@ -184,6 +186,7 @@ describe("connection workflows", () => {
 
 		await commitSeerrConnection(testCase.saved);
 
+		expect(clearSeerrMediaCacheMock).toHaveBeenCalledOnce();
 		expect(removeSeerrCsrfCookiePermissionMock).toHaveBeenCalledTimes(
 			testCase.removesCookiePermission ? 1 : 0,
 		);
