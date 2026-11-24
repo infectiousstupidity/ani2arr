@@ -199,7 +199,7 @@ describe("api services", () => {
 	});
 
 	it.each([false, true])(
-		"bumps the revision for a removed Seerr match only when stored is %s",
+		"does not bump the revision for a Seerr miss when stored is %s",
 		async (stored) => {
 			vi.useFakeTimers();
 			getSeerrAutoResultMock.mockResolvedValue({
@@ -216,7 +216,7 @@ describe("api services", () => {
 			);
 
 			await vi.runAllTimersAsync();
-			expect(bumpMappingsRevision).toHaveBeenCalledTimes(stored ? 1 : 0);
+			expect(bumpMappingsRevision).not.toHaveBeenCalled();
 		},
 	);
 

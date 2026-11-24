@@ -82,6 +82,16 @@ describe("auto mapping store", () => {
 		await expect(getAutomaticLayerRecord(aid(1))).resolves.toMatchObject({ facts: { tmdbMovie: 10 } });
 	});
 
+	it("preserves a Radarr movie mapping when Seerr misses", async () => {
+		const identity = { source: "anilist", id: aid(1) } as const;
+		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, { kind: "mapped", providerId: tmdb(10) });
+		await setSeerrAutoResult(captureAutomaticWriteToken(), identity, "movie", { kind: "unmapped" });
+		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
+			facts: { tmdbMovie: tmdb(10) },
+			attempts: { seerrTmdbMovie: expect.anything() },
+		});
+	});
+
 	it("ignores expired results without deleting them on read", async () => {
 		const identity = { source: "anilist", id: aid(1) } as const;
 		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, {

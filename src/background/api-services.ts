@@ -177,13 +177,9 @@ export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
 		mappingService.getSeerrMappingOutcome(identity, mediaType, anilistId),
 	getAutoResult: getSeerrAutoResult,
 	setAutoResult: async (...args) => {
-		const [, identity, mediaType, result, anilistId] = args;
-		const previous =
-			result.kind === "unmapped"
-				? await getSeerrAutoResult(identity, mediaType, anilistId)
-				: null;
+		const [, identity, , result, anilistId] = args;
 		const stored = await setSeerrAutoResult(...args);
-		if (stored && (result.kind === "mapped" || previous?.kind === "mapped")) {
+		if (stored && result.kind === "mapped") {
 			queueAutomaticMappingsRevision(identity, anilistId);
 		}
 		return stored;

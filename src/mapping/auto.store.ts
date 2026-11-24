@@ -163,12 +163,12 @@ export async function setAutoResult(
 		const record = getMutableRecord(store, identity, anilistId);
 		const slot = provider === "sonarr" ? "tvdbShow" : "tmdbMovie";
 		const lane = provider === "sonarr" ? "sonarrTvdb" : "radarrTmdbMovie";
-		clearSlot(record, slot);
 		delete record.attempts?.[lane];
 		if (result.kind === "unmapped") {
 			setAttempt(record, lane, Date.now() + ATTEMPT_TTL_MS);
 			return;
 		}
+		clearSlot(record, slot);
 		if (provider === "sonarr") {
 			const id = parseTvdbIdOrNull(result.providerId);
 			if (id === null) throw new Error("Invalid automatic Sonarr target.");
@@ -233,12 +233,12 @@ export async function setSeerrAutoResult(
 		const record = getMutableRecord(store, identity, anilistId);
 		const slot = mediaType === "movie" ? "tmdbMovie" : "tmdbShow";
 		const lane = mediaType === "movie" ? "seerrTmdbMovie" : "seerrTmdbShow";
-		clearSlot(record, slot);
 		delete record.attempts?.[lane];
 		if (result.kind === "unmapped") {
 			setAttempt(record, lane, Date.now() + ATTEMPT_TTL_MS);
 			return;
 		}
+		clearSlot(record, slot);
 		const target = normalizeSeerrTarget(result.target);
 		if (!target || target.mediaType !== mediaType) {
 			throw new Error("Invalid automatic Seerr target.");

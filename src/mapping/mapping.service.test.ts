@@ -9,11 +9,13 @@ import {
 	captureAutomaticWriteToken,
 	clearAutoResults,
 	setAutoResult,
+	setSeerrAutoResult,
 } from "./auto.store";
 import {
 	clearManualFacts,
 	clearManualMapping,
 	clearManualSeerrTarget,
+	rejectAutoCandidate,
 	setManualMapping,
 	setManualSeerrTarget,
 } from "./manual.store";
@@ -80,6 +82,27 @@ describe("MappingService", () => {
 			source: "upstream",
 			providerId: tmdb(10),
 		});
+	});
+
+	it("preserves the Seerr movie when a rejected Radarr retry misses", async () => {
+		const source = { source: "anilist", id: aid(1) } as const;
+		await setSeerrAutoResult(captureAutomaticWriteToken(), source, "movie", {
+			kind: "mapped",
+			target: { mediaType: "movie", tmdbId: tmdb(10) },
+		});
+		await rejectAutoCandidate("radarr", source, tmdb(10));
+		const service = new MappingService(async ({ writeToken, provider, identity }) =>
+			setAutoResult(writeToken, provider, identity, { kind: "unmapped" }),
+		);
+		await expect(
+			service.resolveMapping("radarr", source, source.id, { forceRetry: true }),
+		).resolves.toMatchObject({ kind: "unmapped" });
+		await expect(
+			service.getSeerrTarget(source, "movie", source.id),
+		).resolves.toMatchObject({ tmdbId: tmdb(10) });
+		await expect(
+			service.getMapping("radarr", source, source.id),
+		).resolves.toMatchObject({ kind: "unmapped" });
 	});
 
 	it("stores and reuses an automatic result for an unlinked MAL source", async () => {
