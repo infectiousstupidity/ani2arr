@@ -12,6 +12,7 @@ import { normalizeError } from "@/shared/errors/error-utils";
 import type { ProviderFormResources } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
+import type { PublicOptionsUpdate } from "@/settings/schema";
 import type {
 	GetAniListMetadataOutput,
 	GetMyAnimeListMetadataOutput,
@@ -42,7 +43,6 @@ import type {
 	GetAniListMetadataInput,
 	ProviderConnectionTestInput,
 	SaveProviderConnectionInput,
-	SavePublicOptionsInput,
 	SaveSeerrConnectionInput,
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
@@ -77,7 +77,7 @@ export interface Ani2arrApi {
 	updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
 	fetchAniListMedia(anilistId: AniListId): Promise<AniListMedia | null>;
 	getMappingIdentities(ids: AniListId[]): Promise<MappingIdentity[]>;
-	savePublicOptions(input: SavePublicOptionsInput): Promise<{ ok: true }>;
+	updatePublicOptions(input: PublicOptionsUpdate): Promise<{ ok: true }>;
 	saveProviderConnection(
 		input: SaveProviderConnectionInput,
 	): Promise<{ ok: true }>;

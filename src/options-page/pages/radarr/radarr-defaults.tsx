@@ -16,9 +16,8 @@ import {
   RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
   RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/providers/radarr/form-options";
-import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import { usePublicOptions, useUpdatePublicOptions } from "@/queries/options";
 import { useRadarrFormResources } from "@/queries/radarr";
-import type { PublicOptions } from "@/settings/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
@@ -167,7 +166,7 @@ const areRadarrDefaultsEqual = (
 
 export const RadarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
-  const saveOptions = useSavePublicOptions();
+  const saveOptions = useUpdatePublicOptions();
   const isConfigured = savedSettings?.providers.radarr.isConfigured === true;
 
   const { data: formResources, isFetching } = useRadarrFormResources({
@@ -190,7 +189,6 @@ export const RadarrDefaults = () => {
       initialValues={initialValues}
       isFetching={isFetching}
       resourceFieldsDisabled={resourceFieldsDisabled}
-      savedSettings={savedSettings}
       savedValues={savedValues}
       saveOptions={saveOptions}
     />
@@ -202,7 +200,6 @@ const RadarrDefaultsDraft = ({
   initialValues,
   isFetching,
   resourceFieldsDisabled,
-  savedSettings,
   savedValues,
   saveOptions,
 }: {
@@ -210,9 +207,8 @@ const RadarrDefaultsDraft = ({
   initialValues: RadarrFormState;
   isFetching: boolean;
   resourceFieldsDisabled: boolean;
-  savedSettings: PublicOptions;
   savedValues: RadarrFormState;
-  saveOptions: ReturnType<typeof useSavePublicOptions>;
+  saveOptions: ReturnType<typeof useUpdatePublicOptions>;
 }) => {
   const [values, setValues] = useState(() => cloneRadarrDefaults(initialValues));
   const hasDraftChanges = !areRadarrDefaultsEqual(values, initialValues);
@@ -248,16 +244,7 @@ const RadarrDefaultsDraft = ({
   };
 
   const saveDefaults = (): void => {
-    saveOptions.mutate({
-      ...savedSettings,
-      providers: {
-        ...savedSettings.providers,
-        radarr: {
-          ...savedSettings.providers.radarr,
-          defaults: values,
-        },
-      },
-    });
+    saveOptions.mutate({ type: "radarrDefaults", defaults: values });
   };
 
   return (

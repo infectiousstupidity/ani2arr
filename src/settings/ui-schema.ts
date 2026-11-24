@@ -19,7 +19,11 @@ const BROWSE_CARD_PRIMARY_STATUS_OPTIONS: [
 	...BrowseCardPrimaryStatus[],
 ] = ["arr", "seerr"];
 
-const AniListTitleLanguageSchema = v.picklist(ANILIST_TITLE_LANGUAGES);
+export const AniListTitleLanguageSchema = v.picklist(ANILIST_TITLE_LANGUAGES);
+export const BadgeVisibilitySchema = v.picklist(BADGE_VISIBILITY_OPTIONS);
+export const BrowseCardPrimaryStatusSchema = v.picklist(
+	BROWSE_CARD_PRIMARY_STATUS_OPTIONS,
+);
 
 const createDefaultBrowseCardUiOptions =
 	(): UiOptions["browseCards"]["sonarr"] => ({
@@ -55,7 +59,7 @@ const ProviderBrowseCardUiOptionsSchema = v.pipe(
 	v.transform(asRecord),
 	v.object({
 		enabled: v.fallback(v.boolean(), true),
-		visibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), "always"),
+		visibility: v.fallback(BadgeVisibilitySchema, "always"),
 	}),
 );
 
@@ -76,10 +80,7 @@ export const UiOptionsSchema = v.pipe(
 			"english",
 		),
 		browseCards: v.object({
-			primaryStatus: v.fallback(
-				v.picklist(BROWSE_CARD_PRIMARY_STATUS_OPTIONS),
-				"arr",
-			),
+			primaryStatus: v.fallback(BrowseCardPrimaryStatusSchema, "arr"),
 			sonarr: v.fallback(
 				ProviderBrowseCardUiOptionsSchema,
 				createDefaultBrowseCardUiOptions(),

@@ -8,7 +8,8 @@ import {
 	isAniListTitleLanguage,
 	type AniListTitleLanguage,
 } from "@/anilist/title";
-import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import { usePublicOptions, useUpdatePublicOptions } from "@/queries/options";
+import type { PublicOptionsUpdate } from "@/settings/schema";
 import type {
 	BadgeVisibility,
 	BrowseCardPrimaryStatus,
@@ -209,60 +210,26 @@ function AnimePageSwitch(props: {
 
 export const UiPage = (): React.JSX.Element | null => {
 	const { data: publicOptions } = usePublicOptions();
-	const saveOptions = useSavePublicOptions();
+	const saveOptions = useUpdatePublicOptions();
 	const uiOptions = publicOptions?.ui;
 	const isSaving = saveOptions.isPending;
 	const saveError = saveOptions.error
 		? getUserErrorMessage(saveOptions.error, "Failed to save UI settings.")
 		: null;
 
-	const updateSettings = (
-		updater: (current: PublicOptions) => PublicOptions,
-	): void => {
-		if (!publicOptions || isSaving) return;
-		saveOptions.mutate(updater(publicOptions));
+	const updateSettings = (update: PublicOptionsUpdate): void => {
+		if (!uiOptions || isSaving) return;
+		saveOptions.mutate(update);
 	};
 
-	const updateTitleLanguage = (language: string): void => {
-		if (!isAniListTitleLanguage(language)) return;
-
-		void updateSettings((current) => ({
-			...current,
-			ui: {
-				...current.ui,
-				preferredAniListTitleLanguage: language,
-			},
-		}));
+	const updateTitleLanguage = (value: string): void => {
+		if (!isAniListTitleLanguage(value)) return;
+		updateSettings({ type: "titleLanguage", value });
 	};
 
 	const updateBrowsePrimaryStatus = (value: string): void => {
-	if (!isBrowseCardPrimaryStatus(value)) return;
-
-	void updateSettings((current) => ({
-		...current,
-		ui: {
-			...current.ui,
-			browseCards: {
-				...current.ui.browseCards,
-				primaryStatus: value,
-			},
-		},
-	}));
-};
-	const updateBrowseProvider = (
-		provider: BrowseCardProvider,
-		patch: Partial<BrowseCardSettings>,
-	): void => {
-		void updateSettings((current) => ({
-			...current,
-			ui: {
-				...current.ui,
-				browseCards: {
-					...current.ui.browseCards,
-					[provider]: { ...current.ui.browseCards[provider], ...patch },
-				},
-			},
-		}));
+		if (!isBrowseCardPrimaryStatus(value)) return;
+		updateSettings({ type: "browseCardPrimaryStatus", value });
 	};
 
 	const updateBrowseProviderMode = (
@@ -270,15 +237,11 @@ export const UiPage = (): React.JSX.Element | null => {
 		mode: string,
 	): void => {
 		if (!isBrowseCardMode(mode)) return;
-
-		if (mode === "hidden") {
-			updateBrowseProvider(provider, { enabled: false });
-			return;
-		}
-
-		updateBrowseProvider(provider, {
-			enabled: true,
-			visibility: mode,
+		updateSettings({
+			type: "browseCard",
+			provider,
+			patch:
+				mode === "hidden" ? { enabled: false } : { enabled: true, visibility: mode },
 		});
 	};
 
@@ -286,16 +249,7 @@ export const UiPage = (): React.JSX.Element | null => {
 		provider: AnimePageProvider,
 		enabled: boolean,
 	): void => {
-		void updateSettings((current) => ({
-			...current,
-			ui: {
-				...current.ui,
-				animePages: {
-					...current.ui.animePages,
-					[provider]: { ...current.ui.animePages[provider], enabled },
-				},
-			},
-		}));
+		updateSettings({ type: "animePage", provider, enabled });
 	};
 
 	if (!uiOptions) return null;

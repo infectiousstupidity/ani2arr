@@ -3,8 +3,14 @@
 import { storage } from "wxt/utils/storage";
 import * as v from "valibot";
 import { createStorageReadCache } from "@/shared/storage-read-cache";
-import { stripSonarrFormStateForDefaults } from "@/providers/sonarr/form-state";
-import { stripRadarrFormStateForDefaults } from "@/providers/radarr/form-state";
+import {
+	normalizeSonarrDefaults,
+	stripSonarrFormStateForDefaults,
+} from "@/providers/sonarr/form-state";
+import {
+	normalizeRadarrDefaults,
+	stripRadarrFormStateForDefaults,
+} from "@/providers/radarr/form-state";
 import type { SeerrConnection } from "@/providers/seerr/types";
 import type {
 	Provider,
@@ -22,6 +28,8 @@ import {
 	LegacyProviderCredentialsSchema,
 	PrivateConnectionsSchema,
 	PublicOptionsSchema,
+	PublicOptionsUpdateSchema,
+	type PublicOptionsUpdate,
 	StoredPrivateConnectionsSchema,
 	createDefaultPrivateConnections,
 	createDefaultProviderConnection,
@@ -336,16 +344,78 @@ export function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
 	return extensionOptionsCache.read();
 }
 
-export async function savePublicOptionsSnapshot(
-	options: PublicOptions,
+export async function updatePublicOptions(
+	input: PublicOptionsUpdate,
 ): Promise<void> {
+	const update = v.parse(PublicOptionsUpdateSchema, input);
 	await enqueueConnectionWrite(async () => {
-		const connections = parsePrivateConnections(
-			await privateConnectionsStorage.getValue(),
-		);
-		await writePublicOptions(
-			withConnectionStatus(parsePublicOptions(options), connections),
-		);
+		const [options, storedConnections] = await Promise.all([
+			getPublicOptionsSnapshot(),
+			privateConnectionsStorage.getValue(),
+		]);
+		const connections = parsePrivateConnections(storedConnections);
+
+		const { providers, ui } = options;
+		switch (update.type) {
+			case "sonarrDefaults": {
+				options.providers = {
+					...providers,
+					sonarr: {
+						...providers.sonarr,
+						defaults: normalizeSonarrDefaults(update.defaults),
+					},
+				};
+				break;
+			}
+			case "radarrDefaults": {
+				options.providers = {
+					...providers,
+					radarr: {
+						...providers.radarr,
+						defaults: normalizeRadarrDefaults(update.defaults),
+					},
+				};
+				break;
+			}
+			case "titleLanguage": {
+				options.ui = { ...ui, preferredAniListTitleLanguage: update.value };
+				break;
+			}
+			case "browseCardPrimaryStatus": {
+				options.ui = {
+					...ui,
+					browseCards: { ...ui.browseCards, primaryStatus: update.value },
+				};
+				break;
+			}
+			case "browseCard": {
+				const { provider, patch } = update;
+				options.ui = {
+					...ui,
+					browseCards: {
+						...ui.browseCards,
+						[provider]: { ...ui.browseCards[provider], ...patch },
+					},
+				};
+				break;
+			}
+			case "animePage": {
+				options.ui = {
+					...ui,
+					animePages: {
+						...ui.animePages,
+						[update.provider]: { enabled: update.enabled },
+					},
+				};
+				break;
+			}
+			case "debugLogging": {
+				options.debugLogging = update.value;
+				break;
+			}
+		}
+
+		await writePublicOptions(withConnectionStatus(options, connections));
 	});
 }
 

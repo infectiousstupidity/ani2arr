@@ -12,13 +12,69 @@ import {
 	RadarrDefaultsSchema,
 } from "@/providers/radarr/form-state";
 import type { SeerrConnection } from "@/providers/seerr/types";
-import type { ProviderCredentials } from "@/providers/types";
+import { PROVIDERS, type ProviderCredentials } from "@/providers/types";
 import type {
 	ExtensionOptions,
 	PrivateConnections,
 	PublicOptions,
 } from "./types";
-import { createDefaultUiOptions, UiOptionsSchema } from "./ui-schema";
+import {
+	AniListTitleLanguageSchema,
+	BadgeVisibilitySchema,
+	BrowseCardPrimaryStatusSchema,
+	createDefaultUiOptions,
+	UiOptionsSchema,
+} from "./ui-schema";
+
+const UiProviderSchema = v.picklist([...PROVIDERS, "seerr"]);
+const FreeformTagsUpdateSchema = v.array(v.string());
+
+export const PublicOptionsUpdateSchema = v.variant("type", [
+	v.strictObject({
+		type: v.literal("sonarrDefaults"),
+		defaults: v.object({
+			...SonarrDefaultsSchema.entries,
+			freeformTags: FreeformTagsUpdateSchema,
+		}),
+	}),
+	v.strictObject({
+		type: v.literal("radarrDefaults"),
+		defaults: v.object({
+			...RadarrDefaultsSchema.entries,
+			freeformTags: FreeformTagsUpdateSchema,
+		}),
+	}),
+	v.strictObject({
+		type: v.literal("titleLanguage"),
+		value: AniListTitleLanguageSchema,
+	}),
+	v.strictObject({
+		type: v.literal("browseCardPrimaryStatus"),
+		value: BrowseCardPrimaryStatusSchema,
+	}),
+	v.strictObject({
+		type: v.literal("browseCard"),
+		provider: UiProviderSchema,
+		patch: v.pipe(
+			v.strictObject({
+				enabled: v.exactOptional(v.boolean()),
+				visibility: v.exactOptional(BadgeVisibilitySchema),
+			}),
+			v.minEntries(1),
+		),
+	}),
+	v.strictObject({
+		type: v.literal("animePage"),
+		provider: UiProviderSchema,
+		enabled: v.boolean(),
+	}),
+	v.strictObject({
+		type: v.literal("debugLogging"),
+		value: v.boolean(),
+	}),
+]);
+
+export type PublicOptionsUpdate = v.InferOutput<typeof PublicOptionsUpdateSchema>;
 
 const asRecord = (input: unknown): Record<string, unknown> =>
 	input && typeof input === "object" && !Array.isArray(input)

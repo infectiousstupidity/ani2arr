@@ -24,6 +24,7 @@ import {
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
 } from "../settings/store";
+import type { PublicOptionsUpdate } from "../settings/schema";
 import type { ExtensionOptions, PublicOptions } from "../settings/types";
 
 export function useOptionsQuerySync(): void {
@@ -113,11 +114,11 @@ function syncOptionsSnapshots(queryClient: QueryClient): void {
 	);
 }
 
-export const useSavePublicOptions = () => {
+export const useUpdatePublicOptions = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<{ ok: true }, ExtensionError, PublicOptions>({
-		mutationFn: (options) => getAni2arrApi().savePublicOptions(options),
+	return useMutation<{ ok: true }, ExtensionError, PublicOptionsUpdate>({
+		mutationFn: (update) => getAni2arrApi().updatePublicOptions(update),
 		onSuccess: () => {
 			void getPublicOptionsSnapshot().then(
 				(publicOptions) => {

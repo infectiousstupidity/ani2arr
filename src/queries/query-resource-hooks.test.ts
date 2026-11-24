@@ -6,6 +6,12 @@ import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { RequestInSeerrInput, StatusInput } from "@/rpc/types";
 import {
+	createDefaultPublicOptions,
+	type PublicOptionsUpdate,
+} from "@/settings/schema";
+import * as settingsStore from "@/settings/store";
+import { useUpdatePublicOptions } from "./options";
+import {
 	normalizeProviderLookupRequest,
 	normalizeSeerrMediaStatusRequest,
 	normalizeSeerrSearchRequest,
@@ -37,6 +43,7 @@ const mocks = vi.hoisted(() => ({
 		getSeerrMediaStatus: vi.fn(),
 		searchSonarr: vi.fn(),
 		searchSeerrMedia: vi.fn(),
+		updatePublicOptions: vi.fn(),
 	},
 }));
 
@@ -79,6 +86,35 @@ function capturedQuery(callIndex = -1): CapturedQuery {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+});
+
+it("sends a targeted options update and refreshes from the persisted snapshot", async () => {
+	const saved = createDefaultPublicOptions();
+	saved.ui.browseCards.primaryStatus = "seerr";
+	saved.ui.animePages.sonarr.enabled = false;
+	const update = {
+		type: "animePage",
+		provider: "sonarr",
+		enabled: false,
+	} satisfies PublicOptionsUpdate;
+	using readSaved = vi
+		.spyOn(settingsStore, "getPublicOptionsSnapshot")
+		.mockResolvedValue(saved);
+	mocks.api.updatePublicOptions.mockResolvedValueOnce({ ok: true });
+
+	useUpdatePublicOptions();
+	const mutation = mocks.useMutation.mock.lastCall?.[0];
+	const result = await mutation.mutationFn(update);
+	mutation.onSuccess(result, update);
+
+	expect(mocks.api.updatePublicOptions).toHaveBeenCalledExactlyOnceWith(update);
+	expect(readSaved).toHaveBeenCalled();
+	await vi.waitFor(() =>
+		expect(mocks.queryClient.setQueryData).toHaveBeenCalledWith(
+			queryKeys.publicOptions(),
+			saved,
+		),
+	);
 });
 
 describe("normalized query resource hooks", () => {

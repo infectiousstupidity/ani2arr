@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Bug, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
-import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import { usePublicOptions, useUpdatePublicOptions } from "@/queries/options";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import ConfirmDialog from "@/shared/ui/primitives/confirm-dialog";
@@ -14,7 +14,7 @@ import { useResetExtensionState } from "../hooks/use-reset-extension-state";
 
 export const AdvancedPage = () => {
 	const { data: publicOptions } = usePublicOptions();
-	const saveOptions = useSavePublicOptions();
+	const saveOptions = useUpdatePublicOptions();
 	const [showResetDialog, setShowResetDialog] = useState(false);
 	const {
 		resetExtensionState,
@@ -37,10 +37,7 @@ export const AdvancedPage = () => {
 
 	const updateDebugLogging = (checked: boolean): void => {
 		if (!publicOptions || saveOptions.isPending) return;
-		saveOptions.mutate({
-			...publicOptions,
-			debugLogging: checked,
-		});
+		saveOptions.mutate({ type: "debugLogging", value: checked });
 	};
 
 	return (

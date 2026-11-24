@@ -42,7 +42,6 @@ import type {
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
 import type { Provider, ProviderCredentials } from "@/providers/types";
-import type { PublicOptions } from "@/settings/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
@@ -250,8 +249,6 @@ export type OpenSeerrPageInput = {
 };
 
 export type OpenSeerrPageOutput = OpenProviderPageOutput;
-
-export type SavePublicOptionsInput = PublicOptions;
 
 export type SaveProviderConnectionInput = {
 	provider: Provider;

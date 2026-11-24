@@ -6,14 +6,15 @@ import {
 	initializeSettingsStorage,
 	resetAllSettingsSnapshot,
 	saveProviderConnectionSnapshot,
-	savePublicOptionsSnapshot,
 	saveSeerrConnectionSnapshot,
+	updatePublicOptions,
 	watchExtensionOptionsSnapshot,
 } from "@/settings/store";
 import {
 	createDefaultExtensionOptions,
 	createDefaultPrivateConnections,
 	createDefaultPublicOptions,
+	type PublicOptionsUpdate,
 } from "@/settings/schema";
 import type {
 	ExtensionOptions,
@@ -253,20 +254,94 @@ describe("options store helpers", () => {
 		});
 	});
 
-	it("derives connection state while saving public options", async () => {
-		await saveProviderConnectionSnapshot("sonarr", SONARR_CONNECTION);
+	it.each([false, true])(
+		"preserves concurrent defaults and UI saves (reverse: %s)",
+		async (reverse) => {
+			const original = createDefaultPublicOptions();
+			original.providers.radarr.defaults.rootFolderPath = "/movies";
+			await browser.storage.local.set({ [PUBLIC_OPTIONS_STORAGE_KEY]: original });
+			const edits: PublicOptionsUpdate[] = [
+				{
+					type: "sonarrDefaults",
+					defaults: { freeformTags: [], rootFolderPath: "/anime" },
+				},
+				{ type: "titleLanguage", value: "romaji" },
+			];
+			if (reverse) edits.reverse();
+			await Promise.all(edits.map((edit) => updatePublicOptions(edit)));
 
-		const publicOptions = await getPublicOptionsSnapshot();
-		publicOptions.providers.sonarr.isConfigured = false;
-		publicOptions.debugLogging = true;
-		await savePublicOptionsSnapshot(publicOptions);
+			const expected = createDefaultPublicOptions();
+			expected.providers.radarr.defaults.rootFolderPath = "/movies";
+			expected.providers.sonarr.defaults.rootFolderPath = "/anime";
+			expected.ui.preferredAniListTitleLanguage = "romaji";
+			await expect(
+				browser.storage.local.get(PUBLIC_OPTIONS_STORAGE_KEY),
+			).resolves.toEqual({ [PUBLIC_OPTIONS_STORAGE_KEY]: expected });
+		},
+	);
 
-		const snapshot = await getExtensionOptionsSnapshot();
-		const savedPublicOptions = await getPublicOptionsSnapshot();
+	it.each([false, true])(
+		"preserves concurrent browse card enabled and visibility saves (reverse: %s)",
+		async (reverse) => {
+			const edits: PublicOptionsUpdate[] = [
+				{ type: "browseCard", provider: "sonarr", patch: { enabled: false } },
+				{ type: "browseCard", provider: "sonarr", patch: { visibility: "hover" } },
+			];
+			if (reverse) edits.reverse();
+			await Promise.all(edits.map((edit) => updatePublicOptions(edit)));
 
-		expect(snapshot.debugLogging).toBe(true);
-		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
-		expect(savedPublicOptions.providers.sonarr.isConfigured).toBe(true);
+			const expected = createDefaultPublicOptions();
+			expected.ui.browseCards.sonarr = { enabled: false, visibility: "hover" };
+			await expect(
+				browser.storage.local.get(PUBLIC_OPTIONS_STORAGE_KEY),
+			).resolves.toEqual({ [PUBLIC_OPTIONS_STORAGE_KEY]: expected });
+		},
+	);
+
+	it.each([
+		{ type: "browseCard", provider: "sonarr", patch: { visibility: "hidden" } },
+		{ type: "browseCard", provider: "sonarr", patch: { enabled: undefined } },
+		{ type: "radarrDefaults", defaults: { freeformTags: [], rootFolderPath: 123 } },
+		{ type: "sonarrDefaults", defaults: { freeformTags: "anime" } },
+		{
+			type: "debugLogging",
+			value: true,
+			seerr: { isConfigured: true, authMode: "apiKey" },
+		},
+	])("rejects invalid public updates without writing: $type", async (input) => {
+		await expect(
+			updatePublicOptions(input as PublicOptionsUpdate),
+		).rejects.toThrow();
+		await expect(
+			browser.storage.local.get(PUBLIC_OPTIONS_STORAGE_KEY),
+		).resolves.toEqual({});
+	});
+
+	it("derives connection state from private storage during a public update", async () => {
+		const staleOptions = createDefaultPublicOptions();
+		staleOptions.providers.radarr.isConfigured = true;
+		const connections = createPrivateConnections({
+			sonarr: SONARR_CONNECTION,
+			seerr: SEERR_API_KEY_CONNECTION,
+		});
+		await browser.storage.local.set({
+			[PUBLIC_OPTIONS_STORAGE_KEY]: staleOptions,
+			[PRIVATE_CONNECTIONS_STORAGE_KEY]: connections,
+		});
+
+		await updatePublicOptions({ type: "debugLogging", value: true });
+
+		await expect(getPublicOptionsSnapshot()).resolves.toMatchObject({
+			debugLogging: true,
+			providers: {
+				sonarr: { isConfigured: true },
+				radarr: { isConfigured: false },
+			},
+			seerr: { isConfigured: true, authMode: "apiKey" },
+		});
+		await expect(
+			browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
+		).resolves.toEqual({ [PRIVATE_CONNECTIONS_STORAGE_KEY]: connections });
 	});
 
 	it("saving one Arr provider preserves the other private connections", async () => {
@@ -333,6 +408,7 @@ describe("options store helpers", () => {
 			[`${SONARR_SECRETS_STORAGE_KEY}$`]: { v: 1 },
 		});
 		await saveProviderConnectionSnapshot("sonarr", SONARR_CONNECTION);
+		await updatePublicOptions({ type: "debugLogging", value: true });
 
 		await resetAllSettingsSnapshot();
 

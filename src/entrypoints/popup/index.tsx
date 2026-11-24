@@ -11,11 +11,12 @@ import { createExtensionQueryClient } from "@/queries/query-client";
 import {
 	usePublicOptions,
 	usePublicOptionsQuerySync,
-	useSavePublicOptions,
+	useUpdatePublicOptions,
 } from "@/queries/options";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { PROVIDERS, type Provider } from "@/providers/types";
-import type { BadgeVisibility, PublicOptions } from "@/settings/types";
+import type { PublicOptionsUpdate } from "@/settings/schema";
+import type { BadgeVisibility } from "@/settings/types";
 import { cn } from "@/shared/utils/cn";
 import "./style.css";
 
@@ -68,7 +69,7 @@ export function QuickSettings(): React.JSX.Element {
 	usePublicOptionsQuerySync();
 
 	const publicOptionsQuery = usePublicOptions();
-	const saveOptions = useSavePublicOptions();
+	const saveOptions = useUpdatePublicOptions();
 	const [saveError, setSaveError] = useState<string | null>(null);
 
 	const publicSettings = publicOptionsQuery.data;
@@ -95,15 +96,13 @@ export function QuickSettings(): React.JSX.Element {
 	const hasAnyProviderConfigured =
 		isSonarrConfigured || isRadarrConfigured || isSeerrConfigured;
 
-	const updateSettings = async (
-		updater: (current: PublicOptions) => PublicOptions,
-	): Promise<void> => {
+	const updateSettings = async (update: PublicOptionsUpdate): Promise<void> => {
 		if (isSaving) return;
 
 		setSaveError(null);
 
 		try {
-			await saveOptions.mutateAsync(updater(publicSettings));
+			await saveOptions.mutateAsync(update);
 		} catch (error) {
 			setSaveError((error as Error)?.message ?? i18n.t("popup.saveError"));
 		}
@@ -113,64 +112,21 @@ export function QuickSettings(): React.JSX.Element {
 		provider: ConnectionId,
 		enabled: boolean,
 	): void => {
-		void updateSettings((current) => {
-			const currentSettings = current.ui.browseCards[provider];
-
-			return {
-				...current,
-				ui: {
-					...current.ui,
-					browseCards: {
-						...current.ui.browseCards,
-						[provider]: {
-							enabled,
-							visibility: currentSettings?.visibility ?? "hover",
-						},
-					},
-				},
-			};
-		});
+		void updateSettings({ type: "browseCard", provider, patch: { enabled } });
 	};
 
 	const setBrowseCardVisibility = (
 		provider: ConnectionId,
 		visibility: BadgeVisibility,
 	): void => {
-		void updateSettings((current) => {
-			const currentSettings = current.ui.browseCards[provider];
-
-			return {
-				...current,
-				ui: {
-					...current.ui,
-					browseCards: {
-						...current.ui.browseCards,
-						[provider]: {
-							enabled: currentSettings?.enabled ?? false,
-							visibility,
-						},
-					},
-				},
-			};
-		});
+		void updateSettings({ type: "browseCard", provider, patch: { visibility } });
 	};
 
 	const setAnimePageEnabled = (
 		provider: ConnectionId,
 		enabled: boolean,
 	): void => {
-		void updateSettings((current) => ({
-			...current,
-			ui: {
-				...current.ui,
-				animePages: {
-					...current.ui.animePages,
-					[provider]: {
-						enabled,
-					},
-				},
-			},
-		}));
+		void updateSettings({ type: "animePage", provider, enabled });
 	};
 
 	return (

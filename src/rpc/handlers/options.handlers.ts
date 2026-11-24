@@ -7,18 +7,18 @@ import {
 } from "@/background/connection-workflows";
 import type {
 	SaveProviderConnectionInput,
-	SavePublicOptionsInput,
 	SaveSeerrConnectionInput,
 } from "@/rpc/types";
-import { savePublicOptionsSnapshot } from "@/settings/store";
+import type { PublicOptionsUpdate } from "@/settings/schema";
+import { updatePublicOptions } from "@/settings/store";
 import { logger } from "@/shared/utils/logger";
 
 export const optionsHandlers = {
-	async savePublicOptions(input: SavePublicOptionsInput) {
-		await savePublicOptionsSnapshot(input);
-		logger.configure({
-			enabled: input.debugLogging || import.meta.env.DEV,
-		});
+	async updatePublicOptions(input: PublicOptionsUpdate) {
+		await updatePublicOptions(input);
+		if (input.type === "debugLogging") {
+			logger.configure({ enabled: input.value || import.meta.env.DEV });
+		}
 		return { ok: true as const };
 	},
 

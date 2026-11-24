@@ -18,9 +18,8 @@ import type {
   SonarrMonitorOption,
   SonarrSeriesType,
 } from "@/providers/sonarr/schemas";
-import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import { usePublicOptions, useUpdatePublicOptions } from "@/queries/options";
 import { useSonarrFormResources } from "@/queries/sonarr";
-import type { PublicOptions } from "@/settings/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
@@ -208,7 +207,7 @@ const areSonarrDefaultsEqual = (
 
 export const SonarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
-  const saveOptions = useSavePublicOptions();
+  const saveOptions = useUpdatePublicOptions();
   const isConfigured = savedSettings?.providers.sonarr.isConfigured === true;
 
   const { data: formResources, isFetching } = useSonarrFormResources({
@@ -231,7 +230,6 @@ export const SonarrDefaults = () => {
       initialValues={initialValues}
       isFetching={isFetching}
       resourceFieldsDisabled={resourceFieldsDisabled}
-      savedSettings={savedSettings}
       savedValues={savedValues}
       saveOptions={saveOptions}
     />
@@ -243,7 +241,6 @@ const SonarrDefaultsDraft = ({
   initialValues,
   isFetching,
   resourceFieldsDisabled,
-  savedSettings,
   savedValues,
   saveOptions,
 }: {
@@ -251,9 +248,8 @@ const SonarrDefaultsDraft = ({
   initialValues: SonarrFormState;
   isFetching: boolean;
   resourceFieldsDisabled: boolean;
-  savedSettings: PublicOptions;
   savedValues: SonarrFormState;
-  saveOptions: ReturnType<typeof useSavePublicOptions>;
+  saveOptions: ReturnType<typeof useUpdatePublicOptions>;
 }) => {
   const [values, setValues] = useState(() => cloneSonarrDefaults(initialValues));
   const hasDraftChanges = !areSonarrDefaultsEqual(values, initialValues);
@@ -289,16 +285,7 @@ const SonarrDefaultsDraft = ({
   };
 
   const saveDefaults = (): void => {
-    saveOptions.mutate({
-      ...savedSettings,
-      providers: {
-        ...savedSettings.providers,
-        sonarr: {
-          ...savedSettings.providers.sonarr,
-          defaults: values,
-        },
-      },
-    });
+    saveOptions.mutate({ type: "sonarrDefaults", defaults: values });
   };
 
   return (
