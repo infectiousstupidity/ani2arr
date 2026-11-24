@@ -4,7 +4,7 @@ Use global base skills when relevant.
 
 ## Project Shape
 
-Ani2arr is a WXT browser extension for AniList/AniChart pages with Sonarr, Radarr, and Seerr integration.
+Ani2arr is a WXT browser extension for AniList, AniChart, and MyAnimeList pages with Sonarr, Radarr, and Seerr integration.
 
 ## Relevant skills:
 
@@ -49,11 +49,11 @@ Respect folder ownership:
 
 - `anilist`: AniList IDs, API, metadata, cache.
 - `myanimelist`: MyAnimeList IDs, API, metadata, cache.
-- `mapping`: AniList ID to provider ID mappings.
+- `mapping`: source identities and provider ID mappings.
 - `providers`: Sonarr, Radarr, Seerr clients, IDs, metadata, search, library, cache.
 - `settings`: persisted extension settings and provider config.
 - `rpc`: request/response boundary and DTO composition.
-- `queries`: React Query hooks around RPC/local option reads only.
+- `queries`: React Query hooks around RPC and settings snapshot reads/watchers.
 - `background`: service wiring, lifecycle, startup, reset, scheduled refresh.
 - `content`: injected page behavior, DOM parsing, portals, launch snapshots.
 - `features`: modal, overlay, provider actions, mapping UI.
@@ -69,7 +69,13 @@ mapping may import provider identity types only
 Forbidden flow:
 
 providers must not call mapping services or rpc
-queries must not call provider clients or storage
+queries must not call provider clients or storage directly
 shared must not import domain folders
 
-If one file answers multiple domain questions, split or move it.
+Queries may read/watch public settings via the settings store; the options page
+also reads/watches the full settings snapshot for connection forms. Provider
+clients and settings writes are background-owned. This is an ownership convention,
+not a security boundary: content scripts can read extension local storage.
+
+Keep cohesive workflows together; split files when responsibilities genuinely
+diverge. See `docs/decisions.md` for architectural decisions.
