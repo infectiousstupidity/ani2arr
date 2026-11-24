@@ -59,7 +59,7 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 async function ensurePeriodicRefresh(): Promise<void> {
 	const existing = await browser.alarms.get(MAPPING_REFRESH_ALARM);
 	if (!existing) {
-		browser.alarms.create(MAPPING_REFRESH_ALARM, {
+		await browser.alarms.create(MAPPING_REFRESH_ALARM, {
 			periodInMinutes: MAPPING_REFRESH_PERIOD_MIN,
 		});
 	}
@@ -91,10 +91,10 @@ export const bootstrapBackground = (): void => {
 			}
 			await settingsInitialization;
 			await mappingInitialization;
+			await ensurePeriodicRefresh();
 			if (await shouldWarmMappingsCache()) {
 				await refreshMappingPipeline();
 			}
-			await ensurePeriodicRefresh();
 		} catch (error) {
 			logError(normalizeError(error), "Background:onInstalled");
 		}
@@ -104,10 +104,10 @@ export const bootstrapBackground = (): void => {
 		try {
 			await settingsInitialization;
 			await mappingInitialization;
+			await ensurePeriodicRefresh();
 			if (await shouldWarmMappingsCache()) {
 				await refreshMappingPipeline();
 			}
-			await ensurePeriodicRefresh();
 		} catch (error) {
 			logError(normalizeError(error), "Background:onStartup");
 		}
