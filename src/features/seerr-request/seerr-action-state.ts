@@ -19,7 +19,12 @@ export interface SeerrActionStateInput {
 export interface SeerrActionState {
 	state: Extract<
 		MediaActionState,
-		"unconfigured" | "checking" | "in-library" | "error" | "can-add"
+		| "unconfigured"
+		| "checking"
+		| "unmapped"
+		| "unknown"
+		| "in-library"
+		| "can-add"
 	>;
 	label: string;
 	disabled: boolean;
@@ -63,7 +68,7 @@ export function getSeerrActionState(
 	if (!input.isConfigured) {
 		return {
 			state: "unconfigured",
-			label: "Configure Seerr",
+			label: "Configure Seerr…",
 			disabled: false,
 		};
 	}
@@ -71,31 +76,31 @@ export function getSeerrActionState(
 	if (input.isChecking) {
 		return {
 			state: "checking",
-			label: "Checking Seerr...",
+			label: "Checking Seerr…",
 			disabled: true,
 		};
 	}
 
 	if (!input.hasUsableTarget) {
 		return {
-			state: "can-add",
-			label: "Choose Seerr target",
+			state: "unmapped",
+			label: "Find Seerr match…",
 			disabled: false,
 		};
 	}
 
 	if (input.status === "deleted-or-blocked") {
 		return {
-			state: "error",
+			state: "unknown",
 			label: "Unavailable in Seerr",
-			disabled: true,
+			disabled: false,
 		};
 	}
 
 	if (input.status === "deleted") {
 		return {
 			state: "can-add",
-			label: "Request again in Seerr",
+			label: "Request again in Seerr…",
 			disabled: false,
 		};
 	}
@@ -110,7 +115,7 @@ export function getSeerrActionState(
 
 	return {
 		state: "can-add",
-		label: "Request in Seerr",
+		label: "Request in Seerr…",
 		disabled: false,
 	};
 }

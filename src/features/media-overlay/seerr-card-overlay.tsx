@@ -2,32 +2,28 @@
 // src/features/media-overlay/seerr-card-overlay.tsx
 
 import {
+	Ban,
 	Check,
 	CircleDashed,
 	RotateCcw,
 	Send,
-	TriangleAlert,
+	Wrench,
 } from "lucide-react";
-import type {
-	MouseEvent,
-	ReactElement,
-	ReactNode,
-	SyntheticEvent,
-} from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type { AniListMediaHint } from "@/anilist/types";
 import {
 	type SeerrMediaAction,
 	useSeerrMediaAction,
 } from "@/features/media-action/use-seerr-media-action";
-import type { MediaActionState } from "@/features/media-action/state";
+import { getOpenProviderLabel } from "@/features/media-action/labels";
 import { SeerrIcon } from "@/features/provider-ui/provider-icons";
+import type { SeerrActionState } from "@/features/seerr-request/seerr-action-state";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { SeerrMediaStatus, SeerrMediaType } from "@/providers/seerr/types";
 import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
-import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import { CardOverlay } from "./card-overlay";
+import { CardOverlay, CardStackButton } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SeerrCardActionProps {
@@ -55,21 +51,9 @@ interface SeerrStandaloneCardOverlayProps extends SeerrCardActionProps {
 	presentation?: "status-column" | "action-row" | undefined;
 }
 
-type SeerrCardState = Extract<
-	MediaActionState,
-	"unconfigured" | "checking" | "in-library" | "error" | "can-add"
->;
+type SeerrCardState = SeerrActionState["state"];
 
 type SeerrCardAction = SeerrMediaAction;
-
-function swallowEvent(event: SyntheticEvent): void {
-	event.preventDefault();
-	event.stopPropagation();
-}
-
-function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
-	return event.nativeEvent.isTrusted === true || event.isTrusted === true;
-}
 
 function getSeerrCardIcon(input: {
 	state: SeerrCardState;
@@ -86,8 +70,11 @@ function getSeerrCardIcon(input: {
 		case "in-library": {
 			return <Check className="h-4 w-4" aria-hidden="true" />;
 		}
-		case "error": {
-			return <TriangleAlert className="h-4 w-4" aria-hidden="true" />;
+		case "unmapped": {
+			return <Wrench className="h-4 w-4" aria-hidden="true" />;
+		}
+		case "unknown": {
+			return <Ban className="h-4 w-4" aria-hidden="true" />;
 		}
 		default: {
 			return <Send className="h-4 w-4" aria-hidden="true" />;
@@ -95,81 +82,53 @@ function getSeerrCardIcon(input: {
 	}
 }
 
+/** Overrides the default badge icon where Seerr differs from the arr states. */
+function getSeerrPrimaryIcon(action: SeerrCardAction): ReactNode {
+	if (action.visualStatus === "partial") {
+		return (
+			<CircleDashed className="a2a-card-overlay__symbol" aria-hidden="true" />
+		);
+	}
+
+	if (action.status.state === "unknown") {
+		return <Ban className="a2a-card-overlay__symbol" aria-hidden="true" />;
+	}
+
+	return undefined;
+}
+
 function SeerrStackRequestButton(props: {
 	action: SeerrCardAction;
-	tooltipContainer?: FloatingPortalContainer | undefined;
 }): ReactElement {
-	const { action, tooltipContainer } = props;
-
-	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
-		event.preventDefault();
-		event.stopPropagation();
-		if (!isTrustedClick(event)) return;
-
-		action.runPrimaryAction();
-	};
+	const { action } = props;
 
 	return (
-		<TooltipWrapper
-			content={action.visualTitle}
-			side="right"
-			align="center"
-			sideOffset={6}
-			container={tooltipContainer ?? null}
-			showArrow={false}
-		>
-			<button
-				type="button"
-				className="a2a-card-overlay__action a2a-card-overlay__action--seerr"
-				aria-label={action.visualTitle}
-				onClick={handleClick}
-				onMouseDown={swallowEvent}
-				disabled={action.status.disabled}
-				aria-disabled={action.status.disabled || undefined}
-			>
-				{getSeerrCardIcon({
-					state: action.status.state,
-					status: action.visualStatus,
-				})}
-			</button>
-		</TooltipWrapper>
+		<CardStackButton
+			label={action.status.label}
+			modifier="seerr"
+			icon={getSeerrCardIcon({
+				state: action.status.state,
+				status: action.visualStatus,
+			})}
+			onClick={action.runPrimaryAction}
+			disabled={action.status.disabled}
+		/>
 	);
 }
 
 function SeerrStackOpenButton(props: {
 	action: SeerrCardAction;
-	tooltipContainer?: FloatingPortalContainer | undefined;
 }): ReactElement | null {
-	const { action, tooltipContainer } = props;
-	if (!action.openProvider) return null;
-
-	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
-		event.preventDefault();
-		event.stopPropagation();
-		if (!isTrustedClick(event)) return;
-
-		action.openProvider?.();
-	};
+	const { openProvider } = props.action;
+	if (!openProvider) return null;
 
 	return (
-		<TooltipWrapper
-			content="Open in Seerr"
-			side="right"
-			align="center"
-			sideOffset={6}
-			container={tooltipContainer ?? null}
-			showArrow={false}
-		>
-			<button
-				type="button"
-				className="a2a-card-overlay__action a2a-card-overlay__action--external"
-				aria-label="Open in Seerr"
-				onClick={handleClick}
-				onMouseDown={swallowEvent}
-			>
-				<SeerrIcon className="h-4 w-4" aria-hidden="true" />
-			</button>
-		</TooltipWrapper>
+		<CardStackButton
+			label={getOpenProviderLabel("Seerr")}
+			modifier="external"
+			icon={<SeerrIcon className="h-4 w-4" aria-hidden="true" />}
+			onClick={openProvider}
+		/>
 	);
 }
 
@@ -232,16 +191,8 @@ export function SeerrCardStackActions({
 			<CardOverlay
 				providerLabel="Seerr"
 				primaryState={action.status.state}
-				primaryTitle={action.visualTitle}
 				primaryLabel={action.status.label}
-				primaryIcon={
-					action.visualStatus === "partial" ? (
-						<CircleDashed
-							className="a2a-card-overlay__symbol"
-							aria-hidden="true"
-						/>
-					) : undefined
-				}
+				primaryIcon={getSeerrPrimaryIcon(action)}
 				{...(action.visualStatus === "partial"
 					? { primaryTone: "partial" as const }
 					: {})}
@@ -258,15 +209,8 @@ export function SeerrCardStackActions({
 		);
 	}
 
-	const requestButton = (
-		<SeerrStackRequestButton
-			action={action}
-			tooltipContainer={tooltipContainer}
-		/>
-	);
-	const openButton = (
-		<SeerrStackOpenButton action={action} tooltipContainer={tooltipContainer} />
-	);
+	const requestButton = <SeerrStackRequestButton action={action} />;
+	const openButton = <SeerrStackOpenButton action={action} />;
 
 	return stackDirection === "down" ? (
 		<>
@@ -320,16 +264,8 @@ export function SeerrStandaloneCardOverlay({
 		<CardOverlay
 			providerLabel="Seerr"
 			primaryState={action.status.state}
-			primaryTitle={action.visualTitle}
 			primaryLabel={action.status.label}
-			primaryIcon={
-				action.visualStatus === "partial" ? (
-					<CircleDashed
-						className="a2a-card-overlay__symbol"
-						aria-hidden="true"
-					/>
-				) : undefined
-			}
+			primaryIcon={getSeerrPrimaryIcon(action)}
 			{...(action.visualStatus === "partial"
 				? { primaryTone: "partial" as const }
 				: {})}

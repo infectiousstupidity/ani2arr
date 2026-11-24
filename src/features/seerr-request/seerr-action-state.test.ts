@@ -72,7 +72,7 @@ describe("getSeerrActionState", () => {
 			}),
 		).toMatchObject({
 			state: "checking",
-			label: "Checking Seerr...",
+			label: "Checking Seerr…",
 			disabled: true,
 		});
 	});
@@ -84,7 +84,7 @@ describe("getSeerrActionState", () => {
 				status: "unknown",
 			}),
 		).toMatchObject({
-			label: "Request in Seerr",
+			label: "Request in Seerr…",
 			disabled: false,
 		});
 	});
@@ -96,21 +96,34 @@ describe("getSeerrActionState", () => {
 				status: "deleted",
 			}),
 		).toMatchObject({
-			label: "Request again in Seerr",
+			label: "Request again in Seerr…",
 			disabled: false,
 		});
 	});
 
-	it("blocks media that Seerr reports as deleted or blocked under code 6", () => {
+	it("keeps media that Seerr reports as deleted or blocked under code 6 clickable", () => {
 		expect(
 			getSeerrActionState({
 				...baseInput,
 				status: "deleted-or-blocked",
 			}),
 		).toMatchObject({
-			state: "error",
+			state: "unknown",
 			label: "Unavailable in Seerr",
-			disabled: true,
+			disabled: false,
+		});
+	});
+
+	it("asks for a match when there is no usable target", () => {
+		expect(
+			getSeerrActionState({
+				...baseInput,
+				hasUsableTarget: false,
+			}),
+		).toMatchObject({
+			state: "unmapped",
+			label: "Find Seerr match…",
+			disabled: false,
 		});
 	});
 });

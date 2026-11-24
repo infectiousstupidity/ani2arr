@@ -3,17 +3,14 @@
 
 import { SlidersHorizontal } from "lucide-react";
 import type React from "react";
-import type {
-	MouseEvent,
-	ReactElement,
-	ReactNode,
-	SyntheticEvent,
-} from "react";
+import type { ReactNode } from "react";
 import type { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
 	MediaModalMetadataHint,
 	MediaModalOpenState,
 } from "@/features/media-modal/types";
+import { getArrSetupLabel } from "@/features/media-action/labels";
+import { CardStackButton } from "@/features/media-overlay/card-overlay";
 import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
 import {
 	SeerrCardStackActions,
@@ -25,8 +22,6 @@ import type { Provider } from "@/providers/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { MappingIdentity } from "@/rpc/types";
 import type { BrowseCardPrimaryStatus, PublicOptions } from "@/settings/types";
-import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
-import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { resolveBrowseCardRoute } from "./browse-card-provider";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
 
@@ -154,64 +149,21 @@ function getSeerrOverlayOptions(publicOptions: PublicOptions | undefined) {
 	};
 }
 
-function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
-	return event.nativeEvent.isTrusted === true || event.isTrusted === true;
-}
-
-function swallowEvent(event: SyntheticEvent): void {
-	event.preventDefault();
-	event.stopPropagation();
-}
-
-function ProviderStackAction(props: {
-	label: string;
-	tooltipContainer: FloatingPortalContainer | undefined;
-	onClick: () => void;
-}): ReactElement {
-	const { label, tooltipContainer, onClick } = props;
-
-	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
-		event.preventDefault();
-		event.stopPropagation();
-		if (!isTrustedClick(event)) return;
-
-		onClick();
-	};
-
-	return (
-		<TooltipWrapper
-			content={label}
-			side="right"
-			align="center"
-			sideOffset={6}
-			container={tooltipContainer ?? null}
-			showArrow={false}
-		>
-			<button
-				type="button"
-				className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
-				aria-label={label}
-				onClick={handleClick}
-				onMouseDown={swallowEvent}
-			>
-				<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
-			</button>
-		</TooltipWrapper>
-	);
-}
-
 function getProviderStackAction(input: {
 	isConfigured: boolean;
-	configuredLabel: string;
-	configureLabel: string;
-	tooltipContainer: FloatingPortalContainer | undefined;
+	providerLabel: string;
 	onOpen(): void;
 	onConfigure(): void;
 }): ReactNode {
 	return (
-		<ProviderStackAction
-			label={input.isConfigured ? input.configuredLabel : input.configureLabel}
-			tooltipContainer={input.tooltipContainer}
+		<CardStackButton
+			label={
+				input.isConfigured
+					? getArrSetupLabel(input.providerLabel)
+					: `Configure ${input.providerLabel}…`
+			}
+			modifier="advanced"
+			icon={<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />}
 			onClick={input.isConfigured ? input.onOpen : input.onConfigure}
 		/>
 	);
@@ -330,18 +282,14 @@ export function BrowseCardOverlay({
 	if (activeArr === "sonarr") {
 		arrStackAction = getProviderStackAction({
 			isConfigured: sonarrOpts.isConfigured,
-			configuredLabel: "Sonarr options",
-			configureLabel: "Configure Sonarr",
-			tooltipContainer,
+			providerLabel: "Sonarr",
 			onOpen: () => openArrModal("sonarr", "setup"),
 			onConfigure: () => openOptionsPage({ sectionId: "sonarr" }),
 		});
 	} else if (activeArr === "radarr") {
 		arrStackAction = getProviderStackAction({
 			isConfigured: radarrOpts.isConfigured,
-			configuredLabel: "Radarr options",
-			configureLabel: "Configure Radarr",
-			tooltipContainer,
+			providerLabel: "Radarr",
 			onOpen: () => openArrModal("radarr", "setup"),
 			onConfigure: () => openOptionsPage({ sectionId: "radarr" }),
 		});

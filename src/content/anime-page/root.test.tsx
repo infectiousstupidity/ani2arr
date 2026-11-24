@@ -18,11 +18,10 @@ const seerrMediaActionMock = vi.hoisted(() =>
 	vi.fn(() => ({
 		status: {
 			state: "can-add" as const,
-			label: "Choose Seerr target",
+			label: "Find Seerr match…",
 			disabled: false,
 		},
 		visualStatus: undefined,
-		visualTitle: "Choose Seerr target",
 		openProvider: null,
 		runPrimaryAction: vi.fn(),
 	})),
@@ -147,7 +146,7 @@ describe("ContentRoot", () => {
 		const view = renderTarget(target);
 		const actionInput = vi.mocked(useSonarrMediaAction).mock.calls.at(-1)?.[0];
 
-		expect(view).toContain("Find match");
+		expect(view).toContain("Find match…");
 		actionInput?.onOpenMapping?.();
 		expect(modalOpen).toHaveBeenCalledWith({
 			source: target.source,

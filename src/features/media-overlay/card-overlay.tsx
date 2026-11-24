@@ -7,6 +7,7 @@ import {
 	ChevronDown,
 	Plus,
 	RotateCcw,
+	Settings,
 	SlidersHorizontal,
 	TriangleAlert,
 	Wrench,
@@ -18,6 +19,11 @@ import type {
 	SVGProps,
 	SyntheticEvent,
 } from "react";
+import {
+	getArrMappingLabel,
+	getArrSetupLabel,
+	getOpenProviderLabel,
+} from "@/features/media-action/labels";
 import type { MediaActionState } from "@/features/media-action/state";
 import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
@@ -26,14 +32,11 @@ import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 interface CardOverlayProps {
 	providerLabel: string;
 	primaryState: MediaActionState;
-	primaryTitle: string;
-	primaryLabel?: string;
+	primaryLabel: string;
 	primaryIcon?: ReactNode;
 	primaryTone?: "partial";
 	primaryDisabled: boolean;
 	onPrimaryAction(): void;
-	statusPrimaryDisabled?: boolean;
-	onStatusPrimaryAction?: (() => void) | undefined;
 	hasMapping: boolean;
 	onOpenSetup?: (() => void) | undefined;
 	onOpenMapping?: (() => void) | undefined;
@@ -77,6 +80,11 @@ function getPrimaryActionIcon(
 				/>
 			);
 		}
+		case "unconfigured": {
+			return (
+				<Settings className="a2a-card-overlay__symbol" aria-hidden="true" />
+			);
+		}
 		default: {
 			return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />;
 		}
@@ -102,12 +110,36 @@ function swallowEvent(event: SyntheticEvent): void {
 	event.stopPropagation();
 }
 
+export function CardStackButton(props: {
+	label: string;
+	icon: ReactNode;
+	modifier: "advanced" | "fix" | "external" | "seerr";
+	onClick(): void;
+	disabled?: boolean;
+}): ReactElement {
+	const { label, icon, modifier, onClick, disabled = false } = props;
+
+	return (
+		<button
+			type="button"
+			className={`a2a-card-overlay__action a2a-card-overlay__action--${modifier}`}
+			onClick={withSwallow(onClick)}
+			onMouseDown={swallowEvent}
+			disabled={disabled}
+			aria-disabled={disabled || undefined}
+		>
+			<span className="a2a-card-overlay__icon">{icon}</span>
+			<span className="a2a-card-overlay__label">{label}</span>
+		</button>
+	);
+}
+
 function StatusColumnMenu(props: {
 	providerLabel: string;
 	setupAction: (() => void) | undefined;
 	mappingAction: (() => void) | undefined;
 	openProvider: (() => void) | null;
-	mappingLabel: string;
+	hasMapping: boolean;
 	container: FloatingPortalContainer | null;
 }): ReactElement | null {
 	const {
@@ -115,7 +147,7 @@ function StatusColumnMenu(props: {
 		setupAction,
 		mappingAction,
 		openProvider,
-		mappingLabel,
+		hasMapping,
 		container,
 	} = props;
 	if (!setupAction && !mappingAction && !openProvider) return null;
@@ -143,7 +175,7 @@ function StatusColumnMenu(props: {
 							className="a2a-card-overlay__menu-item"
 							onSelect={setupAction}
 						>
-							{providerLabel} options
+							{getArrSetupLabel(providerLabel)}
 						</DropdownMenu.Item>
 					) : null}
 					{mappingAction ? (
@@ -151,7 +183,7 @@ function StatusColumnMenu(props: {
 							className="a2a-card-overlay__menu-item"
 							onSelect={mappingAction}
 						>
-							{mappingLabel}
+							{getArrMappingLabel(hasMapping)}
 						</DropdownMenu.Item>
 					) : null}
 					{openProvider ? (
@@ -159,7 +191,7 @@ function StatusColumnMenu(props: {
 							className="a2a-card-overlay__menu-item"
 							onSelect={openProvider}
 						>
-							Open in {providerLabel}
+							{getOpenProviderLabel(providerLabel)}
 						</DropdownMenu.Item>
 					) : null}
 				</DropdownMenu.Content>
@@ -170,30 +202,24 @@ function StatusColumnMenu(props: {
 
 interface StatusColumnOverlayProps extends CardOverlayProps {
 	resolvedTooltipContainer: FloatingPortalContainer | null;
-	statusMappingLabel: string;
-	statusSetupAction: (() => void) | undefined;
-	statusMappingAction: (() => void) | undefined;
 }
 
 function StatusColumnOverlay({
 	providerLabel,
 	primaryState,
-	primaryTitle,
 	primaryLabel,
 	primaryDisabled,
 	onPrimaryAction,
-	statusPrimaryDisabled,
-	onStatusPrimaryAction,
+	hasMapping,
+	onOpenSetup,
+	onOpenMapping,
 	openProvider,
 	extraAction,
 	resolvedTooltipContainer,
-	statusMappingLabel,
-	statusSetupAction,
-	statusMappingAction,
 }: StatusColumnOverlayProps): ReactElement {
 	const hasMenu =
-		statusSetupAction !== undefined ||
-		statusMappingAction !== undefined ||
+		onOpenSetup !== undefined ||
+		onOpenMapping !== undefined ||
 		openProvider !== null;
 
 	return (
@@ -220,21 +246,19 @@ function StatusColumnOverlay({
 						type="button"
 						className="a2a-card-overlay__status-primary"
 						data-state={primaryState}
-						onClick={withSwallow(onStatusPrimaryAction ?? onPrimaryAction)}
+						onClick={withSwallow(onPrimaryAction)}
 						onMouseDown={swallowEvent}
-						disabled={statusPrimaryDisabled ?? primaryDisabled}
-						aria-disabled={
-							(statusPrimaryDisabled ?? primaryDisabled) || undefined
-						}
+						disabled={primaryDisabled}
+						aria-disabled={primaryDisabled || undefined}
 					>
-						{primaryLabel ?? primaryTitle}
+						{primaryLabel}
 					</button>
 					<StatusColumnMenu
 						providerLabel={providerLabel}
-						setupAction={statusSetupAction}
-						mappingAction={statusMappingAction}
+						setupAction={onOpenSetup}
+						mappingAction={onOpenMapping}
 						openProvider={openProvider}
-						mappingLabel={statusMappingLabel}
+						hasMapping={hasMapping}
 						container={resolvedTooltipContainer}
 					/>
 				</div>
@@ -247,19 +271,15 @@ function StatusColumnOverlay({
 function ActionRowOverlay({
 	providerLabel,
 	primaryState,
-	primaryTitle,
 	primaryLabel,
 	primaryDisabled,
 	onPrimaryAction,
-	statusPrimaryDisabled,
-	onStatusPrimaryAction,
 	openProvider,
 	openProviderIcon: OpenProviderIcon,
 	extraAction,
 	tooltipContainer,
 }: CardOverlayProps): ReactElement {
-	const disabled = statusPrimaryDisabled ?? primaryDisabled;
-	const externalTitle = `Open in ${providerLabel}`;
+	const externalTitle = getOpenProviderLabel(providerLabel);
 
 	return (
 		<fieldset
@@ -276,27 +296,17 @@ function ActionRowOverlay({
 			onPointerDown={stopOverlayEvent}
 			onPointerUp={stopOverlayEvent}
 		>
-			<TooltipWrapper
-				content={primaryTitle}
-				side="top"
-				align="center"
-				sideOffset={6}
-				container={tooltipContainer ?? null}
-				showArrow={false}
+			<button
+				type="button"
+				className="a2a-card-overlay__row-primary"
+				data-state={primaryState}
+				onClick={withSwallow(onPrimaryAction)}
+				onMouseDown={swallowEvent}
+				disabled={primaryDisabled}
+				aria-disabled={primaryDisabled || undefined}
 			>
-				<button
-					type="button"
-					className="a2a-card-overlay__row-primary"
-					data-state={primaryState}
-					aria-label={primaryTitle}
-					onClick={withSwallow(onStatusPrimaryAction ?? onPrimaryAction)}
-					onMouseDown={swallowEvent}
-					disabled={disabled}
-					aria-disabled={disabled || undefined}
-				>
-					{primaryLabel ?? primaryTitle}
-				</button>
-			</TooltipWrapper>
+				{primaryLabel}
+			</button>
 			{openProvider && OpenProviderIcon ? (
 				<TooltipWrapper
 					content={externalTitle}
@@ -326,7 +336,7 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 	const {
 		providerLabel,
 		primaryState,
-		primaryTitle,
+		primaryLabel,
 		primaryIcon,
 		primaryTone,
 		primaryDisabled,
@@ -345,87 +355,44 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 	const resolvedTooltipContainer =
 		tooltipContainer ??
 		(typeof document === "undefined" ? null : document.body);
-	const manualMappingLabel = hasMapping
-		? "Update mapping manually"
-		: "Find match manually";
-	const statusMappingLabel = hasMapping ? "Update mapping" : "Find match";
-	const statusSetupAction = hasMapping ? onOpenSetup : undefined;
-	const statusMappingAction =
-		primaryState === "unconfigured" ? undefined : onOpenMapping;
+	const setupLabel = getArrSetupLabel(providerLabel);
+	const mappingLabel = getArrMappingLabel(hasMapping);
+	const externalLabel = getOpenProviderLabel(providerLabel);
 	if (presentation === "status-column") {
 		return (
 			<StatusColumnOverlay
 				{...props}
 				resolvedTooltipContainer={resolvedTooltipContainer}
-				statusMappingLabel={statusMappingLabel}
-				statusSetupAction={statusSetupAction}
-				statusMappingAction={statusMappingAction}
 			/>
 		);
 	}
 
 	const setupAction = onOpenSetup ? (
-		<TooltipWrapper
-			content={`Open ${providerLabel} setup`}
-			side="right"
-			align="center"
-			sideOffset={6}
-			container={resolvedTooltipContainer}
-			showArrow={false}
-		>
-			<button
-				type="button"
-				className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
-				aria-label={`Open ${providerLabel} setup`}
-				onClick={withSwallow(onOpenSetup)}
-				onMouseDown={swallowEvent}
-			>
-				<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
-			</button>
-		</TooltipWrapper>
+		<CardStackButton
+			label={setupLabel}
+			modifier="advanced"
+			icon={<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />}
+			onClick={onOpenSetup}
+		/>
 	) : null;
 
 	const mappingAction = onOpenMapping ? (
-		<TooltipWrapper
-			content={manualMappingLabel}
-			side="right"
-			align="center"
-			sideOffset={6}
-			container={resolvedTooltipContainer}
-			showArrow={false}
-		>
-			<button
-				type="button"
-				className="a2a-card-overlay__action a2a-card-overlay__action--fix"
-				aria-label={manualMappingLabel}
-				onClick={withSwallow(onOpenMapping)}
-				onMouseDown={swallowEvent}
-			>
-				<Wrench aria-hidden="true" className="h-4 w-4" />
-			</button>
-		</TooltipWrapper>
+		<CardStackButton
+			label={mappingLabel}
+			modifier="fix"
+			icon={<Wrench aria-hidden="true" className="h-4 w-4" />}
+			onClick={onOpenMapping}
+		/>
 	) : null;
 
 	const externalAction =
 		openProvider && OpenProviderIcon ? (
-			<TooltipWrapper
-				content={`Open in ${providerLabel}`}
-				side="right"
-				align="center"
-				sideOffset={6}
-				container={resolvedTooltipContainer}
-				showArrow={false}
-			>
-				<button
-					type="button"
-					className="a2a-card-overlay__action a2a-card-overlay__action--external"
-					aria-label={`Open in ${providerLabel}`}
-					onClick={withSwallow(openProvider)}
-					onMouseDown={swallowEvent}
-				>
-					<OpenProviderIcon aria-hidden="true" className="h-4 w-4" />
-				</button>
-			</TooltipWrapper>
+			<CardStackButton
+				label={externalLabel}
+				modifier="external"
+				icon={<OpenProviderIcon aria-hidden="true" className="h-4 w-4" />}
+				onClick={openProvider}
+			/>
 		) : null;
 
 	return (
@@ -444,28 +411,21 @@ function CardOverlayChrome(props: CardOverlayProps): ReactElement {
 			onPointerUp={stopOverlayEvent}
 		>
 			<div className="a2a-card-overlay__anchor-wrap">
-				<TooltipWrapper
-					content={primaryTitle}
-					side="right"
-					align="center"
-					sideOffset={6}
-					container={resolvedTooltipContainer}
-					showArrow={false}
+				<button
+					type="button"
+					className="a2a-card-overlay__quick"
+					data-state={primaryState}
+					data-tone={primaryTone}
+					onClick={withSwallow(onPrimaryAction)}
+					onMouseDown={swallowEvent}
+					disabled={primaryDisabled}
+					aria-disabled={primaryDisabled || undefined}
 				>
-					<button
-						type="button"
-						className="a2a-card-overlay__quick"
-						data-state={primaryState}
-						data-tone={primaryTone}
-						aria-label={primaryTitle}
-						onClick={withSwallow(onPrimaryAction)}
-						onMouseDown={swallowEvent}
-						disabled={primaryDisabled}
-						aria-disabled={primaryDisabled || undefined}
-					>
+					<span className="a2a-card-overlay__icon">
 						{getPrimaryActionIcon(primaryState, primaryIcon)}
-					</button>
-				</TooltipWrapper>
+					</span>
+					<span className="a2a-card-overlay__label">{primaryLabel}</span>
+				</button>
 			</div>
 
 			{setupAction || mappingAction || externalAction || extraAction ? (

@@ -275,6 +275,7 @@ function SonarrAnimePageActions({
 		forceMappingRetry: true,
 		onConfigure: () => openOptionsPage({ sectionId: "sonarr" }),
 		onOpenMapping,
+		onOpenSetup,
 	});
 
 	return (
@@ -284,6 +285,7 @@ function SonarrAnimePageActions({
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
+			canQuickAdd={providerTitle !== null && defaultForm !== null}
 			disabled={mediaAction.status.disabled}
 			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
@@ -320,6 +322,7 @@ function RadarrAnimePageActions({
 		forceMappingRetry: true,
 		onConfigure: () => openOptionsPage({ sectionId: "radarr" }),
 		onOpenMapping,
+		onOpenSetup,
 	});
 
 	return (
@@ -329,6 +332,7 @@ function RadarrAnimePageActions({
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
+			canQuickAdd={providerTitle !== null && defaultForm !== null}
 			disabled={mediaAction.status.disabled}
 			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}

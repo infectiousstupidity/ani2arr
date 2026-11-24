@@ -28,7 +28,6 @@ import type { GetSeerrTargetInput } from "@/rpc/types";
 export interface SeerrMediaAction {
 	status: SeerrActionState;
 	visualStatus: SeerrMediaStatus | undefined;
-	visualTitle: string;
 	openProvider: (() => void) | null;
 	runPrimaryAction(): void;
 }
@@ -80,10 +79,6 @@ export function useSeerrMediaAction(
 	return {
 		status,
 		visualStatus,
-		visualTitle:
-			visualStatus === "partial"
-				? "Partially in Seerr. Request mapped season."
-				: status.label,
 		openProvider:
 			openTarget === null
 				? null

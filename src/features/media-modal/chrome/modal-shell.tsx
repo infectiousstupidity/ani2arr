@@ -202,6 +202,8 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 				contentContainer={contentContainer}
 				className={SHELL_CLASS}
 				onOpenAutoFocus={(event) => event.preventDefault()}
+				// Radix would return focus to the card, showing a focus ring after mouse use.
+				onCloseAutoFocus={(event) => event.preventDefault()}
 				{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
 			>
 				<div className="a2a-modal-section a2a-delay-50 shrink-0">

@@ -80,18 +80,18 @@ describe("useSeerrMediaAction", () => {
 				enabled: false,
 			});
 			if (input.statusBlocked) {
-				expect(action.status.label).toBe("Checking Seerr...");
+				expect(action.status.label).toBe("Checking Seerr…");
 			}
 		}
 	});
 
 	it("distinguishes a pending target from a settled missing target", () => {
 		queryState.target.isPending = true;
-		expect(getAction().status.label).toBe("Checking Seerr...");
+		expect(getAction().status.label).toBe("Checking Seerr…");
 
 		queryState.target.isPending = false;
 		const action = getAction();
-		expect(action.status.label).toBe("Choose Seerr target");
+		expect(action.status.label).toBe("Find Seerr match…");
 
 		action.runPrimaryAction();
 		expect(onOpenModal).toHaveBeenCalledOnce();
@@ -112,7 +112,7 @@ describe("useSeerrMediaAction", () => {
 			requestInput: { mediaType: "tv", tmdbId, seasons: [1] },
 			enabled: true,
 		});
-		expect(action.status.label).toBe("Checking Seerr...");
+		expect(action.status.label).toBe("Checking Seerr…");
 		expect(action.openProvider).not.toBeNull();
 	});
 
@@ -130,9 +130,7 @@ describe("useSeerrMediaAction", () => {
 
 		const action = getAction();
 
-		expect(action.visualTitle).toBe(
-			"Partially in Seerr. Request mapped season.",
-		);
+		expect(action.visualStatus).toBe("partial");
 		action.runPrimaryAction();
 		expect(onOpenModal).toHaveBeenCalledOnce();
 		action.openProvider?.();

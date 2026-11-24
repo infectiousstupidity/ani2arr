@@ -31,30 +31,85 @@
 	pointer-events: auto;
 }
 
+/*
+ * Floating buttons are a 28px icon circle plus a text label.
+ * Collapsed: only the circle shows. While the card is hovered or focused,
+ * the button widens into one pill so the label reads as part of the button.
+ */
 .a2a-card-overlay :is(.a2a-card-overlay__quick, .a2a-card-overlay__action) {
 	appearance: none;
 	box-sizing: border-box;
-	pointer-events: auto;
-	display: inline-grid;
-	place-items: center;
-	width: 28px;
+	display: inline-flex;
+	align-items: center;
 	height: 28px;
+	min-width: 28px;
 	padding: 0;
 	border: 0;
-	border-radius: 50%;
+	border-radius: 14px;
+	background: transparent;
 	color: #fff;
-	font: inherit;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
 	line-height: 1;
 	cursor: pointer;
 	box-shadow: none;
+	transition:
+		background-color 0.18s ease,
+		box-shadow 0.18s ease,
+		opacity 0.2s ease,
+		transform 0.2s ease,
+		filter 0.18s ease;
+}
+
+.a2a-card-overlay__quick {
+	pointer-events: auto;
 }
 
 .a2a-card-overlay
-	:is(.a2a-card-overlay__quick, .a2a-card-overlay__action):focus,
-.a2a-card-overlay
 	:is(.a2a-card-overlay__quick, .a2a-card-overlay__action):focus-visible {
-	outline: none !important;
-	box-shadow: none !important;
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+}
+
+.a2a-card-overlay__icon {
+	display: inline-grid;
+	flex: 0 0 28px;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: #152232;
+	transition: background-color 0.18s ease;
+}
+
+.a2a-card-overlay__label {
+	max-width: 0;
+	padding: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	opacity: 0;
+	transition:
+		max-width 0.2s ease,
+		padding 0.2s ease,
+		opacity 0.15s ease;
+}
+
+.media-card:is(:hover, :focus-within)
+	.a2a-card-overlay
+	:is(.a2a-card-overlay__quick, .a2a-card-overlay__action),
+.a2a-card-overlay:is(:hover, :focus-within)
+	:is(.a2a-card-overlay__quick, .a2a-card-overlay__action) {
+	background: rgba(21, 34, 50, 0.96);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.media-card:is(:hover, :focus-within) .a2a-card-overlay__label,
+.a2a-card-overlay:is(:hover, :focus-within) .a2a-card-overlay__label {
+	max-width: 180px;
+	padding: 0 12px 0 8px;
+	opacity: 1;
 }
 
 .a2a-card-overlay svg {
@@ -69,28 +124,50 @@
 	height: 16px;
 }
 
-.a2a-card-overlay .a2a-card-overlay__quick {
+.a2a-card-overlay .a2a-card-overlay__quick .a2a-card-overlay__icon {
 	background: #53a7ff;
-	transition: all 0.2s ease-in-out;
 }
 
-.a2a-card-overlay .a2a-card-overlay__quick[data-state="in-library"] {
-	background: #5ccd7a;
+.a2a-card-overlay
+	.a2a-card-overlay__quick:hover:not(:disabled):not([aria-disabled="true"])
+	.a2a-card-overlay__icon {
+	filter: brightness(1.12);
+}
+
+.a2a-card-overlay
+	.a2a-card-overlay__quick:is(:disabled, [aria-disabled="true"]) {
 	cursor: default;
 }
 
-.a2a-card-overlay .a2a-card-overlay__quick[data-state="error"] {
+.a2a-card-overlay
+	.a2a-card-overlay__quick[data-state="in-library"]
+	.a2a-card-overlay__icon {
+	background: #5ccd7a;
+}
+
+.a2a-card-overlay
+	.a2a-card-overlay__quick:is([data-state="unmapped"], [data-state="unknown"])
+	.a2a-card-overlay__icon {
+	background: #4b5b70;
+}
+
+.a2a-card-overlay
+	.a2a-card-overlay__quick[data-state="error"]
+	.a2a-card-overlay__icon {
 	background: #ff6b6b;
 }
 
-.a2a-card-overlay .a2a-card-overlay__quick[data-state="unconfigured"] {
+.a2a-card-overlay
+	.a2a-card-overlay__quick[data-state="unconfigured"]
+	.a2a-card-overlay__icon {
 	background: #1a2230;
 	color: #e4ecf5;
 }
 
-.a2a-card-overlay__quick[data-tone="partial"] {
-	background: #d6922e !important;
-	cursor: pointer;
+.a2a-card-overlay
+	.a2a-card-overlay__quick[data-tone="partial"]
+	.a2a-card-overlay__icon {
+	background: #d6922e;
 }
 
 .a2a-rotate {
@@ -103,16 +180,18 @@
 	pointer-events: none;
 	display: flex;
 	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
 	opacity: 0;
 	transition: opacity 0.2s ease-in-out;
 }
 
 .a2a-card-overlay__stack[data-direction="up"] {
-	bottom: 36px;
+	bottom: 34px;
 }
 
 .a2a-card-overlay__stack[data-direction="down"] {
-	top: 36px;
+	top: 34px;
 }
 
 .a2a-card-overlay[data-visibility="hover"] .a2a-card-overlay__quick {
@@ -136,15 +215,9 @@
 }
 
 .a2a-card-overlay .a2a-card-overlay__action {
-	background: rgba(21, 34, 50, 1);
 	transform: scale(0.2) translateY(8px);
-	transform-origin: center bottom;
+	transform-origin: left center;
 	opacity: 0;
-	margin: 0 0 8px;
-	transition:
-		transform 0.2s ease,
-		opacity 0.2s ease,
-		background-color 0.18s ease;
 }
 
 .a2a-card-overlay__action svg {
@@ -168,28 +241,25 @@
 	opacity: 1;
 }
 
-.media-card:is(:hover, :focus-within)
-	.a2a-card-overlay__stack
-	.a2a-card-overlay__action:last-child,
-.a2a-card-overlay:is(:hover, :focus-within)
-	.a2a-card-overlay__stack
-	.a2a-card-overlay__action:last-child {
-	margin-bottom: 0;
-}
-
 .a2a-card-overlay__action:is(:disabled, [aria-disabled="true"]) {
 	cursor: default;
 }
 
-.a2a-card-overlay__action:hover:not(:disabled):not([aria-disabled="true"]),
-.a2a-card-overlay__action:active:not(:disabled):not([aria-disabled="true"]) {
-	background: rgba(31, 38, 39, 0.9);
-	opacity: 1;
+.a2a-card-overlay
+	.a2a-card-overlay__action:is(:hover, :active):not(:disabled):not(
+		[aria-disabled="true"]
+	),
+.a2a-card-overlay
+	.a2a-card-overlay__action:is(:hover, :active):not(:disabled):not(
+		[aria-disabled="true"]
+	)
+	.a2a-card-overlay__icon {
+	background: #22354d;
 }
 
-.a2a-card-overlay__action:hover:not(:disabled):not([aria-disabled="true"])
-	.a2a-provider-icon,
-.a2a-card-overlay__action:active:not(:disabled):not([aria-disabled="true"])
+.a2a-card-overlay__action:is(:hover, :active):not(:disabled):not(
+		[aria-disabled="true"]
+	)
 	.a2a-provider-icon {
 	color: rgba(228, 236, 245, 0.9);
 }

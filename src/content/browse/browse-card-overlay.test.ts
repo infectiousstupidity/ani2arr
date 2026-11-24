@@ -133,11 +133,11 @@ describe("BrowseCardOverlay", () => {
 	it.each([
 		{
 			format: "TV" as const,
-			configureLabel: "Configure Sonarr",
+			configureLabel: "Configure Sonarr…",
 		},
 		{
 			format: "MOVIE" as const,
-			configureLabel: "Configure Radarr",
+			configureLabel: "Configure Radarr…",
 		},
 	])(
 		"uses Seerr as the visible $format action when only Seerr is configured",

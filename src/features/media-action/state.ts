@@ -17,6 +17,7 @@ type MediaActionCommand =
 	| "configure"
 	| "quick-add"
 	| "open-mapping"
+	| "open-setup"
 	| "retry-status"
 	| "retry-add"
 	| "none";
@@ -97,10 +98,10 @@ export function getMediaActionStatus(input: {
 	if (input.addSucceeded || input.isInLibrary === true) {
 		return {
 			state: "in-library",
-			action: "none",
+			action: "open-setup",
 			errorSource: null,
 			hasMapping,
-			disabled: true,
+			disabled: false,
 		};
 	}
 
@@ -130,9 +131,9 @@ export function getMediaActionStatus(input: {
 
 	return {
 		state: "can-add",
-		action: "quick-add",
+		action: input.canQuickAdd ? "quick-add" : "open-setup",
 		errorSource: null,
 		hasMapping,
-		disabled: !input.canQuickAdd,
+		disabled: false,
 	};
 }

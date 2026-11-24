@@ -16,12 +16,9 @@ describe("CardOverlay", () => {
 				<CardOverlay
 					providerLabel="Sonarr"
 					primaryState="in-library"
-					primaryTitle="Already in Sonarr"
 					primaryLabel="In Sonarr"
-					primaryDisabled={true}
-					statusPrimaryDisabled={false}
+					primaryDisabled={false}
 					onPrimaryAction={() => {}}
-					onStatusPrimaryAction={() => {}}
 					hasMapping={true}
 					onOpenSetup={() => {}}
 					onOpenMapping={() => {}}
@@ -52,12 +49,9 @@ describe("CardOverlay", () => {
 				<CardOverlay
 					providerLabel="Sonarr"
 					primaryState="in-library"
-					primaryTitle="Already in Sonarr"
 					primaryLabel="In Sonarr"
-					primaryDisabled={true}
-					statusPrimaryDisabled={false}
+					primaryDisabled={false}
 					onPrimaryAction={() => {}}
-					onStatusPrimaryAction={() => {}}
 					hasMapping={true}
 					onOpenSetup={() => {}}
 					onOpenMapping={() => {}}
@@ -74,7 +68,6 @@ describe("CardOverlay", () => {
 		expect(view).toContain('aria-label="Sonarr actions"');
 		expect(view).toContain("a2a-card-overlay__row-primary");
 		expect(view).toContain("a2a-card-overlay__row-external");
-		expect(view).toContain('aria-label="Already in Sonarr"');
 		expect(view).toContain('aria-label="Open in Sonarr"');
 		expect(view).toContain('data-provider-icon="sonarr"');
 		expect(view).not.toContain("a2a-card-overlay__quick");

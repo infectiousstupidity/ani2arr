@@ -146,6 +146,8 @@ a[data-a2a-processed] {
 	min-width: 0;
 	flex: 1 1 0;
 	padding: 0 5px;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .a2a-card-overlay[data-presentation="action-row"]

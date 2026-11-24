@@ -71,12 +71,10 @@ export function SeerrAnimePageAction({
 				variant="primary"
 				onClick={handlePrimaryClick}
 				disabled={action.status.disabled}
-				tooltip={action.visualTitle}
-				tooltipContainer={portalContainer}
 				className={`${compact ? "h-6.5 text-[11px]" : "h-8.75 text-[14px]"} w-full rounded-[3px]`}
 			>
 				<span className="inline-flex min-w-0 items-center justify-center gap-2">
-					<span className="truncate">{action.visualTitle}</span>
+					<span className="truncate">{action.status.label}</span>
 				</span>
 			</Button>
 			{hasOpenAction ? (

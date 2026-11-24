@@ -23,6 +23,7 @@ export type MediaActionInputBase<TForm> = {
 	forceMappingRetry?: boolean;
 	onConfigure(): void;
 	onOpenMapping(): void;
+	onOpenSetup(): void;
 };
 
 export interface MediaAction {
@@ -174,6 +175,10 @@ export function useMediaAction<TForm>(
 				}
 				case "open-mapping": {
 					input.onOpenMapping();
+					return;
+				}
+				case "open-setup": {
+					input.onOpenSetup();
 					return;
 				}
 				case "retry-status": {

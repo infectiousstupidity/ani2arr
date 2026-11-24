@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import type { AniListMediaHint } from "@/anilist/types";
+import { getArrPrimaryLabel } from "@/features/media-action/labels";
 import type {
 	MediaAction,
 	MediaActionInputBase,
@@ -11,7 +12,6 @@ import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
-import { getCardPrimaryLabel, getCardPrimaryTitle } from "./card-primary-title";
 
 export interface ArrCardOverlayProps<TForm> {
 	source: SourceIdentity;
@@ -65,41 +65,30 @@ export function ArrCardOverlay<TForm>({
 		statusBlocked: statusBlocked === true,
 		onConfigure: () => openOptionsPage({ sectionId: provider }),
 		onOpenMapping,
+		onOpenSetup,
 	});
-	const primaryLabelInput = {
-		providerLabel: provider === "sonarr" ? "Sonarr" : "Radarr",
+	const providerLabel = provider === "sonarr" ? "Sonarr" : "Radarr";
+	const primaryLabel = getArrPrimaryLabel({
+		providerLabel,
 		state: mediaAction.status.state,
 		errorSource: mediaAction.status.errorSource,
 		canQuickAdd: providerTitle !== null && defaultForm !== null,
-		presentation,
-	};
-	const primaryTitle = getCardPrimaryTitle(primaryLabelInput);
-	const primaryLabel = getCardPrimaryLabel(primaryLabelInput);
-	const openSetup = mediaAction.status.hasMapping ? onOpenSetup : undefined;
-	const statusPrimaryAction =
-		mediaAction.status.state === "in-library"
-			? (openSetup ?? mediaAction.openProvider ?? mediaAction.runPrimaryAction)
-			: mediaAction.runPrimaryAction;
+	});
+	const hasMappingAction =
+		mediaAction.status.state !== "unconfigured" &&
+		mediaAction.status.state !== "unmapped" &&
+		mediaAction.status.state !== "unknown";
 
 	return (
 		<CardOverlay
-			providerLabel={primaryLabelInput.providerLabel}
+			providerLabel={providerLabel}
 			primaryState={mediaAction.status.state}
-			primaryTitle={primaryTitle}
 			primaryLabel={primaryLabel}
 			primaryDisabled={mediaAction.status.disabled}
 			onPrimaryAction={mediaAction.runPrimaryAction}
-			statusPrimaryDisabled={
-				mediaAction.status.state === "in-library"
-					? false
-					: mediaAction.status.disabled
-			}
-			onStatusPrimaryAction={statusPrimaryAction}
 			hasMapping={mediaAction.status.hasMapping}
-			onOpenSetup={openSetup}
-			onOpenMapping={
-				mediaAction.status.state === "unconfigured" ? undefined : onOpenMapping
-			}
+			onOpenSetup={mediaAction.status.hasMapping ? onOpenSetup : undefined}
+			onOpenMapping={hasMappingAction ? onOpenMapping : undefined}
 			openProvider={mediaAction.openProvider}
 			openProviderIcon={provider === "sonarr" ? SonarrIcon : RadarrIcon}
 			extraAction={extraAction}

@@ -20,11 +20,10 @@ const mediaActionMock = vi.hoisted(() =>
 	vi.fn(() => ({
 		status: {
 			state: "unconfigured" as const,
-			label: "Configure Seerr",
+			label: "Configure Seerr…",
 			disabled: false,
 		},
 		visualStatus: undefined,
-		visualTitle: "Configure Seerr",
 		openProvider: null,
 		runPrimaryAction: vi.fn(),
 	})),
