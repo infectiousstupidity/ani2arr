@@ -4,9 +4,11 @@ Use global base skills when relevant.
 
 ## Project Shape
 
-Ani2arr is a WXT browser extension for AniList/AniChart pages with Sonarr, Radarr, and Seerr integration.
+Ani2arr is a WXT browser extension for AniList, AniChart, and MyAnimeList pages with Sonarr, Radarr, and Seerr integration.
 
 ## Relevant skills:
+
+- `add-site` (repository-local: [SKILL.md](.agents/skills/add-site/SKILL.md)) is required for adding a website or a new browse/detail surface, and for repairing site-specific parsing or placement. Read it before implementation; its browser and evidence references are task-specific.
 
 - `wxt-browser-extension` for extension runtime, entrypoints, storage, messaging, manifest, and content-script work.
 - `react-best-practices` for React UI work.
