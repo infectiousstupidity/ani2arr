@@ -258,8 +258,12 @@ export class RadarrLibrary {
 		}
 
 		if (existsInCache) {
-			const changed = await this.removeMovieSnapshot(tmdbId, credentials);
-			if (changed) await input.onCacheChanged?.();
+			try {
+				const changed = await this.removeMovieSnapshot(tmdbId, credentials);
+				if (changed) await input.onCacheChanged?.();
+			} catch (error) {
+				logError(normalizeError(error), `RadarrLibrary:cache:${tmdbId}`);
+			}
 		}
 
 		return {

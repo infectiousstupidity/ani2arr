@@ -614,6 +614,38 @@ describe("Arr library cache contract", () => {
 		},
 	);
 
+	describe.each(libraryCases)("$name live absence", ({ name, create }) => {
+		it.each(["snapshot removal", "revision notification"])(
+			"preserves the verified miss and lookup metadata when %s fails",
+			async (failure) => {
+				const harness = create();
+				const onCacheChanged = vi.fn();
+				await harness.cache.write(harness.cacheKey, [harness.snapshot], CACHE_TTL);
+				harness.find.mockResolvedValueOnce(null);
+				harness.lookup.mockResolvedValueOnce(harness.lookupEntity);
+
+				const error = new Error(`${failure} unavailable`);
+				if (failure === "snapshot removal") {
+					vi.mocked(harness.cache.write).mockRejectedValueOnce(error);
+				} else {
+					onCacheChanged.mockRejectedValueOnce(error);
+				}
+
+				await expect(
+					harness.status(harness.providerId, onCacheChanged),
+				).resolves.toMatchObject({
+					providerId: harness.providerId,
+					isInLibrary: false,
+					[name === "Sonarr" ? "series" : "movie"]: harness.lookupEntity,
+				});
+				expect(harness.cache.write).toHaveBeenCalledTimes(2);
+				expect(onCacheChanged).toHaveBeenCalledTimes(
+					failure === "snapshot removal" ? 0 : 1,
+				);
+			},
+		);
+	});
+
 	it.each(libraryCases)(
 		"returns unknown when the live $name check fails",
 		async ({ create }) => {

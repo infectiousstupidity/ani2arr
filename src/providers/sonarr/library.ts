@@ -256,8 +256,12 @@ export class SonarrLibrary {
 		}
 
 		if (existsInCache) {
-			const changed = await this.removeSeriesSnapshot(tvdbId, credentials);
-			if (changed) await input.onCacheChanged?.();
+			try {
+				const changed = await this.removeSeriesSnapshot(tvdbId, credentials);
+				if (changed) await input.onCacheChanged?.();
+			} catch (error) {
+				logError(normalizeError(error), `SonarrLibrary:cache:${tvdbId}`);
+			}
 		}
 
 		return {
