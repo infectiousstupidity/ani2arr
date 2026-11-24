@@ -6,6 +6,7 @@ import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 import {
 	type AniListMediaHint,
 } from "@/anilist/types";
+import { toMyAnimeListPosterUrl } from "@/myanimelist/url";
 
 export const TITLE_SELECTOR = "h1.title-name";
 const DETAILS_COLUMN_SELECTOR = "#content .leftside, .leftside";
@@ -62,6 +63,13 @@ export function readAnimePageData(doc: Document = document): {
 		),
 	];
 	const format = parseAnimeFormatLabel(facts.get("type"));
+	const poster = doc.querySelector<HTMLImageElement>(
+		'.leftside img[itemprop="image"]',
+	);
+	// MAL lazy-loads posters, so data-src is set before src.
+	const coverImage = toMyAnimeListPosterUrl(
+		poster?.dataset.src ?? poster?.getAttribute("src"),
+	);
 
 	return {
 		title,
@@ -74,6 +82,7 @@ export function readAnimePageData(doc: Document = document): {
 			},
 			synonyms,
 			format,
+			...(coverImage === null ? {} : { coverImage }),
 		},
 	};
 }

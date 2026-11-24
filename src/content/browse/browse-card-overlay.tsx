@@ -55,12 +55,14 @@ function getDisplayTitle(input: {
 function getModalMetadataHint(input: {
 	title: string;
 	parsedFormat: HostMediaTarget["format"] | undefined;
+	parsedCoverImage: HostMediaTarget["coverImage"];
 	metadata: MetadataHint;
 }): MediaModalMetadataHint {
 	return {
 		title: input.title,
 		format: input.parsedFormat ?? input.metadata?.format ?? null,
-		coverImage: input.metadata?.coverImage ?? null,
+		coverImage:
+			input.metadata?.coverImage ?? input.parsedCoverImage ?? null,
 	};
 }
 
@@ -252,6 +254,7 @@ export function BrowseCardOverlay({
 	const metadataHint = getModalMetadataHint({
 		title: displayTitle,
 		parsedFormat: parsed.format,
+		parsedCoverImage: parsed.coverImage,
 		metadata,
 	});
 	const openArrModal = (

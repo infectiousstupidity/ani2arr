@@ -3,7 +3,10 @@ import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 // src/content/myanimelist/browse/adapter.ts
 
 
-import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
+import {
+	readMyAnimeListIdFromUrl,
+	toMyAnimeListPosterUrl,
+} from "@/myanimelist/url";
 import type { MyAnimeListId } from "@/myanimelist/types";
 import {
 	BROWSE_CREATED_ATTRIBUTE,
@@ -109,10 +112,16 @@ function parseFromLinks(input: {
 		cleanText(posterImage.getAttribute("alt"));
 	if (title === null) return null;
 
+	// MAL lazy-loads posters, so data-src is set before src.
+	const coverImage = toMyAnimeListPosterUrl(
+		posterImage.dataset.src ?? posterImage.getAttribute("src"),
+	);
+
 	return {
 		source: { source: "mal", id: poster.malId },
 		title,
 		format: parseFormat(card),
+		...(coverImage === null ? {} : { coverImage }),
 		mountTarget: poster.link,
 	};
 }

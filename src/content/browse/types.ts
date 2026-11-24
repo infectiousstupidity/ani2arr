@@ -19,6 +19,8 @@ export interface HostMediaTarget {
   anilistId?: AniListId;
   title: string;
   format: AnimeFormat | null;
+  /** Poster read from the host page, used when no metadata cover is available. */
+  coverImage?: string;
   mountTarget: HTMLElement;
   presentation?: 'status-column' | 'action-row';
 }

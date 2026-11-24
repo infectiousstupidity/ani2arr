@@ -18,6 +18,20 @@ function parseUrl(value: string): URL | null {
 	}
 }
 
+/** Returns the full-size poster for a MAL CDN image URL, dropping the resize prefix and signature. */
+export function toMyAnimeListPosterUrl(
+	value: string | null | undefined,
+): string | null {
+	if (!value) return null;
+
+	const url = URL.canParse(value) ? new URL(value) : null;
+	if (url?.hostname !== "cdn.myanimelist.net") return null;
+
+	url.pathname = url.pathname.replace(/^\/r\/\d+x\d+(?=\/images\/)/, "");
+	url.search = "";
+	return url.pathname.startsWith("/images/") ? url.href : null;
+}
+
 function stripMyAnimeListVideoSuffix(value: string): string {
 	return value.replace(/\/video(?:[/?#].*)?$/i, "");
 }
