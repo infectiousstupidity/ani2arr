@@ -47,7 +47,11 @@ function shouldRetrySeerrQuery(
 	failureCount: number,
 	error: ExtensionError,
 ): boolean {
-	return failureCount < 1 && !NON_RETRYABLE_SEERR_ERRORS.has(error.code);
+	return (
+		failureCount < 1 &&
+		error.details?.status !== 404 &&
+		!NON_RETRYABLE_SEERR_ERRORS.has(error.code)
+	);
 }
 
 export const useConfiguredSeerrConnectionCheck = (options: {

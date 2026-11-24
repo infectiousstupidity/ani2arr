@@ -1,4 +1,4 @@
-/** Tests for Seerr session/API-key transport, identity checks, and auth errors. */
+/** Tests for Seerr transport, identity checks, auth errors, and media caching. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseTmdbId } from "@/providers/schemas";
 import { ErrorCode } from "@/shared/errors/error.types";
@@ -363,6 +363,119 @@ describe("SeerrClient", () => {
 		await vi.advanceTimersByTimeAsync(15_000);
 
 		await rejection;
+	});
+
+	it("shares an in-flight media read between status and details", async () => {
+		const response = Promise.withResolvers<Response>();
+		fetchMock.mockReturnValueOnce(response.promise);
+		const client = createClient();
+		const input = { mediaType: "movie" as const, tmdbId: parseTmdbId(123) };
+
+		const status = client.getMediaStatus(input, apiKeyConnection);
+		const details = client.getMediaDetails(input, apiKeyConnection);
+		await Promise.resolve();
+		expect(fetchMock).toHaveBeenCalledOnce();
+
+		response.resolve(
+			Response.json({ id: 123, title: "Movie", mediaInfo: { status: 5 } }),
+		);
+
+		await expect(Promise.all([status, details])).resolves.toEqual([
+			{ target: "available", overall: "available" },
+			{ ...input, title: "Movie", status: "available" },
+		]);
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it("reuses media within the five-minute TTL", async () => {
+		vi.useFakeTimers();
+		fetchMock.mockResolvedValueOnce(
+			Response.json({ id: 123, mediaInfo: { status: 5 } }),
+		);
+		const client = createClient();
+		const input = { mediaType: "movie" as const, tmdbId: parseTmdbId(123) };
+
+		await client.getMediaStatus(input, apiKeyConnection);
+		await vi.advanceTimersByTimeAsync(5 * 60 * 1000 - 1);
+
+		await expect(
+			client.getMediaStatus(input, apiKeyConnection),
+		).resolves.toEqual({
+			target: "available",
+			overall: "available",
+		});
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it("fetches fresh media after the five-minute TTL", async () => {
+		vi.useFakeTimers();
+		fetchMock
+			.mockResolvedValueOnce(Response.json({ id: 123 }))
+			.mockResolvedValueOnce(
+				Response.json({ id: 123, mediaInfo: { status: 5 } }),
+			);
+		const client = createClient();
+		const input = { mediaType: "movie" as const, tmdbId: parseTmdbId(123) };
+
+		await client.getMediaStatus(input, apiKeyConnection);
+		await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+
+		await expect(
+			client.getMediaStatus(input, apiKeyConnection),
+		).resolves.toEqual({
+			target: "available",
+			overall: "available",
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("drops the cached media after a successful request", async () => {
+		fetchMock
+			.mockResolvedValueOnce(Response.json({ id: 123 }))
+			.mockResolvedValueOnce(Response.json({ id: 10, status: 1 }))
+			.mockResolvedValueOnce(
+				Response.json({ id: 123, mediaInfo: { status: 2 } }),
+			);
+		const client = createClient();
+		const input = { mediaType: "movie" as const, tmdbId: movieRequest.mediaId };
+
+		await client.getMediaStatus(input, apiKeyConnection);
+		await client.requestMedia(movieRequest, apiKeyConnection);
+
+		await expect(
+			client.getMediaStatus(input, apiKeyConnection),
+		).resolves.toEqual({
+			target: "pending",
+			overall: "pending",
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+		expect(fetchMock.mock.calls[2]?.[0]).toBe(
+			"https://seerr.example/api/v1/movie/123",
+		);
+	});
+
+	it("derives different season targets from one TV media read", async () => {
+		fetchMock.mockResolvedValueOnce(
+			Response.json({
+				id: 456,
+				seasons: [{ seasonNumber: 1 }, { seasonNumber: 2 }],
+				mediaInfo: {
+					status: 4,
+					seasons: [{ seasonNumber: 1, status: 5 }],
+					requests: [{ status: 1, seasons: [{ seasonNumber: 2 }] }],
+				},
+			}),
+		);
+		const client = createClient();
+		const input = { mediaType: "tv" as const, tmdbId: parseTmdbId(456) };
+
+		await expect(
+			client.getMediaStatus({ ...input, seasons: [1] }, apiKeyConnection),
+		).resolves.toEqual({ target: "available", overall: "partial" });
+		await expect(
+			client.getMediaStatus({ ...input, seasons: [2] }, apiKeyConnection),
+		).resolves.toEqual({ target: "pending", overall: "partial" });
+		expect(fetchMock).toHaveBeenCalledOnce();
 	});
 
 	it("reads status, search results, and base-path-safe endpoints", async () => {

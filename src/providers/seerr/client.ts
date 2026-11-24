@@ -2,10 +2,13 @@
 // src/providers/seerr/client.ts
 
 import { readProviderErrorMessage } from "@/providers/provider-error";
+import type { TmdbId } from "@/providers/schemas";
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { ErrorCode, type ExtensionError } from "@/shared/errors/error.types";
 import { createError } from "@/shared/errors/error-utils";
 import { SEERR_XSRF_HEADER_NAME } from "./csrf-token";
 import {
+	projectSeerrMedia,
 	readSeerrMediaDetails,
 	readSeerrMediaStatus,
 	readSeerrPublicSettings,
@@ -17,6 +20,7 @@ import type {
 	SeerrMediaDetails,
 	SeerrMediaRequest,
 	SeerrMediaStatusInput,
+	SeerrMediaType,
 	SeerrPublicSettings,
 	SeerrRequestPayload,
 	SeerrSearchResult,
@@ -24,6 +28,7 @@ import type {
 } from "./types";
 
 const REQUEST_TIMEOUT_MS = 15_000;
+const MEDIA_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type SeerrRequestOptions = Omit<RequestInit, "body"> & {
 	json?: unknown;
@@ -32,6 +37,13 @@ type SeerrRequestOptions = Omit<RequestInit, "body"> & {
 export class SeerrClient {
 	private readonly hasUrlPermission: (url: string) => Promise<boolean>;
 	private readonly getCsrfToken: (url: string) => Promise<string | null>;
+	private readonly mediaCache = new Map<
+		string,
+		{
+			promise: Promise<ReturnType<typeof projectSeerrMedia>>;
+			expiresAt: number;
+		}
+	>();
 
 	public constructor(options: {
 		hasUrlPermission: (url: string) => Promise<boolean>;
@@ -85,7 +97,14 @@ export class SeerrClient {
 			throw await createSeerrResponseError(response, connection);
 		}
 
-		return readJsonResponse(response, "request") as Promise<SeerrMediaRequest>;
+		const result = (await readJsonResponse(
+			response,
+			"request",
+		)) as SeerrMediaRequest;
+		this.mediaCache.delete(
+			getMediaCacheKey(connection, payload.mediaType, payload.mediaId),
+		);
+		return result;
 	}
 
 	public async searchMedia(
@@ -107,24 +126,20 @@ export class SeerrClient {
 		input: Pick<SeerrMediaStatusInput, "mediaType" | "tmdbId">,
 		connection: SeerrConnection,
 	): Promise<SeerrMediaDetails> {
-		const route = input.mediaType === "movie" ? "movie" : "tv";
-		const details = await this.requestJson(
-			`${route}/${input.tmdbId}`,
-			connection,
-		);
-		return readSeerrMediaDetails(details, input.mediaType);
+		const media = await this.loadMedia(input, connection);
+		return readSeerrMediaDetails(media, input.mediaType);
 	}
 
 	public async getMediaStatus(
 		input: SeerrMediaStatusInput,
 		connection: SeerrConnection,
 	): Promise<SeerrStatusSummary> {
-		const route = input.mediaType === "movie" ? "movie" : "tv";
-		const details = await this.requestJson(
-			`${route}/${input.tmdbId}`,
-			connection,
-		);
-		return readSeerrMediaStatus(details, input);
+		const media = await this.loadMedia(input, connection);
+		return readSeerrMediaStatus(media, input);
+	}
+
+	public clearMediaCache(): void {
+		this.mediaCache.clear();
 	}
 
 	public async getPublicSettings(
@@ -132,6 +147,32 @@ export class SeerrClient {
 	): Promise<SeerrPublicSettings> {
 		const settings = await this.requestJson("settings/public", connection);
 		return readSeerrPublicSettings(settings);
+	}
+
+	private loadMedia(
+		{ mediaType, tmdbId }: Pick<SeerrMediaStatusInput, "mediaType" | "tmdbId">,
+		connection: SeerrConnection,
+	): Promise<ReturnType<typeof projectSeerrMedia>> {
+		const key = getMediaCacheKey(connection, mediaType, tmdbId);
+		const cached = this.mediaCache.get(key);
+		if (cached && Date.now() < cached.expiresAt) return cached.promise;
+
+		const entry = {
+			// The freshness window starts when the in-flight read completes.
+			expiresAt: Infinity,
+			promise: this.requestJson(`${mediaType}/${tmdbId}`, connection)
+				.then((value) => {
+					const media = projectSeerrMedia(value);
+					entry.expiresAt = Date.now() + MEDIA_CACHE_TTL_MS;
+					return media;
+				})
+				.catch((error: unknown) => {
+					if (this.mediaCache.get(key) === entry) this.mediaCache.delete(key);
+					throw error;
+				}),
+		};
+		this.mediaCache.set(key, entry);
+		return entry.promise;
 	}
 
 	private async assertVerifiedSessionAccount(
@@ -224,6 +265,14 @@ export class SeerrClient {
 			clearTimeout(timeout);
 		}
 	}
+}
+
+function getMediaCacheKey(
+	connection: SeerrConnection,
+	mediaType: SeerrMediaType,
+	tmdbId: TmdbId,
+): string {
+	return `${connection.auth.mode}:${getProviderConnectionScope(connection)}:${mediaType}:${tmdbId}`;
 }
 
 function assertConfiguredConnection(connection: SeerrConnection): void {

@@ -238,6 +238,7 @@ export const scheduleLibraryRefresh = (provider: Provider): void => {
 };
 
 export const clearPersistentCaches = async (): Promise<void> => {
+	seerrClient.clearMediaCache();
 	await Promise.all([
 		anilistMetadataStore.clearLocalCache(),
 		clearUpstreamMappings(),

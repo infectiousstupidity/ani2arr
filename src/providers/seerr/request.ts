@@ -267,6 +267,83 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
+function projectSeerrSeasonRows(value: unknown) {
+	if (!Array.isArray(value)) return;
+
+	return value.filter(isRecord).flatMap((season) => {
+		const { seasonNumber, status, name, episodeCount } = season;
+		if (typeof seasonNumber !== "number") return [];
+
+		// Omitted mediaInfo fields must not overwrite top-level season metadata.
+		return [
+			{
+				seasonNumber,
+				...(status === undefined
+					? {}
+					: { status: typeof status === "number" ? status : null }),
+				...(name === undefined ? {} : { name: readString(name) }),
+				...(episodeCount === undefined
+					? {}
+					: {
+							episodeCount:
+								typeof episodeCount === "number" ? episodeCount : undefined,
+						}),
+			},
+		];
+	});
+}
+
+export function projectSeerrMedia(value: unknown) {
+	if (!isRecord(value)) return null;
+
+	const mediaInfo = isRecord(value.mediaInfo) ? value.mediaInfo : null;
+	const requests = Array.isArray(mediaInfo?.requests)
+		? mediaInfo.requests.filter(isRecord).flatMap(({ status, seasons }) => {
+				if (
+					(status !== SEERR_REQUEST_PENDING &&
+						status !== SEERR_REQUEST_APPROVED) ||
+					!Array.isArray(seasons)
+				)
+					return [];
+
+				return [
+					{
+						status,
+						seasons: seasons
+							.filter(isRecord)
+							.flatMap(({ seasonNumber }) =>
+								typeof seasonNumber === "number" ? [{ seasonNumber }] : [],
+							),
+					},
+				];
+			})
+		: undefined;
+
+	return {
+		id: parseTmdbIdOrNull(value.id ?? value.tmdbId),
+		tvdbId:
+			parseTvdbIdOrNull(
+				isRecord(value.externalIds) ? value.externalIds.tvdbId : undefined,
+			) ?? parseTvdbIdOrNull(value.tvdbId),
+		title: readString(value.title),
+		name: readString(value.name),
+		originalTitle: readString(value.originalTitle),
+		originalName: readString(value.originalName),
+		releaseDate: readString(value.releaseDate),
+		firstAirDate: readString(value.firstAirDate),
+		posterPath: readNullableString(value.posterPath),
+		backdropPath: readNullableString(value.backdropPath),
+		overview: readNullableString(value.overview),
+		seasons: projectSeerrSeasonRows(value.seasons),
+		mediaInfo: mediaInfo && {
+			status:
+				typeof mediaInfo.status === "number" ? mediaInfo.status : undefined,
+			seasons: projectSeerrSeasonRows(mediaInfo.seasons),
+			requests,
+		},
+	};
+}
+
 function readString(value: unknown): string | undefined {
 	return typeof value === "string" && value.trim().length > 0
 		? value.trim()
