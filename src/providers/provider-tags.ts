@@ -24,9 +24,12 @@ export async function resolveProviderTagIds(input: {
 	freeformLabels: string[] | undefined;
 }): Promise<ProviderTagId[]> {
 	const providerLabel = getProviderLabel(input.provider);
+	const labels = normalizeLabels(input.freeformLabels ?? [], providerLabel);
+	// Only new labels need the tag list; skip the request otherwise.
+	if (labels.length === 0) return [...new Set(input.existingIds)];
+
 	const existingTags = await input.client.getTags(input.credentials);
 	const labelToId = buildTagMap(existingTags);
-	const labels = normalizeLabels(input.freeformLabels ?? [], providerLabel);
 
 	for (const label of labels) {
 		if (labelToId.has(label)) continue;
