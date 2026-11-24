@@ -105,7 +105,6 @@ export const useSeerrTarget = (
 	options?: { enabled?: boolean },
 ) => {
 	const request = input === null ? null : normalizeSeerrTargetRequest(input);
-	const forceRetry = input?.forceRetry === true;
 	return useQuery<SeerrRequestTarget | null, ExtensionError>({
 		queryKey:
 			request === null
@@ -113,14 +112,10 @@ export const useSeerrTarget = (
 				: queryKeys.seerrTarget(request),
 		queryFn: async () => {
 			if (request === null) throw new Error("Seerr target input is required.");
-			return getAni2arrApi().getSeerrTarget({
-				...request,
-				...(forceRetry ? { forceRetry: true } : {}),
-			});
+			return getAni2arrApi().getSeerrTarget(request);
 		},
 		enabled: (options?.enabled ?? true) && request !== null,
-		staleTime: forceRetry ? 0 : 10 * 60 * 1000,
-		...(forceRetry ? { refetchOnMount: "always" as const } : {}),
+		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});

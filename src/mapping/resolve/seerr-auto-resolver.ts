@@ -31,7 +31,6 @@ export type SeerrAutoResolverInput = {
 	anilistId: AniListId | null;
 	title?: string;
 	metadata?: AniListMediaHint | null;
-	forceRetry?: boolean;
 };
 
 type SeerrAutoResolverDependencies = {
@@ -211,8 +210,6 @@ async function buildMatchedTarget(input: {
 export function createSeerrAutoResolver(
 	dependencies: SeerrAutoResolverDependencies,
 ): (input: SeerrAutoResolverInput) => Promise<EffectiveSeerrTarget | null> {
-	// The resolver intentionally branches across cache, retry, enrichment, and write outcomes.
-	// eslint-disable-next-line complexity
 	return async function resolveSeerrTarget(
 		input: SeerrAutoResolverInput,
 	): Promise<EffectiveSeerrTarget | null> {
@@ -225,10 +222,7 @@ export function createSeerrAutoResolver(
 		};
 		const effective = await dependencies.getEffectiveTarget(identity);
 		if (effective.kind === "conflict") return null;
-		if (
-			effective.kind === "mapped" &&
-			(input.forceRetry !== true || effective.source !== "automatic")
-		) {
+		if (effective.kind === "mapped") {
 			return {
 				...(effective.anilistId === undefined
 					? {}
@@ -244,10 +238,10 @@ export function createSeerrAutoResolver(
 			input.mediaType,
 			canonicalAniListId,
 		);
-		if (cached?.kind === "mapped" && input.forceRetry !== true) {
+		if (cached?.kind === "mapped") {
 			return toEffectiveTarget(input, cached.target);
 		}
-		if (cached?.kind === "unmapped" && input.forceRetry !== true) {
+		if (cached?.kind === "unmapped") {
 			return null;
 		}
 

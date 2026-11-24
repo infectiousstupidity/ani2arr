@@ -135,7 +135,6 @@ export type GetSeerrTargetInput = {
 	mediaType: "movie" | "tv";
 	title?: string | null;
 	metadata?: AniListMediaHint | null;
-	forceRetry?: boolean;
 };
 
 export type GetMappingInspectionInput = {

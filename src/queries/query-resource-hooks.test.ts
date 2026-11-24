@@ -150,30 +150,18 @@ describe("normalized query resource hooks", () => {
 		).toBeUndefined();
 	});
 
-	it("reuses the normal Seerr target key and forces retry execution", async () => {
-		const base = {
+	it("uses a normalized Seerr target key and request", async () => {
+		const input = {
 			source: { source: "anilist", id: aid(1) },
 			mediaType: "tv" as const,
-			title: "\tFrieren\t",
-			metadata: { titles: { english: " Frieren " }, coverImage: "cover" },
+			title: " Frieren ",
 		} as const;
-		const resource = normalizeSeerrTargetRequest(base);
-
-		useSeerrTarget(base);
-		useSeerrTarget({ ...base, forceRetry: true });
-
-		const normal = capturedQuery(0);
-		const forced = capturedQuery(1);
-		expect(normal.queryKey).toEqual(queryKeys.seerrTarget(resource));
-		expect(forced.queryKey).toEqual(normal.queryKey);
-		expect(forced.staleTime).toBe(0);
-		expect(forced.refetchOnMount).toBe("always");
-
-		await forced.queryFn();
-		expect(mocks.api.getSeerrTarget).toHaveBeenCalledWith({
-			...resource,
-			forceRetry: true,
-		});
+		const resource = normalizeSeerrTargetRequest(input);
+		useSeerrTarget(input);
+		const query = capturedQuery();
+		expect(query.queryKey).toEqual(queryKeys.seerrTarget(resource));
+		await query.queryFn();
+		expect(mocks.api.getSeerrTarget).toHaveBeenCalledWith(resource);
 	});
 
 	it("uses normalized Seerr seasons for both status key and RPC", async () => {

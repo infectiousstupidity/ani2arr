@@ -103,7 +103,6 @@ describe("seerrHandlers", () => {
 				source,
 				mediaType: "movie",
 				title: "Perfect Blue",
-				forceRetry: true,
 			});
 
 			expect(getUniqueAniListIdForSourceMock).toHaveBeenCalledOnce();
@@ -112,7 +111,6 @@ describe("seerrHandlers", () => {
 				anilistId: linkedAniListId,
 				mediaType: "movie",
 				title: "Perfect Blue",
-				forceRetry: true,
 			});
 		},
 	);

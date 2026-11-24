@@ -73,20 +73,13 @@ export const seerrHandlers = {
 		const source = requireSourceIdentity(input.source);
 		const mediaType = requireMediaType(input.mediaType);
 		const linkedAniListId = await getUniqueAniListIdForSource(source);
-		if (
-			input.title != null ||
-			input.metadata != null ||
-			input.forceRetry === true
-		) {
+		if (input.title != null || input.metadata != null) {
 			return resolveSeerrAutomaticTarget({
 				source,
 				mediaType,
 				anilistId: linkedAniListId,
 				...(input.title == null ? {} : { title: input.title }),
 				...(input.metadata == null ? {} : { metadata: input.metadata }),
-				...(input.forceRetry === undefined
-					? {}
-					: { forceRetry: input.forceRetry }),
 			});
 		}
 		return mappingService.getSeerrTarget(source, mediaType, linkedAniListId);

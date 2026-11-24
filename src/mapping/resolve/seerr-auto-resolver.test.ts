@@ -578,34 +578,4 @@ describe("Seerr automatic resolver", () => {
 		expect(loadMyAnimeListMetadata).not.toHaveBeenCalled();
 		expect(getTvDetails).not.toHaveBeenCalled();
 	});
-
-	it("uses forceRetry to retry a cached null result without new hints", async () => {
-		cached = { kind: "unmapped" };
-		loadAniListMedia.mockResolvedValue({
-			id: source.id,
-			format: "MOVIE",
-			title: { english: "Perfect Blue" },
-			synonyms: [],
-			seasonYear: 1998,
-		});
-		searchMedia.mockResolvedValue([movie()]);
-
-		await expect(
-			resolve(request(undefined, undefined, "movie")),
-		).resolves.toBeNull();
-		expect(loadAniListMedia).not.toHaveBeenCalled();
-		expect(searchMedia).not.toHaveBeenCalled();
-
-		await expect(
-			resolve({
-				...request(undefined, undefined, "movie"),
-				forceRetry: true,
-			}),
-		).resolves.toMatchObject({
-			tmdbId: tmdb(10_494),
-		});
-
-		expect(loadAniListMedia).toHaveBeenCalledOnce();
-		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
-	});
 });

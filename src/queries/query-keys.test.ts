@@ -139,17 +139,6 @@ describe("query keys", () => {
 			force_verify: true,
 			force_mapping_retry: true,
 		};
-		const normalTarget = normalizeSeerrTargetRequest({
-			source,
-			mediaType: "tv",
-			title: "Title",
-		});
-		const forcedTarget = normalizeSeerrTargetRequest({
-			source,
-			mediaType: "tv",
-			title: "Title",
-			forceRetry: true,
-		});
 
 		expect(
 			queryKeys.providerMediaStatus(
@@ -161,9 +150,6 @@ describe("query keys", () => {
 				"sonarr",
 				normalizeSonarrStatusRequest(forcedStatus),
 			),
-		);
-		expect(queryKeys.seerrTarget(normalTarget)).toEqual(
-			queryKeys.seerrTarget(forcedTarget),
 		);
 	});
 
