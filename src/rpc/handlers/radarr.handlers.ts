@@ -5,7 +5,6 @@ import {
 	mappingService,
 	radarrClient,
 	radarrLibrary,
-	scheduleLibraryRefresh,
 } from "@/background/api-services";
 import {
 	getProviderConfig,
@@ -36,6 +35,7 @@ import type {
 	ValidateTmdbInput,
 } from "@/rpc/types";
 import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
+import { maintainArrMutationCache } from "./arr-mutation-cache";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 type RadarrMappingResult =
@@ -62,12 +62,12 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		const changed = await radarrLibrary.upsertMovieSnapshot(
-			toRadarrMovieSnapshot(created),
-			credentials,
+		await maintainArrMutationCache("radarr", () =>
+			radarrLibrary.upsertMovieSnapshot(
+				toRadarrMovieSnapshot(created),
+				credentials,
+			),
 		);
-		scheduleLibraryRefresh("radarr");
-		if (changed) await bumpProviderLibraryRevision("radarr");
 		return created;
 	},
 
@@ -81,12 +81,12 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		const changed = await radarrLibrary.upsertMovieSnapshot(
-			toRadarrMovieSnapshot(updated),
-			credentials,
+		await maintainArrMutationCache("radarr", () =>
+			radarrLibrary.upsertMovieSnapshot(
+				toRadarrMovieSnapshot(updated),
+				credentials,
+			),
 		);
-		scheduleLibraryRefresh("radarr");
-		if (changed) await bumpProviderLibraryRevision("radarr");
 		return updated;
 	},
 

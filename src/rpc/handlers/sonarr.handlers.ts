@@ -38,6 +38,7 @@ import type {
 	ValidateTvdbInput,
 } from "@/rpc/types";
 import { normalizeError } from "@/shared/errors/error-utils";
+import { maintainArrMutationCache } from "./arr-mutation-cache";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 type SonarrMappingResult =
@@ -65,19 +66,20 @@ export const sonarrHandlers = {
 			},
 			{ client: sonarrClient },
 		);
-		const changed = await sonarrLibrary.upsertSeriesSnapshot(
-			toSonarrSeriesSnapshot(created),
-			credentials,
+		await maintainArrMutationCache("sonarr", () =>
+			sonarrLibrary.upsertSeriesSnapshot(
+				toSonarrSeriesSnapshot(created),
+				credentials,
+			),
 		);
-		scheduleLibraryRefresh("sonarr");
-		if (changed) await bumpProviderLibraryRevision("sonarr");
 		return created;
 	},
 
 	async updateSonarrSeries(input: UpdateSonarrInput) {
 		const credentials = await requireProviderCredentials("sonarr");
+		let updated: Awaited<ReturnType<typeof updateSonarrSeriesProvider>>;
 		try {
-			const updated = await updateSonarrSeriesProvider(
+			updated = await updateSonarrSeriesProvider(
 				{
 					tvdbId: input.tvdbId,
 					title: input.title,
@@ -89,13 +91,6 @@ export const sonarrHandlers = {
 				},
 				{ client: sonarrClient },
 			);
-			const changed = await sonarrLibrary.upsertSeriesSnapshot(
-				toSonarrSeriesSnapshot(updated),
-				credentials,
-			);
-			scheduleLibraryRefresh("sonarr");
-			if (changed) await bumpProviderLibraryRevision("sonarr");
-			return updated;
 		} catch (error) {
 			const normalized = normalizeError(error);
 			if (normalized.details?.partialSuccess === true) {
@@ -103,6 +98,13 @@ export const sonarrHandlers = {
 			}
 			throw normalized;
 		}
+		await maintainArrMutationCache("sonarr", () =>
+			sonarrLibrary.upsertSeriesSnapshot(
+				toSonarrSeriesSnapshot(updated),
+				credentials,
+			),
+		);
+		return updated;
 	},
 
 	async getSonarrFormResources(input?: GetProviderFormResourcesInput) {

@@ -247,6 +247,124 @@ describe("Arr RPC handlers", () => {
 		},
 	);
 
+	const mutations = [
+		{
+			name: "Sonarr add",
+			provider: "sonarr",
+			result: createdSeries,
+			remote: addSonarrSeriesMock,
+			upsert: apiServicesMock.sonarrLibrary.upsertSeriesSnapshot,
+			run: () =>
+				sonarrHandlers.addToSonarr({
+					source: { source: "anilist", id: aid(100) },
+					tvdbId: tvdb(200),
+					title: "Series",
+					form: sonarrAddForm,
+				}),
+		},
+		{
+			name: "Sonarr update",
+			provider: "sonarr",
+			result: createdSeries,
+			remote: updateSonarrSeriesMock,
+			upsert: apiServicesMock.sonarrLibrary.upsertSeriesSnapshot,
+			run: () =>
+				sonarrHandlers.updateSonarrSeries({
+					source: { source: "anilist", id: aid(100) },
+					tvdbId: tvdb(200),
+					title: "Series",
+					form: sonarrForm,
+				}),
+		},
+		{
+			name: "Radarr add",
+			provider: "radarr",
+			result: createdMovie,
+			remote: addRadarrMovieMock,
+			upsert: apiServicesMock.radarrLibrary.upsertMovieSnapshot,
+			run: () =>
+				radarrHandlers.addToRadarr({
+					source: { source: "anilist", id: aid(100) },
+					tmdbId: tmdb(300),
+					title: "Movie",
+					form: radarrAddForm,
+				}),
+		},
+		{
+			name: "Radarr update",
+			provider: "radarr",
+			result: createdMovie,
+			remote: updateRadarrMovieMock,
+			upsert: apiServicesMock.radarrLibrary.upsertMovieSnapshot,
+			run: () =>
+				radarrHandlers.updateRadarrMovie({
+					source: { source: "anilist", id: aid(100) },
+					tmdbId: tmdb(300),
+					title: "Movie",
+					form: radarrForm,
+				}),
+		},
+	];
+
+	it.each(mutations)(
+		"returns $name success when local maintenance fails",
+		async ({ provider, result, remote, upsert, run }) => {
+			providerConfigMock.requireProviderConfig.mockResolvedValue({
+				credentials,
+				options: providerOptions,
+			});
+			providerConfigMock.requireProviderCredentials.mockResolvedValue(
+				credentials,
+			);
+			remote.mockResolvedValue(result);
+			const log = vi.spyOn(console, "error").mockImplementation(() => {});
+			try {
+				for (const failure of [upsert, bumpProviderLibraryRevisionMock]) {
+					vi.clearAllMocks();
+					failure.mockRejectedValueOnce(
+						new Error(`cache failure ${credentials.apiKey}`),
+					);
+					await expect(run()).resolves.toBe(result);
+					expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
+						provider,
+					);
+					expect(upsert).toHaveBeenCalledOnce();
+					if (failure === upsert) {
+						expect(bumpProviderLibraryRevisionMock).not.toHaveBeenCalled();
+					} else {
+						expect(bumpProviderLibraryRevisionMock).toHaveBeenCalledWith(
+							provider,
+						);
+					}
+					expect(log).toHaveBeenCalled();
+					expect(JSON.stringify(log.mock.calls)).not.toContain(
+						credentials.apiKey,
+					);
+				}
+			} finally {
+				log.mockRestore();
+			}
+		},
+	);
+
+	it.each(mutations)(
+		"rejects remote $name failures without cache maintenance",
+		async ({ remote, upsert, run }) => {
+			providerConfigMock.requireProviderConfig.mockResolvedValue({
+				credentials,
+				options: providerOptions,
+			});
+			providerConfigMock.requireProviderCredentials.mockResolvedValue(
+				credentials,
+			);
+			remote.mockRejectedValue(new Error("remote failure"));
+			await expect(run()).rejects.toBeDefined();
+			expect(upsert).not.toHaveBeenCalled();
+			expect(apiServicesMock.scheduleLibraryRefresh).not.toHaveBeenCalled();
+			expect(bumpProviderLibraryRevisionMock).not.toHaveBeenCalled();
+		},
+	);
+
 	it("refreshes Sonarr after a partial-success update failure", async () => {
 		const partialSuccessError = {
 			code: ErrorCode.API_ERROR,
