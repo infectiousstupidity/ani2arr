@@ -49,25 +49,25 @@ export class ProviderApiClient {
 		credentials: ProviderCredentials,
 		options: ProviderRequestOptions = {},
 	): Promise<unknown> {
-		const response = await this.request(endpoint, credentials, options);
+		return this.request(endpoint, credentials, options, async (response) => {
+			if (response.status === 204) {
+				throw createError(
+					ErrorCode.API_ERROR,
+					`${this.providerName} returned no content for ${endpoint}.`,
+					`${this.providerName} returned an empty API response.`,
+				);
+			}
 
-		if (response.status === 204) {
-			throw createError(
-				ErrorCode.API_ERROR,
-				`${this.providerName} returned no content for ${endpoint}.`,
-				`${this.providerName} returned an empty API response.`,
-			);
-		}
-
-		try {
-			return await response.json();
-		} catch {
-			throw createError(
-				ErrorCode.API_ERROR,
-				`${this.providerName} returned invalid JSON for ${endpoint}.`,
-				`${this.providerName} returned an invalid API response.`,
-			);
-		}
+			try {
+				return await response.json();
+			} catch {
+				throw createError(
+					ErrorCode.API_ERROR,
+					`${this.providerName} returned invalid JSON for ${endpoint}.`,
+					`${this.providerName} returned an invalid API response.`,
+				);
+			}
+		});
 	}
 
 	protected async requestVoid(
@@ -75,14 +75,15 @@ export class ProviderApiClient {
 		credentials: ProviderCredentials,
 		options: ProviderRequestOptions = {},
 	): Promise<void> {
-		await this.request(endpoint, credentials, options);
+		await this.request(endpoint, credentials, options, async () => {});
 	}
 
-	private async request(
+	private async request<T>(
 		endpoint: string,
 		credentials: ProviderCredentials,
 		options: ProviderRequestOptions,
-	): Promise<Response> {
+		readResponse: (response: Response) => Promise<T>,
+	): Promise<T> {
 		if (!credentials.url || !credentials.apiKey) {
 			throw createError(
 				ErrorCode.CONFIGURATION_ERROR,
@@ -121,13 +122,10 @@ export class ProviderApiClient {
 			);
 
 			if (!response.ok) {
-				const providerMessage = await readProviderErrorMessage(
-					response,
-					{
-						url: credentials.url,
-						apiKey: credentials.apiKey,
-					},
-				);
+				const providerMessage = await readProviderErrorMessage(response, {
+					url: credentials.url,
+					apiKey: credentials.apiKey,
+				});
 				throw createError(
 					ErrorCode.API_ERROR,
 					`${this.providerName} API returned ${response.status} ${response.statusText}.`,
@@ -142,7 +140,16 @@ export class ProviderApiClient {
 				);
 			}
 
-			return response;
+			return await readResponse(response);
+		} catch (error) {
+			if (controller.signal.aborted) {
+				throw createError(
+					ErrorCode.NETWORK_ERROR,
+					`${this.providerName} request timed out.`,
+					`${this.providerName} request timed out. Check the server and network.`,
+				);
+			}
+			throw error;
 		} finally {
 			clearTimeout(timeout);
 		}

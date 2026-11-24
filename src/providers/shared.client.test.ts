@@ -17,6 +17,10 @@ class TestProviderClient extends ProviderApiClient {
 			hasUrlPermission: async () => true,
 		});
 	}
+
+	public async sendVoid(): Promise<void> {
+		await this.requestVoid("action", credentials);
+	}
 }
 
 const client = new TestProviderClient();
@@ -37,9 +41,46 @@ function createErrorResponse(body: unknown, status = 400): Response {
 
 describe("ProviderApiClient", () => {
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
 	});
+
+	it.each([200, 500])(
+		"times out a stalled response body (HTTP %s)",
+		async (status) => {
+			vi.useFakeTimers();
+			vi.stubGlobal(
+				"fetch",
+				vi.fn<typeof fetch>().mockImplementation(async (_input, init) => {
+					const response = new Response(null, { status });
+					const read = () =>
+						new Promise<never>((_resolve, reject) => {
+							init?.signal?.addEventListener("abort", () =>
+								reject(new DOMException("Aborted", "AbortError")),
+							);
+						});
+					vi.spyOn(
+						response,
+						status === 200 ? "json" : "text",
+					).mockImplementation(read);
+					return response;
+				}),
+			);
+			let error: unknown;
+			const request = client
+				.testConnection(credentials)
+				.catch((error_: unknown) => {
+					error = error_;
+				});
+			await vi.advanceTimersByTimeAsync(14_999);
+			expect(error).toBeUndefined();
+			await vi.advanceTimersByTimeAsync(1);
+			expect(error).toMatchObject({ code: ErrorCode.NETWORK_ERROR });
+			await request;
+			expect(vi.getTimerCount()).toBe(0);
+		},
+	);
 
 	it("tests connection through system status", async () => {
 		const fetchMock = stubFetch(Response.json({ version: "4.0.1" }));
@@ -55,6 +96,39 @@ describe("ProviderApiClient", () => {
 		if (!request) throw new Error("Expected fetch request options.");
 		expect(request.method).toBeUndefined();
 		expect(new Headers(request.headers).get("X-Api-Key")).toBe("secret");
+	});
+
+	it("cleans up deadlines for success, malformed JSON, empty and HTTP error responses", async () => {
+		vi.useFakeTimers();
+		stubFetch(Response.json({ version: "4" }));
+		await expect(client.testConnection(credentials)).resolves.toEqual({
+			version: "4",
+		});
+		expect(vi.getTimerCount()).toBe(0);
+
+		stubFetch(new Response("not json"));
+		await expect(client.testConnection(credentials)).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage: "Testarr returned an invalid API response.",
+		});
+		expect(vi.getTimerCount()).toBe(0);
+
+		stubFetch(new Response(null, { status: 204 }));
+		await expect(client.testConnection(credentials)).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage: "Testarr returned an empty API response.",
+		});
+		expect(vi.getTimerCount()).toBe(0);
+
+		stubFetch(new Response(null, { status: 204 }));
+		await expect(client.sendVoid()).resolves.toBeUndefined();
+		expect(vi.getTimerCount()).toBe(0);
+
+		stubFetch(createErrorResponse({ message: "Bad request" }));
+		await expect(client.testConnection(credentials)).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+		});
+		expect(vi.getTimerCount()).toBe(0);
 	});
 
 	it("rejects system status responses without a version", async () => {

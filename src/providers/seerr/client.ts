@@ -56,16 +56,17 @@ export class SeerrClient {
 	public async getCurrentUser(
 		connection: SeerrConnection,
 	): Promise<SeerrAccountSummary> {
-		const response = await this.request("auth/me", connection);
-		if (!response.ok) {
-			if (isAccessDenied(response) && connection.auth.mode === "session") {
-				throw createSeerrAuthRequiredError();
+		return this.request("auth/me", connection, {}, async (response) => {
+			if (!response.ok) {
+				if (isAccessDenied(response) && connection.auth.mode === "session") {
+					throw createSeerrAuthRequiredError();
+				}
+				throw await createSeerrResponseError(response, connection);
 			}
-			throw await createSeerrResponseError(response, connection);
-		}
 
-		const json = await readJsonResponse(response, "auth/me");
-		return readSeerrAccountSummary(json);
+			const json = await readJsonResponse(response, "auth/me");
+			return readSeerrAccountSummary(json);
+		});
 	}
 
 	public async validateConnection(
@@ -86,21 +87,27 @@ export class SeerrClient {
 			await this.assertVerifiedSessionAccount(connection);
 		}
 
-		const response = await this.request("request", connection, {
-			method: "POST",
-			json: payload,
-		});
-		if (!response.ok) {
-			if (connection.auth.mode === "session" && isAccessDenied(response)) {
-				await this.assertVerifiedSessionAccount(connection);
-			}
-			throw await createSeerrResponseError(response, connection);
-		}
-
-		const result = (await readJsonResponse(
-			response,
+		const result = await this.request(
 			"request",
-		)) as SeerrMediaRequest;
+			connection,
+			{
+				method: "POST",
+				json: payload,
+			},
+			async (response) => {
+				if (!response.ok) {
+					if (connection.auth.mode === "session" && isAccessDenied(response)) {
+						await this.assertVerifiedSessionAccount(connection);
+					}
+					throw await createSeerrResponseError(response, connection);
+				}
+
+				return (await readJsonResponse(
+					response,
+					"request",
+				)) as SeerrMediaRequest;
+			},
+		);
 		this.mediaCache.delete(
 			getMediaCacheKey(connection, payload.mediaType, payload.mediaId),
 		);
@@ -187,22 +194,24 @@ export class SeerrClient {
 		connection: SeerrConnection,
 		options: SeerrRequestOptions = {},
 	): Promise<unknown> {
-		const response = await this.request(endpoint, connection, options);
-		if (!response.ok) {
-			if (connection.auth.mode === "session" && isAccessDenied(response)) {
-				await this.getCurrentUser(connection);
+		return this.request(endpoint, connection, options, async (response) => {
+			if (!response.ok) {
+				if (connection.auth.mode === "session" && isAccessDenied(response)) {
+					await this.getCurrentUser(connection);
+				}
+				throw await createSeerrResponseError(response, connection);
 			}
-			throw await createSeerrResponseError(response, connection);
-		}
 
-		return readJsonResponse(response, endpoint);
+			return readJsonResponse(response, endpoint);
+		});
 	}
 
-	private async request(
+	private async request<T>(
 		endpoint: string,
 		connection: SeerrConnection,
-		options: SeerrRequestOptions = {},
-	): Promise<Response> {
+		options: SeerrRequestOptions,
+		readResponse: (response: Response) => Promise<T>,
+	): Promise<T> {
 		assertConfiguredConnection(connection);
 
 		if (!(await this.hasUrlPermission(connection.url))) {
@@ -215,6 +224,7 @@ export class SeerrClient {
 
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+		let responseReceived = false;
 
 		try {
 			const { json, ...fetchOptions } = options;
@@ -243,14 +253,17 @@ export class SeerrClient {
 				...(body === undefined ? {} : { body }),
 			};
 
-			return await fetch(
+			const response = await fetch(
 				buildSeerrApiUrl(connection.url, endpoint),
 				requestOptions,
 			);
+			responseReceived = true;
+			return await readResponse(response);
 		} catch (error) {
 			if (
 				connection.auth.mode === "session" &&
-				(controller.signal.aborted || error instanceof TypeError)
+				(controller.signal.aborted ||
+					(!responseReceived && error instanceof TypeError))
 			) {
 				throw createError(
 					ErrorCode.SEERR_SESSION_UNAVAILABLE,
@@ -258,6 +271,13 @@ export class SeerrClient {
 						? "Seerr session request timed out."
 						: "Seerr session request failed.",
 					"Could not use your Seerr browser session. Check the server, network, and third-party-cookie settings, or use API-key mode when Seerr CSRF protection is disabled.",
+				);
+			}
+			if (controller.signal.aborted) {
+				throw createError(
+					ErrorCode.NETWORK_ERROR,
+					"Seerr request timed out.",
+					"Seerr request timed out. Check the server and network.",
 				);
 			}
 			throw error;

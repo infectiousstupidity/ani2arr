@@ -344,6 +344,76 @@ describe("SeerrClient", () => {
 		});
 	});
 
+	it.each([
+		[200, apiKeyConnection, ErrorCode.NETWORK_ERROR],
+		[500, apiKeyConnection, ErrorCode.NETWORK_ERROR],
+		[200, sessionConnection, ErrorCode.SEERR_SESSION_UNAVAILABLE],
+		[500, sessionConnection, ErrorCode.SEERR_SESSION_UNAVAILABLE],
+	])(
+		"times out stalled HTTP %s bodies in $auth.mode mode",
+		async (status, connection, code) => {
+			vi.useFakeTimers();
+			fetchMock.mockImplementation(async (_input, init) => {
+				const response = new Response(null, { status });
+				const read = () =>
+					new Promise<never>((_resolve, reject) => {
+						init?.signal?.addEventListener("abort", () =>
+							reject(new DOMException("Aborted", "AbortError")),
+						);
+					});
+				vi.spyOn(response, status === 200 ? "json" : "text").mockImplementation(
+					read,
+				);
+				return response;
+			});
+			let error: unknown;
+			const request = createClient()
+				.getCurrentUser(connection)
+				.catch((error_: unknown) => {
+					error = error_;
+				});
+			await vi.advanceTimersByTimeAsync(14_999);
+			expect(error).toBeUndefined();
+			await vi.advanceTimersByTimeAsync(1);
+			expect(error).toMatchObject({ code });
+			await request;
+			expect(vi.getTimerCount()).toBe(0);
+		},
+	);
+
+	it("cleans up deadlines for success, malformed JSON, empty and HTTP error responses", async () => {
+		vi.useFakeTimers();
+		fetchMock.mockResolvedValueOnce(createAccountResponse());
+		await expect(
+			createClient().getCurrentUser(apiKeyConnection),
+		).resolves.toMatchObject({ id: 1 });
+		expect(vi.getTimerCount()).toBe(0);
+
+		fetchMock.mockResolvedValueOnce(new Response("not json"));
+		await expect(
+			createClient().getCurrentUser(apiKeyConnection),
+		).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage: "Seerr returned an invalid API response.",
+		});
+		expect(vi.getTimerCount()).toBe(0);
+
+		fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+		await expect(
+			createClient().getCurrentUser(apiKeyConnection),
+		).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage: "Seerr returned an empty API response.",
+		});
+		expect(vi.getTimerCount()).toBe(0);
+
+		fetchMock.mockResolvedValueOnce(createErrorResponse("Bad request", 500));
+		await expect(
+			createClient().getCurrentUser(apiKeyConnection),
+		).rejects.toMatchObject({ code: ErrorCode.API_ERROR });
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
 	it("preserves the 15-second timeout for session transport", async () => {
 		vi.useFakeTimers();
 		fetchMock.mockImplementation(
