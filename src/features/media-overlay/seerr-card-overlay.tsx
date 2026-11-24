@@ -14,6 +14,7 @@ import type {
 	ReactNode,
 	SyntheticEvent,
 } from "react";
+import { useEffect, useState } from "react";
 import type { AniListMediaHint } from "@/anilist/types";
 import {
 	type SeerrMediaAction,
@@ -186,13 +187,34 @@ export function SeerrCardStackActions({
 	statusBlocked,
 }: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
+	const [engaged, setEngaged] = useState(false);
+	const isInline = presentation === "status-column" || presentation === "action-row";
+
+	useEffect(() => {
+		if (isInline || engaged || !observeTarget) return;
+		const target = observeTarget.closest(".media-card") ?? observeTarget;
+		if (target.matches(":hover, :focus-within")) {
+			// Capture engagement that happened before the listeners were attached.
+			// eslint-disable-next-line react-hooks/set-state-in-effect
+			setEngaged(true);
+			return;
+		}
+		const engage = () => setEngaged(true);
+		target.addEventListener("pointerenter", engage);
+		target.addEventListener("focusin", engage);
+		return () => {
+			target.removeEventListener("pointerenter", engage);
+			target.removeEventListener("focusin", engage);
+		};
+	}, [engaged, isInline, observeTarget]);
+
 	const action = useSeerrMediaAction({
 		source,
 		title,
 		metadata,
 		mediaType,
 		isConfigured,
-		enabled: isInViewport,
+		enabled: isInViewport && (isInline || engaged),
 		statusBlocked: statusBlocked === true,
 		onOpenModal,
 	});

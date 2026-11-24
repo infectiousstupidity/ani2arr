@@ -1,7 +1,9 @@
+// @vitest-environment happy-dom
 /** Viewport gating tests for the shared Seerr card action. */
 
 import type { ComponentType, ReactNode } from "react";
-import { createElement } from "react";
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
@@ -10,6 +12,9 @@ import {
 	SeerrCardStackActions,
 	SeerrStandaloneCardOverlay,
 } from "./seerr-card-overlay";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
+	.IS_REACT_ACT_ENVIRONMENT = true;
 
 const mediaActionMock = vi.hoisted(() =>
 	vi.fn(() => ({
@@ -67,8 +72,54 @@ it("passes viewport enablement to the shared action", () => {
 	);
 
 	viewportMock.mockReturnValue(true);
-	renderToStaticMarkup(<SeerrCardStackActions {...props} />);
+	renderToStaticMarkup(<SeerrCardStackActions {...props} presentation="status-column" />);
 	expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
 		expect.objectContaining({ enabled: true }),
 	);
+});
+
+it("enables floating actions when the card is already hovered or focused", async () => {
+	viewportMock.mockReturnValue(true);
+	const card = document.createElement("div");
+	card.className = "media-card";
+	const target = document.createElement("div");
+	card.append(target);
+	document.body.append(card);
+	const matches = vi.spyOn(card, "matches").mockReturnValue(true);
+	const root = createRoot(target);
+	// eslint-disable-next-line testing-library/no-unnecessary-act
+	await act(async () => {
+		root.render(<SeerrCardStackActions {...props} observeTarget={target} />);
+	});
+	expect(matches).toHaveBeenCalledWith(":hover, :focus-within");
+	expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
+		expect.objectContaining({ enabled: true }),
+	);
+	await act(async () => root.unmount());
+	card.remove();
+});
+
+it("enables floating actions after engagement with the card ancestor", async () => {
+	viewportMock.mockReturnValue(true);
+	const card = document.createElement("div");
+	card.className = "media-card";
+	const target = document.createElement("div");
+	card.append(target);
+	document.body.append(card);
+	const root = createRoot(target);
+	// eslint-disable-next-line testing-library/no-unnecessary-act
+	await act(async () => {
+		root.render(<SeerrCardStackActions {...props} observeTarget={target} />);
+	});
+	expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
+		expect.objectContaining({ enabled: false }),
+	);
+	await act(async () => {
+		card.dispatchEvent(new Event("pointerenter"));
+	});
+	expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
+		expect.objectContaining({ enabled: true }),
+	);
+	await act(async () => root.unmount());
+	card.remove();
 });
