@@ -9,7 +9,7 @@ import {
 const ANIBRIDGE_URL =
 	"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
 const ANIBRIDGE_TIMEOUT_MS = 15_000;
-export const MAX_ANIBRIDGE_BYTES = 10 * 1024 * 1024;
+export const MAX_ANIBRIDGE_BYTES = 20 * 1024 * 1024;
 
 export type AniBridgeDownloadResult =
 	| { status: "not-modified" }
