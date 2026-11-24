@@ -139,6 +139,7 @@ export class RadarrLibrary {
 			} catch (error) {
 				const normalized = normalizeError(error);
 				logError(normalized, "RadarrLibrary:refreshMovieSnapshots");
+				if (!cached) throw normalized;
 				const ttl = {
 					...CACHE_TTL.error,
 					meta: { lastErrorCode: normalized.code },
@@ -170,7 +171,19 @@ export class RadarrLibrary {
 		onCacheChanged?: () => Promise<void> | void;
 	}): Promise<RadarrMovieLibraryStatus> {
 		const { credentials, tmdbId } = input;
-		const snapshots = await this.getMovieSnapshots(credentials);
+		let snapshots: RadarrMovieSnapshot[] = [];
+		try {
+			snapshots = await this.getMovieSnapshots(credentials);
+		} catch {
+			if (input.forceVerify !== true) {
+				return {
+					provider: "radarr",
+					providerId: tmdbId,
+					isInLibrary: null,
+					libraryUnknownReason: "library-check-failed",
+				};
+			}
+		}
 		const cachedMovie =
 			snapshots.find((movie) => movie.tmdbId === tmdbId) ?? null;
 		const existsInCache = cachedMovie !== null;
@@ -184,26 +197,12 @@ export class RadarrLibrary {
 			};
 		}
 
+		let liveMovie: RadarrMovie | null;
 		try {
-			const liveMovie = await this.client.findMovieByTmdbId(
+			liveMovie = await this.client.findMovieByTmdbId(
 				tmdbId,
 				credentials,
 			);
-
-			if (liveMovie) {
-				const snapshot = toRadarrMovieSnapshot(liveMovie);
-				if (!existsInCache) {
-					const changed = await this.upsertMovieSnapshot(snapshot, credentials);
-					if (changed) await input.onCacheChanged?.();
-				}
-
-				return {
-					provider: "radarr",
-					providerId: tmdbId,
-					isInLibrary: true,
-					movie: liveMovie,
-				};
-			}
 		} catch (error) {
 			logError(normalizeError(error), `RadarrLibrary:check:${tmdbId}`);
 			return {
@@ -211,6 +210,28 @@ export class RadarrLibrary {
 				providerId: tmdbId,
 				isInLibrary: null,
 				libraryUnknownReason: "library-check-failed",
+			};
+		}
+
+		if (liveMovie) {
+			const snapshot = toRadarrMovieSnapshot(liveMovie);
+			if (!existsInCache) {
+				try {
+					const changed = await this.upsertMovieSnapshot(
+						snapshot,
+						credentials,
+					);
+					if (changed) await input.onCacheChanged?.();
+				} catch (error) {
+					logError(normalizeError(error), `RadarrLibrary:cache:${tmdbId}`);
+				}
+			}
+
+			return {
+				provider: "radarr",
+				providerId: tmdbId,
+				isInLibrary: true,
+				movie: liveMovie,
 			};
 		}
 
@@ -249,7 +270,8 @@ export class RadarrLibrary {
 				? memoryCache
 				: await this.cache.read(cacheKey);
 		if (generation !== this.cacheGeneration) return false;
-		const current = cached?.value ?? [];
+		if (!cached) return false;
+		const current = cached.value;
 		const existingIndex = current.findIndex(
 			(item) => item.tmdbId === snapshot.tmdbId,
 		);

@@ -135,6 +135,8 @@ export class SonarrLibrary {
 				return snapshots;
 			} catch (error) {
 				const normalized = normalizeError(error);
+				logError(normalized, "SonarrLibrary:refreshSeriesSnapshots");
+				if (!cached) throw normalized;
 				const ttl = {
 					...CACHE_TTL.error,
 					meta: { lastErrorCode: normalized.code },
@@ -166,7 +168,19 @@ export class SonarrLibrary {
 		onCacheChanged?: () => Promise<void> | void;
 	}): Promise<SonarrSeriesLibraryStatus> {
 		const { credentials, tvdbId } = input;
-		const snapshots = await this.getSeriesSnapshots(credentials);
+		let snapshots: SonarrSeriesSnapshot[] = [];
+		try {
+			snapshots = await this.getSeriesSnapshots(credentials);
+		} catch {
+			if (input.forceVerify !== true) {
+				return {
+					provider: "sonarr",
+					providerId: tvdbId,
+					isInLibrary: null,
+					libraryUnknownReason: "library-check-failed",
+				};
+			}
+		}
 		const cachedSeries =
 			snapshots.find((series) => series.tvdbId === tvdbId) ?? null;
 		const existsInCache = cachedSeries !== null;
@@ -180,29 +194,12 @@ export class SonarrLibrary {
 			};
 		}
 
+		let liveSeries: SonarrSeries | null;
 		try {
-			const liveSeries = await this.client.findSeriesByTvdbId(
+			liveSeries = await this.client.findSeriesByTvdbId(
 				tvdbId,
 				credentials,
 			);
-
-			if (liveSeries) {
-				const snapshot = toSonarrSeriesSnapshot(liveSeries);
-				if (!existsInCache) {
-					const changed = await this.upsertSeriesSnapshot(
-						snapshot,
-						credentials,
-					);
-					if (changed) await input.onCacheChanged?.();
-				}
-
-				return {
-					provider: "sonarr",
-					providerId: tvdbId,
-					isInLibrary: true,
-					series: liveSeries,
-				};
-			}
 		} catch (error) {
 			logError(normalizeError(error), `SonarrLibrary:check:${tvdbId}`);
 			return {
@@ -210,6 +207,28 @@ export class SonarrLibrary {
 				providerId: tvdbId,
 				isInLibrary: null,
 				libraryUnknownReason: "library-check-failed",
+			};
+		}
+
+		if (liveSeries) {
+			const snapshot = toSonarrSeriesSnapshot(liveSeries);
+			if (!existsInCache) {
+				try {
+					const changed = await this.upsertSeriesSnapshot(
+						snapshot,
+						credentials,
+					);
+					if (changed) await input.onCacheChanged?.();
+				} catch (error) {
+					logError(normalizeError(error), `SonarrLibrary:cache:${tvdbId}`);
+				}
+			}
+
+			return {
+				provider: "sonarr",
+				providerId: tvdbId,
+				isInLibrary: true,
+				series: liveSeries,
 			};
 		}
 
@@ -251,7 +270,8 @@ export class SonarrLibrary {
 				? memoryCache
 				: await this.cache.read(cacheKey);
 		if (generation !== this.cacheGeneration) return false;
-		const current = cached?.value ?? [];
+		if (!cached) return false;
+		const current = cached.value;
 		const existingIndex = current.findIndex(
 			(item) => item.tvdbId === snapshot.tvdbId,
 		);

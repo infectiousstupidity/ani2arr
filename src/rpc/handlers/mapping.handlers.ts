@@ -75,7 +75,7 @@ async function loadSonarrLibrary(): Promise<SonarrSeriesSnapshot[]> {
 		return [];
 	}
 
-	return sonarrLibrary.getSeriesSnapshots(credentials);
+	return sonarrLibrary.getSeriesSnapshots(credentials).catch(() => []);
 }
 
 async function loadRadarrLibrary(): Promise<RadarrMovieSnapshot[]> {
@@ -84,7 +84,7 @@ async function loadRadarrLibrary(): Promise<RadarrMovieSnapshot[]> {
 		return [];
 	}
 
-	return radarrLibrary.getMovieSnapshots(credentials);
+	return radarrLibrary.getMovieSnapshots(credentials).catch(() => []);
 }
 
 function sonarrMeta(

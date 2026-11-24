@@ -58,6 +58,8 @@ type LibraryHarness = {
 	getSnapshots(credentials: ProviderCredentials): Promise<unknown[]>;
 	refresh(credentials: ProviderCredentials): Promise<unknown[]>;
 	clear(): Promise<void>;
+	nonForcedStatus(): Promise<LibraryStatus>;
+	upsert(): Promise<boolean>;
 	status(
 		providerId: number,
 		onCacheChanged: () => void,
@@ -155,6 +157,13 @@ function createSonarrHarness(): LibraryHarness {
 		refresh: (inputCredentials) =>
 			library.refreshSeriesSnapshots(inputCredentials),
 		clear: () => library.clearSeriesSnapshotCache(),
+		nonForcedStatus: () =>
+			library.getSeriesLibraryStatusByTvdbId({
+				tvdbId: entity.tvdbId,
+				credentials,
+			}),
+		upsert: () =>
+			library.upsertSeriesSnapshot(toSonarrSeriesSnapshot(entity), credentials),
 		status: (providerId, onCacheChanged) =>
 			library.getSeriesLibraryStatusByTvdbId({
 				tvdbId: parseTvdbId(providerId),
@@ -221,6 +230,13 @@ function createRadarrHarness(): LibraryHarness {
 		refresh: (inputCredentials) =>
 			library.refreshMovieSnapshots(inputCredentials),
 		clear: () => library.clearMovieSnapshotCache(),
+		nonForcedStatus: () =>
+			library.getMovieLibraryStatusByTmdbId({
+				tmdbId: entity.tmdbId,
+				credentials,
+			}),
+		upsert: () =>
+			library.upsertMovieSnapshot(toRadarrMovieSnapshot(entity), credentials),
 		status: (providerId, onCacheChanged) =>
 			library.getMovieLibraryStatusByTmdbId({
 				tmdbId: parseTmdbId(providerId),
@@ -240,6 +256,87 @@ const libraryCases: ReadonlyArray<{
 ];
 
 describe("Arr library cache contract", () => {
+	it.each(libraryCases)(
+		"reports unknown after a cold $name refresh failure",
+		async ({ create }) => {
+			const harness = create();
+			harness.fetchAll.mockRejectedValue(new Error("unavailable"));
+			await expect(harness.nonForcedStatus()).resolves.toMatchObject({
+				isInLibrary: null,
+				libraryUnknownReason: "library-check-failed",
+			});
+			expect(harness.cache.keys()).toEqual([]);
+			expect(harness.cache.write).not.toHaveBeenCalled();
+			harness.fetchAll.mockResolvedValue([harness.entity]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
+				harness.snapshot,
+			]);
+			expect(harness.fetchAll).toHaveBeenCalled();
+		},
+	);
+
+	it.each(libraryCases)(
+		"verifies live after a cold $name refresh failure",
+		async ({ create }) => {
+			const harness = create();
+			harness.fetchAll.mockRejectedValue(new Error("unavailable"));
+			harness.find.mockResolvedValue(harness.entity);
+			await expect(
+				harness.status(harness.providerId, vi.fn()),
+			).resolves.toMatchObject({ isInLibrary: true });
+			expect(harness.cache.keys()).toEqual([]);
+		},
+	);
+
+	it.each(libraryCases)(
+		"preserves a confirmed $name live hit when cache reads fail",
+		async ({ create }) => {
+			const harness = create();
+			vi.mocked(harness.cache.read).mockRejectedValue(
+				new Error("cache unavailable"),
+			);
+			harness.find.mockResolvedValue(harness.entity);
+			await expect(
+				harness.status(harness.providerId, vi.fn()),
+			).resolves.toMatchObject({ isInLibrary: true });
+			expect(harness.cache.read).toHaveBeenCalledTimes(2);
+		},
+	);
+
+	it.each(libraryCases)(
+		"serves the cached $name list after refresh failure",
+		async ({ create }) => {
+			const harness = create();
+			await harness.cache.write(
+				harness.cacheKey,
+				[harness.snapshot],
+				CACHE_TTL,
+			);
+			harness.fetchAll.mockRejectedValue(new Error("unavailable"));
+			await expect(harness.refresh(harness.credentials)).resolves.toEqual([
+				harness.snapshot,
+			]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
+				harness.snapshot,
+			]);
+		},
+	);
+
+	it.each(libraryCases)(
+		"does not upsert a cold $name library",
+		async ({ create }) => {
+			const harness = create();
+			await expect(harness.upsert()).resolves.toBe(false);
+			expect(harness.cache.keys()).toEqual([]);
+			expect(harness.cache.write).not.toHaveBeenCalled();
+			harness.fetchAll.mockResolvedValue([harness.entity]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
+				harness.snapshot,
+			]);
+			expect(harness.fetchAll).toHaveBeenCalled();
+		},
+	);
+
 	it.each(libraryCases)(
 		"normalizes and isolates $name server cache scopes",
 		async ({ create }) => {
