@@ -15,6 +15,13 @@ import {
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { createSeerrAutoResolver } from "./seerr-auto-resolver";
+import { flushAutomaticStore } from "@/mapping/auto.store";
+
+// Automatic results persist in the background after a short delay; flush before raw reads.
+async function readPersisted(keys: string | string[]) {
+	await flushAutomaticStore();
+	return browser.storage.local.get(keys);
+}
 
 const source = {
 	source: "anilist",
@@ -335,7 +342,7 @@ describe("Seerr automatic resolver", () => {
 				expect.objectContaining({ kind: "mapped" }),
 				anilistId ?? undefined,
 			);
-			const stored = await browser.storage.local.get("mapping:auto");
+			const stored = await readPersisted("mapping:auto");
 			const automatic = stored["mapping:auto"] as {
 				records: Record<string, unknown>;
 			};
@@ -396,7 +403,7 @@ describe("Seerr automatic resolver", () => {
 		await expect(getSeerrAutoResult(source, "movie")).resolves.toBeNull();
 	});
 
-	it("uses TV details only to validate the inferred TMDB season", async () => {
+	it("skips TV details when no season is inferred", async () => {
 		searchMedia.mockResolvedValue([
 			tv(209_867, "Frieren: Beyond Journey's End", 2023),
 		]);
@@ -420,7 +427,7 @@ describe("Seerr automatic resolver", () => {
 			tmdbId: tmdb(209_867),
 		});
 
-		expect(getTvDetails).toHaveBeenCalledWith(tmdb(209_867));
+		expect(getTvDetails).not.toHaveBeenCalled();
 		expect(cached).toMatchObject({
 			kind: "mapped",
 			target: { mediaType: "tv", tmdbId: tmdb(209_867) },

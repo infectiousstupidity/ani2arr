@@ -177,9 +177,6 @@ async function buildMatchedTarget(input: {
 		return { mediaType: "movie", tmdbId: input.match.result.tmdbId };
 	}
 
-	const details = await input.dependencies.getTvDetails(
-		input.match.result.tmdbId,
-	);
 	let enrichedMedia = input.enrichedMedia;
 	let inferredSeason = inferExplicitSeason(
 		collectTitles(input.request, enrichedMedia),
@@ -190,9 +187,16 @@ async function buildMatchedTarget(input: {
 			collectTitles(input.request, enrichedMedia),
 		);
 	}
-	const hasInferredSeason = details.seasons?.some(
-		(season) => season.seasonNumber === inferredSeason,
-	);
+	// Details only validate an inferred season, so fetch them only when there is one.
+	let hasInferredSeason = false;
+	if (inferredSeason !== undefined) {
+		const details = await input.dependencies.getTvDetails(
+			input.match.result.tmdbId,
+		);
+		hasInferredSeason =
+			details.seasons?.some((season) => season.seasonNumber === inferredSeason) ??
+			false;
+	}
 	return {
 		mediaType: "tv",
 		tmdbId: input.match.result.tmdbId,
