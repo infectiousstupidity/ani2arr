@@ -73,7 +73,7 @@ describe.each([
 		inLibraryLabel,
 	}) => {
 		const onSelect =
-			vi.fn<(candidate: { summary: MediaModalTargetSummary } | null) => void>();
+			vi.fn<(candidate: MediaModalTargetSummary | null) => void>();
 		let container: HTMLDivElement;
 		let root: ReturnType<typeof createRoot>;
 
@@ -89,13 +89,15 @@ describe.each([
 			container.remove();
 		});
 
-		function mountPanel(): void {
+		function mountPanel(
+			selectedCandidate: MediaModalTargetSummary | null = null,
+		): void {
 			root.render(
 				<Tooltip.Provider>
 					<Panel
 						contentContainer={null}
 						currentTarget={null}
-						selectedCandidate={null}
+						selectedCandidate={selectedCandidate}
 						onSelectCandidate={onSelect}
 					/>
 				</Tooltip.Provider>,
@@ -124,7 +126,7 @@ describe.each([
 						...stats,
 					},
 				});
-				act(mountPanel);
+				act(() => mountPanel());
 
 				expect(container.textContent).toContain("1 linked");
 				expect(container.textContent?.includes(inLibraryLabel)).toBe(
@@ -143,7 +145,7 @@ describe.each([
 						?.click(),
 				);
 
-				const summary = onSelect.mock.lastCall?.[0]?.summary;
+				const summary = onSelect.mock.lastCall?.[0];
 				expect(summary).toMatchObject({
 					title,
 					overview,
@@ -185,6 +187,36 @@ describe.each([
 			},
 		);
 
+		it("clears the selection when the selected row is clicked or the query changes", () => {
+			lookup.mockReturnValue({
+				data: { results: [result], [idsKey]: [] },
+			});
+			const selected = { provider, providerId: id, title, isInLibrary: false };
+			act(() => mountPanel(selected as MediaModalTargetSummary));
+
+			onSelect.mockClear();
+			act(() =>
+				container
+					.querySelector<HTMLButtonElement>(
+						`[aria-label=${CSS.escape(`Clear selected match: ${title}`)}]`,
+					)
+					?.click(),
+			);
+			expect(onSelect.mock.calls).toEqual([[null]]);
+
+			onSelect.mockClear();
+			const input = container.querySelector("input");
+			act(() => {
+				if (!input) return;
+				Object.getOwnPropertyDescriptor(
+					HTMLInputElement.prototype,
+					"value",
+				)?.set?.call(input, "other");
+				input.dispatchEvent(new Event("input", { bubbles: true }));
+			});
+			expect(onSelect.mock.calls).toEqual([[null]]);
+		});
+
 		it("renders lookup errors", () => {
 			lookup.mockReturnValue({
 				error: createError(
@@ -193,7 +225,7 @@ describe.each([
 					"Lookup failed.",
 				),
 			});
-			act(mountPanel);
+			act(() => mountPanel());
 			expect(container.textContent).toContain("Lookup failed.");
 		});
 	},

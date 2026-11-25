@@ -13,10 +13,7 @@ import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
 import { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
 import type { GetSeriesStatusOutput } from "@/rpc/types";
 import { DetailsPanel } from "../details/details-panel";
-import {
-	SonarrMappingPanel,
-	type SonarrMappingCandidate,
-} from "./sonarr-mapping-panel";
+import { SonarrMappingPanel } from "./sonarr-mapping-panel";
 import { useSonarrSetupForm } from "./sonarr-setup-form";
 import {
 	canShowSonarrSetup,
@@ -220,7 +217,7 @@ export function SonarrModal({
 	const anilistId = getModalAniListId(source, sourceAniListIds.data);
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
-		useState<SonarrMappingCandidate | null>(null);
+		useState<MediaModalTargetSummary | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const data = useSonarrModalData({
 		source,
@@ -273,9 +270,7 @@ export function SonarrModal({
 		verificationSettled: data.verificationSettled,
 		onClose,
 	});
-	const previewTarget = isMappingView
-		? (selectedCandidate?.summary ?? null)
-		: null;
+	const previewTarget = isMappingView ? selectedCandidate : null;
 	const handleOpenSettings = useOpenMappingSettingsAction({
 		anilistId,
 		openSource,
@@ -292,7 +287,7 @@ export function SonarrModal({
 	const canIgnoreTitle = inspection.data?.mapping.kind !== "ignored";
 	const canSubmitMapping =
 		selectedCandidate !== null &&
-		!targetsEqual(selectedCandidate.summary, data.currentTarget);
+		!targetsEqual(selectedCandidate, data.currentTarget);
 	const overwriteTargetTitle = getOverwriteTargetTitle(
 		previewTarget,
 		data.currentTarget,
@@ -304,7 +299,7 @@ export function SonarrModal({
 	const mappingActions = useMappingActions({
 		source,
 		provider: PROVIDER,
-		selectedProviderId: selectedCandidate?.tvdbId ?? null,
+		selectedProviderId: selectedCandidate?.providerId ?? null,
 		rejectProviderId: rejectCandidateTvdbId,
 		clearRejectedProviderId: clearRejectedCandidateTvdbId,
 		requiresApplyConfirmation:

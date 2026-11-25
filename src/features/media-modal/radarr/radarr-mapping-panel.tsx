@@ -1,182 +1,77 @@
 /** Radarr-specific manual mapping search panel for the media modal. */
 // src/features/media-modal/radarr/radarr-mapping-panel.tsx
 
-import { useMemo, useState } from "react";
-import { parseTmdbId, type TmdbId } from "@/providers/schemas";
-import {
-	getProviderExternalIdLabel,
-	getProviderLabel,
-} from "@/providers/provider-labels";
-import { getProviderOpenTarget } from "@/providers/provider-links";
+import { useState } from "react";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { RadarrLookupMovie } from "@/providers/radarr/types";
-import { openProviderPage } from "@/rpc/provider-page";
+import { parseTmdbId } from "@/providers/schemas";
 import { useRadarrLookupSearch } from "@/queries/radarr";
-import { normalizeError } from "@/shared/errors/error-utils";
-import { MappingCandidateRow } from "../mapping/mapping-search-results";
-import { MappingSearchShell } from "../mapping/mapping-search-shell";
+import type { RadarrLookupOutput } from "@/rpc/types";
+import {
+	MappingSearchShell,
+	type MappingPanelProps,
+} from "../mapping/mapping-search-shell";
 import { normalizeLinkedAniListIds, pickProviderPoster } from "../helpers";
 import type { MediaModalTargetSummary } from "../types";
 
-export type RadarrMappingCandidate = {
-	tmdbId: TmdbId;
-	result: RadarrLookupMovie;
-	summary: MediaModalTargetSummary;
-};
-
-type RadarrMappingPanelProps = {
-	contentContainer: HTMLDivElement | null;
-	currentTarget: MediaModalTargetSummary | null;
-	selectedCandidate: RadarrMappingCandidate | null;
-	onSelectCandidate: (candidate: RadarrMappingCandidate | null) => void;
-};
-
 const PROVIDER = "radarr" as const;
 
-function buildCandidate(input: {
-	movie: RadarrLookupMovie;
-	libraryTmdbIds: number[] | null;
-	linkedAniListIdsByTmdbId: Record<number, number[]> | undefined;
-}): RadarrMappingCandidate {
-	const tmdbId = parseTmdbId(input.movie.tmdbId);
-	const isInLibrary = input.libraryTmdbIds?.includes(tmdbId) ?? null;
+function buildCandidate(
+	movie: RadarrLookupMovie,
+	data: RadarrLookupOutput,
+): MediaModalTargetSummary {
+	const tmdbId = parseTmdbId(movie.tmdbId);
+	const isInLibrary = data.libraryTmdbIds?.includes(tmdbId) ?? null;
 	const providerRouteSlug = isInLibrary
-		? (getProviderRouteSlug(PROVIDER, input.movie) ?? undefined)
+		? (getProviderRouteSlug(PROVIDER, movie) ?? undefined)
 		: undefined;
-	const posterUrl = pickProviderPoster(input.movie);
+	const posterUrl = pickProviderPoster(movie);
 	const linkedAniListIds = normalizeLinkedAniListIds(
-		input.linkedAniListIdsByTmdbId?.[tmdbId],
+		data.linkedAniListIdsByTmdbId?.[tmdbId],
 	);
-	const summary: MediaModalTargetSummary = {
+
+	return {
 		provider: PROVIDER,
 		providerId: tmdbId,
-		title: input.movie.title,
+		title: movie.title,
 		isInLibrary,
 		typeLabel: "Movie",
-		...(input.movie.folderName
-			? { providerFolderName: input.movie.folderName }
-			: {}),
-		...(typeof input.movie.year === "number" ? { year: input.movie.year } : {}),
+		...(movie.folderName ? { providerFolderName: movie.folderName } : {}),
+		...(typeof movie.year === "number" ? { year: movie.year } : {}),
 		...(providerRouteSlug ? { providerRouteSlug } : {}),
 		...(posterUrl === undefined ? {} : { posterUrl }),
-		...(input.movie.status === undefined
-			? {}
-			: { statusLabel: input.movie.status }),
-		...(input.movie.overview ? { overview: input.movie.overview } : {}),
-		...(typeof input.movie.runtime === "number"
-			? { runtimeMinutes: input.movie.runtime }
+		...(movie.status === undefined ? {} : { statusLabel: movie.status }),
+		...(movie.overview ? { overview: movie.overview } : {}),
+		...(typeof movie.runtime === "number"
+			? { runtimeMinutes: movie.runtime }
 			: {}),
-		...(input.movie.hasFile === undefined
-			? {}
-			: { hasFile: input.movie.hasFile }),
+		...(movie.hasFile === undefined ? {} : { hasFile: movie.hasFile }),
 		...(linkedAniListIds?.length ? { linkedAniListIds } : {}),
 	};
-
-	return { tmdbId, result: input.movie, summary };
-}
-
-function getLibraryLabel(input: {
-	candidate: RadarrMappingCandidate;
-	providerLabel: string;
-}): string | null {
-	const { candidate, providerLabel } = input;
-	if (!candidate.summary.isInLibrary) return null;
-
-	if (candidate.summary.hasFile !== undefined) {
-		return `In ${providerLabel}: ${candidate.summary.hasFile ? "1 file" : "0 files"}`;
-	}
-
-	return `In ${providerLabel}`;
 }
 
 export function RadarrMappingPanel(
-	props: RadarrMappingPanelProps,
+	props: MappingPanelProps,
 ): React.JSX.Element {
-	const {
-		contentContainer,
-		currentTarget,
-		selectedCandidate,
-		onSelectCandidate,
-	} = props;
 	const [searchTerm, setSearchTerm] = useState("");
 	const search = useRadarrLookupSearch({
 		term: searchTerm,
 		enabled: searchTerm.length > 0,
 	});
-	const providerLabel = getProviderLabel(PROVIDER);
-	const providerIdLabel = getProviderExternalIdLabel(PROVIDER);
 	const { data } = search;
-	const candidates = useMemo(
-		() =>
-			data?.results.map((movie) =>
-				buildCandidate({
-					movie,
-					libraryTmdbIds: data.libraryTmdbIds,
-					linkedAniListIdsByTmdbId: data.linkedAniListIdsByTmdbId,
-				}),
-			) ?? [],
-		[data],
-	);
-
-	const handleQueryChange = (): void => {
-		setSearchTerm("");
-		onSelectCandidate(null);
-	};
 
 	return (
 		<MappingSearchShell
-			providerLabel={providerLabel}
+			{...props}
+			provider={PROVIDER}
 			searchPlaceholder="Search by movie title or TMDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
-			errorMessage={
-				search.error ? normalizeError(search.error).userMessage : null
+			error={search.error}
+			candidates={
+				data?.results.map((movie) => buildCandidate(movie, data)) ?? []
 			}
-			resultCount={candidates.length}
-			onQueryChange={handleQueryChange}
 			onSearch={setSearchTerm}
-		>
-			{candidates.map((candidate) => {
-				const summary = candidate.summary;
-				const { isInLibrary } = summary;
-				const externalLabel = `Open in ${providerLabel}`;
-				const isSelected = selectedCandidate?.tmdbId === candidate.tmdbId;
-
-				return (
-					<MappingCandidateRow
-						key={candidate.tmdbId}
-						title={summary.title}
-						providerIdLabel={providerIdLabel}
-						providerId={summary.providerId}
-						contentContainer={contentContainer}
-						externalLabel={externalLabel}
-						openProvider={
-							isInLibrary === null
-								? undefined
-								: () => {
-										openProviderPage({
-											provider: PROVIDER,
-											target: getProviderOpenTarget({
-												isInLibrary,
-												providerRouteSlug: summary.providerRouteSlug,
-												searchTerm: summary.title,
-											}),
-										});
-									}
-						}
-						isCurrent={currentTarget?.providerId === candidate.tmdbId}
-						isSelected={isSelected}
-						libraryLabel={getLibraryLabel({ candidate, providerLabel })}
-						linkedAniListCount={summary.linkedAniListIds?.length}
-						onToggleSelection={() =>
-							onSelectCandidate(isSelected ? null : candidate)
-						}
-						posterUrl={summary.posterUrl}
-						typeLabel={summary.typeLabel}
-						year={summary.year}
-					/>
-				);
-			})}
-		</MappingSearchShell>
+		/>
 	);
 }

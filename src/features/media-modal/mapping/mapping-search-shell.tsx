@@ -1,37 +1,61 @@
-/** Shared explicit-search shell for provider mapping panels. */
+/** Shared explicit search and result list for Sonarr/Radarr mapping panels. */
 // src/features/media-modal/mapping/mapping-search-shell.tsx
 
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState, type SubmitEvent } from "react";
+import {
+	getProviderExternalIdLabel,
+	getProviderLabel,
+} from "@/providers/provider-labels";
+import { getProviderOpenTarget } from "@/providers/provider-links";
+import type { Provider } from "@/providers/types";
+import { openProviderPage } from "@/rpc/provider-page";
+import { normalizeError } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
+import { getLibraryPillLabel } from "../helpers";
+import type { MediaModalTargetSummary } from "../types";
+import { MappingCandidateRow } from "./mapping-search-results";
 
-type MappingSearchShellProps = {
-	providerLabel: string;
+/** Props each provider modal passes to its mapping panel. */
+export type MappingPanelProps = {
+	contentContainer: HTMLDivElement | null;
+	currentTarget: MediaModalTargetSummary | null;
+	selectedCandidate: MediaModalTargetSummary | null;
+	onSelectCandidate: (candidate: MediaModalTargetSummary | null) => void;
+};
+
+type MappingSearchShellProps = MappingPanelProps & {
+	provider: Provider;
 	searchPlaceholder: string;
 	hasSearchTerm: boolean;
 	isFetching: boolean;
-	errorMessage?: string | null | undefined;
-	resultCount: number;
-	onQueryChange: () => void;
+	error: Error | null;
+	candidates: MediaModalTargetSummary[];
+	/** Receives the submitted term, or "" when the user edits the query. */
 	onSearch: (term: string) => void;
-	children: React.ReactNode;
 };
 
 export function MappingSearchShell(
 	props: MappingSearchShellProps,
 ): React.JSX.Element {
 	const {
-		providerLabel,
+		provider,
 		searchPlaceholder,
 		hasSearchTerm,
 		isFetching,
-		errorMessage,
-		resultCount,
-		onQueryChange,
+		error,
+		candidates,
 		onSearch,
-		children,
+		contentContainer,
+		currentTarget,
+		selectedCandidate,
+		onSelectCandidate,
 	} = props;
+	const providerLabel = getProviderLabel(provider);
+	const providerIdLabel = getProviderExternalIdLabel(provider);
+	const errorMessage = error ? normalizeError(error).userMessage : null;
+	const resultCount = candidates.length;
 	const [query, setQuery] = useState("");
 	const [resultListKey, setResultListKey] = useState(0);
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +93,47 @@ export function MappingSearchShell(
 		setResultListKey((key) => key + 1);
 	};
 
+	const rows = candidates.map((candidate) => {
+		const { isInLibrary, providerId, title } = candidate;
+		const isSelected = selectedCandidate?.providerId === providerId;
+
+		return (
+			<MappingCandidateRow
+				key={providerId}
+				title={title}
+				providerIdLabel={providerIdLabel}
+				providerId={providerId}
+				contentContainer={contentContainer}
+				externalLabel={`Open in ${providerLabel}`}
+				openProvider={
+					isInLibrary === null
+						? undefined
+						: () =>
+								openProviderPage({
+									provider,
+									target: getProviderOpenTarget({
+										isInLibrary,
+										providerRouteSlug: candidate.providerRouteSlug,
+										searchTerm: title,
+									}),
+								})
+				}
+				isCurrent={currentTarget?.providerId === providerId}
+				isSelected={isSelected}
+				libraryLabel={
+					isInLibrary ? getLibraryPillLabel(candidate, providerLabel) : null
+				}
+				linkedAniListCount={candidate.linkedAniListIds?.length}
+				onToggleSelection={() =>
+					onSelectCandidate(isSelected ? null : candidate)
+				}
+				posterUrl={candidate.posterUrl}
+				typeLabel={candidate.typeLabel}
+				year={candidate.year}
+			/>
+		);
+	});
+
 	return (
 		<div className="flex h-80 min-h-0 flex-col overflow-hidden pt-4 md:h-full">
 			<div className="shrink-0 pb-4">
@@ -82,7 +147,10 @@ export function MappingSearchShell(
 						value={query}
 						onChange={(event) => {
 							setQuery(event.target.value);
-							if (hasSearchTerm) onQueryChange();
+							if (!hasSearchTerm) return;
+
+							onSearch("");
+							onSelectCandidate(null);
 						}}
 						placeholder={searchPlaceholder}
 						className="min-w-0 flex-1 rounded-xl border border-border-primary/60 bg-bg-tertiary/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:border-accent-primary focus:outline-none"
@@ -116,7 +184,7 @@ export function MappingSearchShell(
 									key={resultListKey}
 									className="a2a-stagger-list flex flex-col gap-2"
 								>
-									{children}
+									{rows}
 								</div>
 							) : null}
 						</div>

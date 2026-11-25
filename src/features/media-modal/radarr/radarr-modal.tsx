@@ -27,10 +27,7 @@ import {
 import { MappingFooter, SetupFooter } from "../chrome/modal-footer";
 import { ModalHeader } from "../chrome/modal-header";
 import { ModalShell } from "../chrome/modal-shell";
-import {
-	RadarrMappingPanel,
-	type RadarrMappingCandidate,
-} from "./radarr-mapping-panel";
+import { RadarrMappingPanel } from "./radarr-mapping-panel";
 import { useRadarrSetupForm } from "./radarr-setup-form";
 import {
 	canShowRadarrSetup,
@@ -189,7 +186,7 @@ export function RadarrModal({
 	const anilistId = getModalAniListId(source, sourceAniListIds.data);
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
-		useState<RadarrMappingCandidate | null>(null);
+		useState<MediaModalTargetSummary | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const data = useRadarrModalData({
 		source,
@@ -242,9 +239,7 @@ export function RadarrModal({
 		verificationSettled: data.verificationSettled,
 		onClose,
 	});
-	const previewTarget = isMappingView
-		? (selectedCandidate?.summary ?? null)
-		: null;
+	const previewTarget = isMappingView ? selectedCandidate : null;
 	const handleOpenSettings = useOpenMappingSettingsAction({
 		anilistId,
 		openSource,
@@ -261,7 +256,7 @@ export function RadarrModal({
 	const canIgnoreTitle = inspection.data?.mapping.kind !== "ignored";
 	const canSubmitMapping =
 		selectedCandidate !== null &&
-		!targetsEqual(selectedCandidate.summary, data.currentTarget);
+		!targetsEqual(selectedCandidate, data.currentTarget);
 	const overwriteTargetTitle = getOverwriteTargetTitle(
 		previewTarget,
 		data.currentTarget,
@@ -273,7 +268,7 @@ export function RadarrModal({
 	const mappingActions = useMappingActions({
 		source,
 		provider: PROVIDER,
-		selectedProviderId: selectedCandidate?.tmdbId ?? null,
+		selectedProviderId: selectedCandidate?.providerId ?? null,
 		rejectProviderId: rejectCandidateTmdbId,
 		clearRejectedProviderId: clearRejectedCandidateTmdbId,
 		requiresApplyConfirmation:

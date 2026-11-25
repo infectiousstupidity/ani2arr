@@ -3,6 +3,7 @@
 
 import { getProviderLabel } from "@/providers/provider-labels";
 import Pill from "@/shared/ui/primitives/pill";
+import { getLibraryPillLabel } from "../helpers";
 import type { MediaModalTargetSummary } from "../types";
 
 type TargetDetailsCardProps = {
@@ -68,35 +69,6 @@ function getStatusTone(
 	}
 
 	return "muted";
-}
-
-function getLibraryPillLabel(
-	mapping: MediaModalTargetSummary,
-	providerLabel: string,
-): string {
-	if (mapping.isInLibrary === null) {
-		return `${providerLabel} library status unknown`;
-	}
-
-	if (!mapping.isInLibrary) {
-		return `Not in ${providerLabel}`;
-	}
-
-	if (mapping.provider === "sonarr") {
-		const { episodeCount, episodeFileCount } = mapping;
-
-		if (episodeCount !== undefined && episodeFileCount !== undefined) {
-			return `In ${providerLabel}: ${episodeFileCount}/${episodeCount} eps`;
-		}
-
-		return `In ${providerLabel}`;
-	}
-
-	if (mapping.hasFile !== undefined) {
-		return `In ${providerLabel}: ${mapping.hasFile ? "1 file" : "0 files"}`;
-	}
-
-	return `In ${providerLabel}`;
 }
 
 function getExtraFactPillLabels(mapping: MediaModalTargetSummary): string[] {
