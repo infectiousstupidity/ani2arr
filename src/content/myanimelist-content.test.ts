@@ -37,7 +37,8 @@ function setLocation(url: string): void {
 
 describe("runMyAnimeListContent", () => {
 	beforeEach(() => {
-		if (!document.body) document.documentElement.append(document.createElement("body"));
+		if (!document.body)
+			document.documentElement.append(document.createElement("body"));
 		document.body.replaceChildren();
 	});
 

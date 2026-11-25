@@ -4,12 +4,7 @@
 import { useSyncExternalStore } from "react";
 
 export type PageId =
-	| "sonarr"
-	| "radarr"
-	| "seerr"
-	| "mappings"
-	| "ui"
-	| "advanced";
+	"sonarr" | "radarr" | "seerr" | "mappings" | "ui" | "advanced";
 
 const DEFAULT_PAGE: PageId = "sonarr";
 const VALID_PAGES = new Set<PageId>([

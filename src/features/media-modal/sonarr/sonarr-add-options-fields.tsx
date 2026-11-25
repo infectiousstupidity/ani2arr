@@ -1,180 +1,208 @@
 /** Sonarr add-options fields for media modal setup flows. */
 // src/features/media-modal/sonarr/sonarr-add-options-fields.tsx
 
-import React from 'react';
-import * as v from 'valibot';
+import React from "react";
+import * as v from "valibot";
 
 import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
-import type { SonarrFormState } from '@/providers/sonarr/form-state';
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import {
-  SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
-  SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-} from '@/providers/sonarr/form-options';
-import { SelectField } from '@/shared/ui/fields/select-field';
-import { SwitchField } from '@/shared/ui/fields/switch-field';
-import { ProviderTagField } from '@/features/provider-ui/provider-tag-field';
-import { cn } from '@/shared/utils/cn';
+	SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
+	SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
+} from "@/providers/sonarr/form-options";
+import { SelectField } from "@/shared/ui/fields/select-field";
+import { SwitchField } from "@/shared/ui/fields/switch-field";
+import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
+import { cn } from "@/shared/utils/cn";
 
-import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from '../setup/provider-root-folder-select';
+import {
+	ProviderRootFolderSelect,
+	type ProviderRootFolderPathPreview,
+} from "../setup/provider-root-folder-select";
 
 export interface SonarrAddOptionsFieldsProps {
-  values: SonarrFormState;
-  formResources: ProviderFormResources;
-  onChange: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
-  disabled?: boolean | undefined;
-  className?: string | undefined;
-  portalContainer?: HTMLElement | ShadowRoot | null | undefined;
-  pathPreview?: ProviderRootFolderPathPreview | undefined;
+	values: SonarrFormState;
+	formResources: ProviderFormResources;
+	onChange: <K extends keyof SonarrFormState>(
+		field: K,
+		value: SonarrFormState[K],
+	) => void;
+	disabled?: boolean | undefined;
+	className?: string | undefined;
+	portalContainer?: HTMLElement | ShadowRoot | null | undefined;
+	pathPreview?: ProviderRootFolderPathPreview | undefined;
 }
 
 function SonarrSearchToggles(props: {
-  values: SonarrFormState;
-  disabled: boolean;
-  portalContainer?: HTMLElement | ShadowRoot | null | undefined;
-  onChange: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
+	values: SonarrFormState;
+	disabled: boolean;
+	portalContainer?: HTMLElement | ShadowRoot | null | undefined;
+	onChange: <K extends keyof SonarrFormState>(
+		field: K,
+		value: SonarrFormState[K],
+	) => void;
 }): React.JSX.Element {
-  const { values, disabled, portalContainer, onChange } = props;
-  const searchForMissingEpisodes = values.addOptions?.searchForMissingEpisodes ?? false;
-  const searchForCutoffUnmetEpisodes =
-    values.addOptions?.searchForCutoffUnmetEpisodes ?? false;
+	const { values, disabled, portalContainer, onChange } = props;
+	const searchForMissingEpisodes =
+		values.addOptions?.searchForMissingEpisodes ?? false;
+	const searchForCutoffUnmetEpisodes =
+		values.addOptions?.searchForCutoffUnmetEpisodes ?? false;
 
-  return (
-    <>
-      <SwitchField
-        label="Search Missing"
-        disabled={disabled}
-        checked={searchForMissingEpisodes}
-        onCheckedChange={checked =>
-          onChange('addOptions', {
-            ...values.addOptions,
-            searchForMissingEpisodes: checked,
-          })}
-        labelHelp="Automatically search for missing episodes when adding a series."
-        labelHelpDelay={600}
-        labelHelpContainer={portalContainer ?? null}
-        layout="inline"
-        labelClassName="text-sm font-medium text-text-primary"
-      />
+	return (
+		<>
+			<SwitchField
+				label="Search Missing"
+				disabled={disabled}
+				checked={searchForMissingEpisodes}
+				onCheckedChange={(checked) =>
+					onChange("addOptions", {
+						...values.addOptions,
+						searchForMissingEpisodes: checked,
+					})
+				}
+				labelHelp="Automatically search for missing episodes when adding a series."
+				labelHelpDelay={600}
+				labelHelpContainer={portalContainer ?? null}
+				layout="inline"
+				labelClassName="text-sm font-medium text-text-primary"
+			/>
 
-      <SwitchField
-        label="Search Cutoff"
-        disabled={disabled}
-        checked={searchForCutoffUnmetEpisodes}
-        onCheckedChange={checked =>
-          onChange('addOptions', {
-            ...values.addOptions,
-            searchForCutoffUnmetEpisodes: checked,
-          })}
-        labelHelp="Search for episodes that haven't met the cutoff."
-        labelHelpDelay={600}
-        labelHelpContainer={portalContainer ?? null}
-        layout="inline"
-        labelClassName="text-sm font-medium text-text-primary"
-      />
-    </>
-  );
+			<SwitchField
+				label="Search Cutoff"
+				disabled={disabled}
+				checked={searchForCutoffUnmetEpisodes}
+				onCheckedChange={(checked) =>
+					onChange("addOptions", {
+						...values.addOptions,
+						searchForCutoffUnmetEpisodes: checked,
+					})
+				}
+				labelHelp="Search for episodes that haven't met the cutoff."
+				labelHelpDelay={600}
+				labelHelpContainer={portalContainer ?? null}
+				layout="inline"
+				labelClassName="text-sm font-medium text-text-primary"
+			/>
+		</>
+	);
 }
 
 export function SonarrAddOptionsFields(
-  props: SonarrAddOptionsFieldsProps,
+	props: SonarrAddOptionsFieldsProps,
 ): React.JSX.Element {
-  const {
-    values,
-    formResources,
-    onChange,
-    disabled = false,
-    className,
-    portalContainer,
-    pathPreview,
-  } = props;
+	const {
+		values,
+		formResources,
+		onChange,
+		disabled = false,
+		className,
+		portalContainer,
+		pathPreview,
+	} = props;
 
-  const qualityProfileOptions = formResources.qualityProfiles.map(profile => ({
-    value: String(profile.id),
-    label: profile.name,
-  }));
-  const monitor = values.addOptions?.monitor ?? '';
+	const qualityProfileOptions = formResources.qualityProfiles.map(
+		(profile) => ({
+			value: String(profile.id),
+			label: profile.name,
+		}),
+	);
+	const monitor = values.addOptions?.monitor ?? "";
 
-  return (
-    <div className={cn('flex flex-col gap-4', className)}>
-      <ProviderRootFolderSelect
-        disabled={disabled}
-        value={values.rootFolderPath ?? ''}
-        rootFolders={formResources.rootFolders}
-        onChange={value => onChange('rootFolderPath', value)}
-        portalContainer={portalContainer ?? null}
-        pathPreview={pathPreview}
-      />
+	return (
+		<div className={cn("flex flex-col gap-4", className)}>
+			<ProviderRootFolderSelect
+				disabled={disabled}
+				value={values.rootFolderPath ?? ""}
+				rootFolders={formResources.rootFolders}
+				onChange={(value) => onChange("rootFolderPath", value)}
+				portalContainer={portalContainer ?? null}
+				pathPreview={pathPreview}
+			/>
 
-      <SelectField
-        label="Monitor Episodes"
-        disabled={disabled}
-        value={monitor}
-        onChange={value =>
-          onChange('addOptions', {
-            ...values.addOptions,
-            monitor: value as NonNullable<SonarrFormState['addOptions']>['monitor'],
-          })}
-        options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
-        container={portalContainer ?? null}
-      />
+			<SelectField
+				label="Monitor Episodes"
+				disabled={disabled}
+				value={monitor}
+				onChange={(value) =>
+					onChange("addOptions", {
+						...values.addOptions,
+						monitor: value as NonNullable<
+							SonarrFormState["addOptions"]
+						>["monitor"],
+					})
+				}
+				options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
+				container={portalContainer ?? null}
+			/>
 
-      <SelectField
-        label="Quality Profile"
-        disabled={disabled}
-        value={values.qualityProfileId === undefined ? '' : String(values.qualityProfileId)}
-        onChange={value => {
-          const num = Number(value);
-          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : v.parse(ProviderQualityProfileIdSchema, num));
-        }}
-        options={qualityProfileOptions}
-        placeholder="Select a profile..."
-        container={portalContainer ?? null}
-      />
+			<SelectField
+				label="Quality Profile"
+				disabled={disabled}
+				value={
+					values.qualityProfileId === undefined
+						? ""
+						: String(values.qualityProfileId)
+				}
+				onChange={(value) => {
+					const num = Number(value);
+					onChange(
+						"qualityProfileId",
+						!value || Number.isNaN(num)
+							? undefined
+							: v.parse(ProviderQualityProfileIdSchema, num),
+					);
+				}}
+				options={qualityProfileOptions}
+				placeholder="Select a profile..."
+				container={portalContainer ?? null}
+			/>
 
-      <SelectField
-        label="Series Type"
-        disabled={disabled}
-        value={values.seriesType ?? ''}
-        onChange={value => onChange('seriesType', value as SonarrFormState['seriesType'])}
-        options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
-        container={portalContainer ?? null}
-      />
+			<SelectField
+				label="Series Type"
+				disabled={disabled}
+				value={values.seriesType ?? ""}
+				onChange={(value) =>
+					onChange("seriesType", value as SonarrFormState["seriesType"])
+				}
+				options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
+				container={portalContainer ?? null}
+			/>
 
-      <ProviderTagField
-        availableTags={formResources.tags}
-        disabled={disabled}
-        selectedTagIds={values.tags ?? []}
-        selectedFreeformTags={values.freeformTags}
-        label="Tags"
-        onChange={({ tagIds, freeformTags }) => {
-          onChange('tags', tagIds);
-          onChange('freeformTags', freeformTags);
-        }}
-      />
+			<ProviderTagField
+				availableTags={formResources.tags}
+				disabled={disabled}
+				selectedTagIds={values.tags ?? []}
+				selectedFreeformTags={values.freeformTags}
+				label="Tags"
+				onChange={({ tagIds, freeformTags }) => {
+					onChange("tags", tagIds);
+					onChange("freeformTags", freeformTags);
+				}}
+			/>
 
-      <div className="pt-1">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <SwitchField
-            label="Season Folders"
-            disabled={disabled}
-            checked={values.seasonFolder ?? false}
-            onCheckedChange={checked => onChange('seasonFolder', checked)}
-            labelHelp="Organize episodes into per-season subfolders created automatically."
-            labelHelpDelay={600}
-            labelHelpContainer={portalContainer ?? null}
-            layout="inline"
-            labelClassName="text-sm font-medium text-text-primary"
-          />
+			<div className="pt-1">
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+					<SwitchField
+						label="Season Folders"
+						disabled={disabled}
+						checked={values.seasonFolder ?? false}
+						onCheckedChange={(checked) => onChange("seasonFolder", checked)}
+						labelHelp="Organize episodes into per-season subfolders created automatically."
+						labelHelpDelay={600}
+						labelHelpContainer={portalContainer ?? null}
+						layout="inline"
+						labelClassName="text-sm font-medium text-text-primary"
+					/>
 
-          <SonarrSearchToggles
-            values={values}
-            disabled={disabled}
-            portalContainer={portalContainer}
-            onChange={onChange}
-          />
-        </div>
-      </div>
-    </div>
-  );
+					<SonarrSearchToggles
+						values={values}
+						disabled={disabled}
+						portalContainer={portalContainer}
+						onChange={onChange}
+					/>
+				</div>
+			</div>
+		</div>
+	);
 }

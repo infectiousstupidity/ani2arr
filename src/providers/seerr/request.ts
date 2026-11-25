@@ -379,9 +379,9 @@ function readAlternateTitles(
 	primaryTitle: string,
 	values: readonly unknown[],
 ): string[] {
-	return [...new Set(values.flatMap((value) => readString(value) ?? []))].filter(
-		(title) => title !== primaryTitle,
-	);
+	return [
+		...new Set(values.flatMap((value) => readString(value) ?? [])),
+	].filter((title) => title !== primaryTitle);
 }
 
 function getSearchResultsPayload(value: unknown): unknown[] {

@@ -9,13 +9,7 @@ import {
 } from "./seerr-selection";
 
 type PillTone =
-	| "muted"
-	| "success"
-	| "warning"
-	| "info"
-	| "accent"
-	| "blue"
-	| "default";
+	"muted" | "success" | "warning" | "info" | "accent" | "blue" | "default";
 
 function getSeasonStatusLabel(
 	status: SeerrSeasonStatus["status"] | undefined,
@@ -98,9 +92,7 @@ export function SeerrSeasonRows(props: {
 					<label
 						key={season.seasonNumber}
 						className={`flex min-h-12 items-center gap-3 rounded-lg border border-border-primary/50 bg-bg-tertiary/35 px-3 py-2 text-sm ${
-							selectable
-								? "cursor-pointer"
-								: "cursor-not-allowed opacity-60"
+							selectable ? "cursor-pointer" : "cursor-not-allowed opacity-60"
 						}`}
 					>
 						<input

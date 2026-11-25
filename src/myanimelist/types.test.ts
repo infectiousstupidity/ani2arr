@@ -24,8 +24,6 @@ describe("parseMyAnimeListIdOrNull", () => {
 
 describe("parseMyAnimeListId", () => {
 	it("throws for invalid values", () => {
-		expect(() => parseMyAnimeListId("5114")).toThrow(
-			"Invalid MyAnimeList ID",
-		);
+		expect(() => parseMyAnimeListId("5114")).toThrow("Invalid MyAnimeList ID");
 	});
 });

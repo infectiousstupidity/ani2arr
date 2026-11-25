@@ -8,10 +8,7 @@ import { normalizeError } from "@/shared/errors/error-utils";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { queryKeys } from "@/queries/query-keys";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 
 type TestProviderConnectionInput = {
 	provider: Provider;
@@ -28,7 +25,11 @@ const testConnection = (input: TestProviderConnectionInput) => {
 const getConnectionQueryKey = (
 	provider: Provider,
 	credentials?: ProviderCredentials | null,
-) => queryKeys.providerConnection(provider, getProviderConnectionScope(credentials));
+) =>
+	queryKeys.providerConnection(
+		provider,
+		getProviderConnectionScope(credentials),
+	);
 
 export const useProviderConnectionCheck = (options: {
 	provider: Provider;

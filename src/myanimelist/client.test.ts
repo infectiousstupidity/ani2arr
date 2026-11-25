@@ -20,7 +20,8 @@ describe("parseJikanAnimeResponse", () => {
 				synopsis: "  The adventure is over, but life goes on.  ",
 				images: {
 					jpg: {
-						image_url: "https://cdn.myanimelist.net/images/anime/1015/138006.jpg",
+						image_url:
+							"https://cdn.myanimelist.net/images/anime/1015/138006.jpg",
 						small_image_url:
 							"https://cdn.myanimelist.net/images/anime/1015/138006t.jpg",
 						large_image_url:

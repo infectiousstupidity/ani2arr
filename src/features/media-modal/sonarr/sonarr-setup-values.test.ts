@@ -39,8 +39,7 @@ describe("sonarr setup values", () => {
 		type DirtyInput = Parameters<typeof isSonarrSetupDraftDirty>[0];
 		const isDirty = (
 			values: DirtyInput["values"],
-			monitoringAction: DirtyInput["monitoringAction"] =
-				defaults.monitoringAction,
+			monitoringAction: DirtyInput["monitoringAction"] = defaults.monitoringAction,
 		) =>
 			isSonarrSetupDraftDirty({
 				baselineValues: defaults.form,
@@ -64,7 +63,11 @@ describe("sonarr setup values", () => {
 
 	it("does not create an edit target from a lean in-library item", () => {
 		const status: GetSeriesStatusOutput = {
-			mapping: { kind: "mapped", source: "manual", providerId: parseTvdbId(22) },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: parseTvdbId(22),
+			},
 			isInLibrary: true,
 			series: {
 				id: parseSonarrSeriesId(11),
@@ -86,7 +89,11 @@ describe("sonarr setup values", () => {
 
 	it("creates an edit target from a full in-library item", () => {
 		const status: GetSeriesStatusOutput = {
-			mapping: { kind: "mapped", source: "manual", providerId: parseTvdbId(22) },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: parseTvdbId(22),
+			},
 			isInLibrary: true,
 			series,
 		};
@@ -120,7 +127,11 @@ describe("sonarr setup values", () => {
 
 	it("creates an add target from mapped not-in-library status", () => {
 		const status: GetSeriesStatusOutput = {
-			mapping: { kind: "mapped", source: "manual", providerId: parseTvdbId(22) },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: parseTvdbId(22),
+			},
 			isInLibrary: false,
 		};
 

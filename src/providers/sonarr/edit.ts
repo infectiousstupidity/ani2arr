@@ -1,10 +1,7 @@
 /** Sonarr edit workflow for full-resource update saves and monitoring actions. */
 // src/providers/sonarr/edit.ts
 
-import type {
-	SonarrEditOptions,
-	SonarrSeries,
-} from "./types";
+import type { SonarrEditOptions, SonarrSeries } from "./types";
 import type { SonarrClient } from "./client";
 import type { SonarrFormState } from "./form-state";
 import type { SonarrEditMonitoringAction } from "./schemas";
@@ -14,10 +11,7 @@ import type {
 	TvdbId,
 } from "../schemas";
 import type { ProviderCredentials } from "../types";
-import {
-	createError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
+import { createError, normalizeError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import {
 	joinRootAndFolder,

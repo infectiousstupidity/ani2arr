@@ -106,8 +106,7 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
 		const db = await getDb();
 		const cacheKey = keyFor(key);
 		const entry = (await db.get(TTL_CACHE_STORE_NAME, cacheKey)) as
-			| CacheEntry<T>
-			| undefined;
+			CacheEntry<T> | undefined;
 		if (!entry) return null;
 
 		if (now >= entry.expiresAt) {

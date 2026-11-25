@@ -28,10 +28,7 @@ export const SonarrIcon = ({
 	className,
 	...props
 }: ProviderIconProps): React.ReactElement => (
-	<ProviderIconSvg
-		className={className}
-		{...props}
-	>
+	<ProviderIconSvg className={className} {...props}>
 		<g transform="translate(12 12) scale(1.12) translate(-12 -12)">
 			<path
 				fill="currentColor"
@@ -45,10 +42,7 @@ export const RadarrIcon = ({
 	className,
 	...props
 }: ProviderIconProps): React.ReactElement => (
-	<ProviderIconSvg
-		className={className}
-		{...props}
-	>
+	<ProviderIconSvg className={className} {...props}>
 		<g transform="translate(12 12) scale(1.16) translate(-12 -12)">
 			<path
 				fill="currentColor"
@@ -62,10 +56,7 @@ export const SeerrIcon = ({
 	className,
 	...props
 }: ProviderIconProps): React.ReactElement => (
-	<ProviderIconSvg
-		className={className}
-		{...props}
-	>
+	<ProviderIconSvg className={className} {...props}>
 		<path
 			fill="currentColor"
 			fillRule="evenodd"

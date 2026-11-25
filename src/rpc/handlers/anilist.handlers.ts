@@ -10,12 +10,9 @@ import type { GetAniListMetadataInput } from "@/rpc/types";
 
 export const anilistHandlers = {
 	async fetchAniListMedia(anilistId: AniListId) {
-		const media = await anilistMediaService.fetchMediaWithRelations(
-			anilistId,
-			{
-				priority: "high",
-			},
-		);
+		const media = await anilistMediaService.fetchMediaWithRelations(anilistId, {
+			priority: "high",
+		});
 		return media ?? null;
 	},
 

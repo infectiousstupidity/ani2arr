@@ -148,7 +148,11 @@ describe("title matching", () => {
 			] as const) {
 				const candidates = [
 					{ providerId: 1, title: "Example Title", year: preferredYear },
-					{ providerId: 2, title: "Example Title", ...(otherYear === undefined ? {} : { year: otherYear }) },
+					{
+						providerId: 2,
+						title: "Example Title",
+						...(otherYear === undefined ? {} : { year: otherYear }),
+					},
 				];
 				for (const order of [candidates, candidates.toReversed()]) {
 					expect(findTitleMatchForTerm(provider, term, 2020, order)).toEqual({

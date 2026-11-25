@@ -46,8 +46,7 @@ export function BaseProviderSetupPanel(props: {
 					choices.
 				</p>
 				<p className="text-xs">
-					Add your {providerName} URL and API key, then return here to
-					continue.
+					Add your {providerName} URL and API key, then return here to continue.
 				</p>
 			</div>
 		);

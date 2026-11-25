@@ -9,7 +9,13 @@ import type { AniListId } from "@/anilist/types";
 import { apiHandlers } from "@/rpc/handlers";
 import { sonarrLibrary } from "@/background/api-services";
 import { saveProviderConnectionSnapshot } from "@/settings/store";
-import { loadUpstreamRecords, report, seedUpstream, time, useRealisticStorage } from "./helpers";
+import {
+	loadUpstreamRecords,
+	report,
+	seedUpstream,
+	time,
+	useRealisticStorage,
+} from "./helpers";
 
 vi.mock("@/shared/cache/ttl-cache", () => {
 	const data = new Map<string, unknown>();
@@ -36,7 +42,8 @@ vi.mock("@/rpc/revision-signals", () => ({
 function pickMappedAniListIds(count: number): AniListId[] {
 	const ids: AniListId[] = [];
 	for (const [key, record] of Object.entries(loadUpstreamRecords())) {
-		if (!key.startsWith("anilist:") || record.facts.tvdbShow === undefined) continue;
+		if (!key.startsWith("anilist:") || record.facts.tvdbShow === undefined)
+			continue;
 		ids.push(Number(key.slice("anilist:".length)) as AniListId);
 		if (ids.length === count) break;
 	}
@@ -49,7 +56,9 @@ async function seedAutomaticStore(entries: number): Promise<void> {
 	for (let index = 0; index < entries; index += 1) {
 		records[`anilist:${900_000 + index}`] = {
 			facts: { tvdbShow: 500_000 + index },
-			slotMeta: { tvdbShow: { expiresAt, matchedTitle: `Some Long Anime Title ${index}` } },
+			slotMeta: {
+				tvdbShow: { expiresAt, matchedTitle: `Some Long Anime Title ${index}` },
+			},
 			attempts: { sonarrTvdb: { expiresAt } },
 		};
 	}
@@ -59,12 +68,15 @@ async function seedAutomaticStore(entries: number): Promise<void> {
 // Fresh module graph per iteration = a cold MV3 worker (empty in-memory caches).
 async function coldModules() {
 	vi.resetModules();
-	const [{ migrateMappingStorage: migrate }, { apiHandlers: handlers }, services] =
-		await Promise.all([
-			import("@/mapping/migrate"),
-			import("@/rpc/handlers"),
-			import("@/background/api-services"),
-		]);
+	const [
+		{ migrateMappingStorage: migrate },
+		{ apiHandlers: handlers },
+		services,
+	] = await Promise.all([
+		import("@/mapping/migrate"),
+		import("@/rpc/handlers"),
+		import("@/background/api-services"),
+	]);
 	vi.spyOn(services.sonarrLibrary, "getSeriesSnapshots").mockResolvedValue([]);
 	return { migrate, handlers };
 }
@@ -85,7 +97,10 @@ describe("browse batch background cost", () => {
 		const { migrate } = await coldModules();
 		storage.reset();
 		await migrate();
-		report("cold migrateMappingStorage storage reads", JSON.stringify(Object.fromEntries(storage.reads)));
+		report(
+			"cold migrateMappingStorage storage reads",
+			JSON.stringify(Object.fromEntries(storage.reads)),
+		);
 		const samples: number[] = [];
 		for (let index = 0; index < 3; index += 1) {
 			const cold = await coldModules();
@@ -93,7 +108,11 @@ describe("browse batch background cost", () => {
 			await cold.migrate();
 			samples.push(performance.now() - start);
 		}
-		report("cold migrateMappingStorage (every worker wake)", Math.min(...samples).toFixed(2), "ms (min of 3)");
+		report(
+			"cold migrateMappingStorage (every worker wake)",
+			Math.min(...samples).toFixed(2),
+			"ms (min of 3)",
+		);
 	});
 
 	it("cold anime page: identities(1) + one status, then warm", async () => {
@@ -104,15 +123,23 @@ describe("browse batch background cost", () => {
 			const { handlers } = await coldModules();
 			const start = performance.now();
 			await handlers.getMappingIdentities([id!]);
-			await handlers.getSeriesStatus({ source: { source: "anilist", id: id! } });
+			await handlers.getSeriesStatus({
+				source: { source: "anilist", id: id! },
+			});
 			samples.push(performance.now() - start);
 		}
-		report("cold anime page background work (identities + status, serial)", Math.min(...samples).toFixed(2), "ms (min of 3)");
+		report(
+			"cold anime page background work (identities + status, serial)",
+			Math.min(...samples).toFixed(2),
+			"ms (min of 3)",
+		);
 		await time(
 			"warm anime page background work (identities + status, serial)",
 			async () => {
 				await apiHandlers.getMappingIdentities([id!]);
-				await apiHandlers.getSeriesStatus({ source: { source: "anilist", id: id! } });
+				await apiHandlers.getSeriesStatus({
+					source: { source: "anilist", id: id! },
+				});
 			},
 			5,
 		);
@@ -125,10 +152,18 @@ describe("browse batch background cost", () => {
 		for (let index = 0; index < 3; index += 1) {
 			const { handlers } = await coldModules();
 			const start = performance.now();
-			await Promise.all(ids.map((id) => handlers.getSeriesStatus({ source: { source: "anilist", id } })));
+			await Promise.all(
+				ids.map((id) =>
+					handlers.getSeriesStatus({ source: { source: "anilist", id } }),
+				),
+			);
 			samples.push(performance.now() - start);
 		}
-		report("cold 50 x getSeriesStatus (fresh worker)", Math.min(...samples).toFixed(2), "ms (min of 3)");
+		report(
+			"cold 50 x getSeriesStatus (fresh worker)",
+			Math.min(...samples).toFixed(2),
+			"ms (min of 3)",
+		);
 	});
 
 	for (const cards of [50]) {
@@ -138,18 +173,34 @@ describe("browse batch background cost", () => {
 
 			storage.reset();
 			await apiHandlers.getMappingIdentities(ids);
-			report(`getMappingIdentities(${cards}) storage reads`, JSON.stringify(Object.fromEntries(storage.reads)));
-			await time(`getMappingIdentities(${cards} ids)`, () => apiHandlers.getMappingIdentities(ids), 3);
+			report(
+				`getMappingIdentities(${cards}) storage reads`,
+				JSON.stringify(Object.fromEntries(storage.reads)),
+			);
+			await time(
+				`getMappingIdentities(${cards} ids)`,
+				() => apiHandlers.getMappingIdentities(ids),
+				3,
+			);
 
 			storage.reset();
-			await apiHandlers.getSeriesStatus({ source: { source: "anilist", id: ids[0]! } });
-			report("getSeriesStatus x1 storage reads", JSON.stringify(Object.fromEntries(storage.reads)));
+			await apiHandlers.getSeriesStatus({
+				source: { source: "anilist", id: ids[0]! },
+			});
+			report(
+				"getSeriesStatus x1 storage reads",
+				JSON.stringify(Object.fromEntries(storage.reads)),
+			);
 
 			await time(
 				`${cards} x getSeriesStatus (parallel, like one browse batch)`,
 				() =>
 					Promise.all(
-						ids.map((id) => apiHandlers.getSeriesStatus({ source: { source: "anilist", id } })),
+						ids.map((id) =>
+							apiHandlers.getSeriesStatus({
+								source: { source: "anilist", id },
+							}),
+						),
 					),
 				3,
 			);

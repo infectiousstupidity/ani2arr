@@ -12,13 +12,8 @@ import {
 	stripRadarrFormStateForDefaults,
 } from "@/providers/radarr/form-state";
 import type { SeerrConnection } from "@/providers/seerr/types";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
-import {
-	normalizeProviderConnectionInput,
-} from "./provider-config";
+import type { Provider, ProviderCredentials } from "@/providers/types";
+import { normalizeProviderConnectionInput } from "./provider-config";
 import {
 	getSeerrConnection,
 	normalizeSeerrConnectionInput,
@@ -297,9 +292,7 @@ async function removeLegacyConnectionStorage(): Promise<void> {
 		const hasValue = values[index]?.value != null;
 		const meta = metas[index]?.meta;
 		const hasMeta = meta && Object.keys(meta).length > 0;
-		return hasValue || hasMeta
-			? [{ key, options: { removeMeta: true } }]
-			: [];
+		return hasValue || hasMeta ? [{ key, options: { removeMeta: true } }] : [];
 	});
 	if (keysToRemove.length > 0) {
 		await storage.removeItems(keysToRemove);

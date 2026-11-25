@@ -9,10 +9,7 @@ import {
 	type CacheWriteOptions,
 	type TtlCache,
 } from "@/shared/cache/ttl-cache";
-import {
-	logError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
 import type { TvdbId } from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { SonarrClient } from "./client";
@@ -209,10 +206,7 @@ export class SonarrLibrary {
 
 		let liveSeries: SonarrSeries | null;
 		try {
-			liveSeries = await this.client.findSeriesByTvdbId(
-				tvdbId,
-				credentials,
-			);
+			liveSeries = await this.client.findSeriesByTvdbId(tvdbId, credentials);
 		} catch (error) {
 			logError(normalizeError(error), `SonarrLibrary:check:${tvdbId}`);
 			return {
@@ -277,7 +271,9 @@ export class SonarrLibrary {
 		credentials: ProviderCredentials,
 	): Promise<boolean> {
 		return this.mutateSnapshots(credentials, (current) => {
-			const index = current.findIndex((item) => item.tvdbId === snapshot.tvdbId);
+			const index = current.findIndex(
+				(item) => item.tvdbId === snapshot.tvdbId,
+			);
 			if (index === -1) return [...current, snapshot];
 			if (JSON.stringify(current[index]) === JSON.stringify(snapshot)) {
 				return null;
@@ -316,7 +312,9 @@ export class SonarrLibrary {
 
 	private async mutateSnapshots(
 		credentials: ProviderCredentials,
-		update: (current: readonly SonarrSeriesSnapshot[]) => SonarrSeriesSnapshot[] | null,
+		update: (
+			current: readonly SonarrSeriesSnapshot[],
+		) => SonarrSeriesSnapshot[] | null,
 	): Promise<boolean> {
 		if (this.clearPromise) await this.clearPromise;
 

@@ -2,34 +2,32 @@ import type { AnimeFormat } from "@/shared/types/anime-format";
 /** Browse card and adapter contracts owned by content-surface overlays. */
 // src/content/browse/types.ts
 
-import type {
-	AniListId,
-} from '@/anilist/types';
-import type { SourceIdentity } from '@/mapping/source-identity';
+import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 
-export const BROWSE_OVERLAY_CONTAINER_CLASS = 'a2a-overlay-container';
-export const BROWSE_PROCESSED_ATTRIBUTE = 'data-a2a-processed';
-export const BROWSE_CREATED_ATTRIBUTE = 'data-a2a-created';
+export const BROWSE_OVERLAY_CONTAINER_CLASS = "a2a-overlay-container";
+export const BROWSE_PROCESSED_ATTRIBUTE = "data-a2a-processed";
+export const BROWSE_CREATED_ATTRIBUTE = "data-a2a-created";
 
-type AnchorCorner = 'bottom-left' | 'top-left';
-type StackDirection = 'up' | 'down';
+type AnchorCorner = "bottom-left" | "top-left";
+type StackDirection = "up" | "down";
 
 export interface HostMediaTarget {
-  source: SourceIdentity;
-  anilistId?: AniListId;
-  title: string;
-  format: AnimeFormat | null;
-  /** Poster read from the host page, used when no metadata cover is available. */
-  coverImage?: string;
-  mountTarget: HTMLElement;
-  presentation?: 'status-column' | 'action-row';
+	source: SourceIdentity;
+	anilistId?: AniListId;
+	title: string;
+	format: AnimeFormat | null;
+	/** Poster read from the host page, used when no metadata cover is available. */
+	coverImage?: string;
+	mountTarget: HTMLElement;
+	presentation?: "status-column" | "action-row";
 }
 
 export interface BrowseAdapter {
-  cardSelector: string;
-  parseCard(card: Element): HostMediaTarget | null;
-  getObserverRoot?(): Node | null;
-  getScanRoot?(): Element | null;
-  anchorCorner?: AnchorCorner;
-  stackDirection?: StackDirection;
+	cardSelector: string;
+	parseCard(card: Element): HostMediaTarget | null;
+	getObserverRoot?(): Node | null;
+	getScanRoot?(): Element | null;
+	anchorCorner?: AnchorCorner;
+	stackDirection?: StackDirection;
 }

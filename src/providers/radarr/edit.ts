@@ -17,9 +17,7 @@ import type {
 } from "../schemas";
 import type { RadarrClient } from "./client";
 import type { RadarrFormState } from "./form-state";
-import type {
-	RadarrMovie,
-} from "./types";
+import type { RadarrMovie } from "./types";
 import { resolveProviderTagIds } from "../provider-tags";
 
 type RadarrMovieChanges = Partial<

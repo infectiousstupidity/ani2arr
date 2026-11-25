@@ -3,10 +3,7 @@ import type { AnimeFormat } from "@/shared/types/anime-format";
 // src/features/media-modal/details/linked-entries.tsx
 
 import { ExternalLink } from "lucide-react";
-import type {
-	AniListId,
-	AniListMetadata,
-} from "@/anilist/types";
+import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { buildAniListAnimeUrl, resolveTitlePreference } from "@/anilist/title";
 import type { Provider } from "@/providers/types";
 import type { MappingDetailsPayload } from "@/rpc/types";
@@ -62,9 +59,7 @@ function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 					{row.year ? ` • ${row.year}` : ""}
 				</div>
 			</div>
-			<span
-				className="absolute right-3 top-3 scale-[0.92] text-text-secondary opacity-0 transition-[opacity,transform,color] duration-150 group-hover:scale-100 group-hover:text-accent-primary group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:text-accent-primary group-focus-visible:opacity-100"
-			>
+			<span className="absolute right-3 top-3 scale-[0.92] text-text-secondary opacity-0 transition-[opacity,transform,color] duration-150 group-hover:scale-100 group-hover:text-accent-primary group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:text-accent-primary group-focus-visible:opacity-100">
 				<ExternalLink className="h-4 w-4" />
 			</span>
 		</a>
@@ -144,7 +139,9 @@ export function MappingLinkedEntries(
 						format: metadata?.format ?? null,
 						year: metadata?.seasonYear ?? null,
 						posterUrl:
-							metadata?.coverImage?.medium ?? metadata?.coverImage?.large ?? null,
+							metadata?.coverImage?.medium ??
+							metadata?.coverImage?.large ??
+							null,
 					};
 				});
 	const rowsKey = rows.map((row) => row.anilistId).join(":");

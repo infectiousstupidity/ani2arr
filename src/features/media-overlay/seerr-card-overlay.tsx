@@ -147,7 +147,8 @@ export function SeerrCardStackActions({
 }: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const [engaged, setEngaged] = useState(false);
-	const isInline = presentation === "status-column" || presentation === "action-row";
+	const isInline =
+		presentation === "status-column" || presentation === "action-row";
 
 	useEffect(() => {
 		if (isInline || engaged || !observeTarget) return;

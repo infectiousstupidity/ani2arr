@@ -52,9 +52,7 @@ function FooterButtonSlot(props: { children: ReactNode }): React.JSX.Element {
 	const { children } = props;
 
 	return (
-		<span
-			className="a2a-footer-button-in flex flex-1 md:flex-none"
-		>
+		<span className="a2a-footer-button-in flex flex-1 md:flex-none">
 			{children}
 		</span>
 	);
@@ -230,11 +228,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 	}
 
 	return (
-		<FooterLayout
-			notice={notice}
-			left={leftActions}
-			right={rightActions}
-		/>
+		<FooterLayout notice={notice} left={leftActions} right={rightActions} />
 	);
 }
 

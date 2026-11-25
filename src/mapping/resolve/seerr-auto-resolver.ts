@@ -195,8 +195,9 @@ async function buildMatchedTarget(input: {
 			input.match.result.tmdbId,
 		);
 		hasInferredSeason =
-			details.seasons?.some((season) => season.seasonNumber === inferredSeason) ??
-			false;
+			details.seasons?.some(
+				(season) => season.seasonNumber === inferredSeason,
+			) ?? false;
 	}
 	return {
 		mediaType: "tv",

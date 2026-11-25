@@ -9,10 +9,7 @@ import {
 	type CacheWriteOptions,
 	type TtlCache,
 } from "@/shared/cache/ttl-cache";
-import {
-	logError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
 import type { TmdbId } from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
@@ -120,7 +117,8 @@ export class RadarrLibrary {
 						snapshots: movies
 							.filter(
 								(movie) =>
-									typeof movie.tmdbId === "number" && Number.isFinite(movie.tmdbId),
+									typeof movie.tmdbId === "number" &&
+									Number.isFinite(movie.tmdbId),
 							)
 							.map((movie) => toRadarrMovieSnapshot(movie)),
 					}))
@@ -214,10 +212,7 @@ export class RadarrLibrary {
 
 		let liveMovie: RadarrMovie | null;
 		try {
-			liveMovie = await this.client.findMovieByTmdbId(
-				tmdbId,
-				credentials,
-			);
+			liveMovie = await this.client.findMovieByTmdbId(tmdbId, credentials);
 		} catch (error) {
 			logError(normalizeError(error), `RadarrLibrary:check:${tmdbId}`);
 			return {
@@ -232,10 +227,7 @@ export class RadarrLibrary {
 			const snapshot = toRadarrMovieSnapshot(liveMovie);
 			if (!existsInCache) {
 				try {
-					const changed = await this.upsertMovieSnapshot(
-						snapshot,
-						credentials,
-					);
+					const changed = await this.upsertMovieSnapshot(snapshot, credentials);
 					if (changed) await input.onCacheChanged?.();
 				} catch (error) {
 					logError(normalizeError(error), `RadarrLibrary:cache:${tmdbId}`);
@@ -279,7 +271,9 @@ export class RadarrLibrary {
 		credentials: ProviderCredentials,
 	): Promise<boolean> {
 		return this.mutateSnapshots(credentials, (current) => {
-			const index = current.findIndex((item) => item.tmdbId === snapshot.tmdbId);
+			const index = current.findIndex(
+				(item) => item.tmdbId === snapshot.tmdbId,
+			);
 			if (index === -1) return [...current, snapshot];
 			if (JSON.stringify(current[index]) === JSON.stringify(snapshot)) {
 				return null;
@@ -318,7 +312,9 @@ export class RadarrLibrary {
 
 	private async mutateSnapshots(
 		credentials: ProviderCredentials,
-		update: (current: readonly RadarrMovieSnapshot[]) => RadarrMovieSnapshot[] | null,
+		update: (
+			current: readonly RadarrMovieSnapshot[],
+		) => RadarrMovieSnapshot[] | null,
 	): Promise<boolean> {
 		if (this.clearPromise) await this.clearPromise;
 

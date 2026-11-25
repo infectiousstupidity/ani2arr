@@ -54,10 +54,7 @@ export function normalizeError(error: unknown): ExtensionError {
 	);
 }
 
-export function getUserErrorMessage(
-	error: unknown,
-	fallback: string,
-): string {
+export function getUserErrorMessage(error: unknown, fallback: string): string {
 	if (
 		error &&
 		typeof error === "object" &&

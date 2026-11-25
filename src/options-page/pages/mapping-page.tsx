@@ -37,7 +37,9 @@ interface MappingsPageProps {
 	hash: string;
 }
 
-export const MappingsPage = ({ hash }: MappingsPageProps): React.JSX.Element => {
+export const MappingsPage = ({
+	hash,
+}: MappingsPageProps): React.JSX.Element => {
 	const targetAniListId = readTargetAniListIdFromHash(hash);
 
 	return (

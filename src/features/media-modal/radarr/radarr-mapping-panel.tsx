@@ -129,7 +129,9 @@ export function RadarrMappingPanel(
 			searchPlaceholder="Search by movie title or TMDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
-			errorMessage={search.error ? normalizeError(search.error).userMessage : null}
+			errorMessage={
+				search.error ? normalizeError(search.error).userMessage : null
+			}
 			resultCount={candidates.length}
 			onQueryChange={handleQueryChange}
 			onSearch={setSearchTerm}

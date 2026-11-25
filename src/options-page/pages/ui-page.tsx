@@ -2,7 +2,16 @@
 // src/options-page/pages/ui-page.tsx
 
 import type { ComponentType } from "react";
-import { AppWindow, Check, ChevronDown, ExternalLink, Heart, Languages, LayoutGrid, Send } from "lucide-react";
+import {
+	AppWindow,
+	Check,
+	ChevronDown,
+	ExternalLink,
+	Heart,
+	Languages,
+	LayoutGrid,
+	Send,
+} from "lucide-react";
 import {
 	ANILIST_TITLE_LANGUAGES,
 	isAniListTitleLanguage,
@@ -27,7 +36,8 @@ type BrowseCardProvider = keyof Omit<
 	PublicOptions["ui"]["browseCards"],
 	"primaryStatus"
 >;
-type BrowseCardSettings = PublicOptions["ui"]["browseCards"][BrowseCardProvider];
+type BrowseCardSettings =
+	PublicOptions["ui"]["browseCards"][BrowseCardProvider];
 type AnimePageProvider = keyof PublicOptions["ui"]["animePages"];
 type IconComponent = ComponentType<{ className?: string }>;
 
@@ -161,7 +171,10 @@ function BrowseCardModeControl(props: {
 		<div className="flex min-h-30 min-w-0 flex-col justify-center gap-4">
 			<div className="flex min-w-0 items-center gap-2.5 text-text-primary">
 				<Icon className="h-5 w-5 shrink-0" />
-				<Label id={labelId} className="mb-0 inline truncate text-sm font-semibold">
+				<Label
+					id={labelId}
+					className="mb-0 inline truncate text-sm font-semibold"
+				>
 					Show on {label} browse cards?
 				</Label>
 			</div>
@@ -192,7 +205,10 @@ function AnimePageSwitch(props: {
 			<div className="flex min-h-11 w-full items-center justify-between gap-4">
 				<div className="flex min-w-0 items-center gap-2.5 text-text-primary">
 					<Icon className="h-5 w-5 shrink-0" />
-					<Label htmlFor={id} className="mb-0 inline cursor-pointer text-sm font-semibold">
+					<Label
+						htmlFor={id}
+						className="mb-0 inline cursor-pointer text-sm font-semibold"
+					>
 						Show on {label} anime pages
 					</Label>
 				</div>
@@ -241,7 +257,9 @@ export const UiPage = (): React.JSX.Element | null => {
 			type: "browseCard",
 			provider,
 			patch:
-				mode === "hidden" ? { enabled: false } : { enabled: true, visibility: mode },
+				mode === "hidden"
+					? { enabled: false }
+					: { enabled: true, visibility: mode },
 		});
 	};
 
@@ -293,8 +311,8 @@ export const UiPage = (): React.JSX.Element | null => {
 							Primary browse-card status
 						</Label>
 						<p className="text-sm text-text-secondary">
-							Choose which provider owns the visible browse-card button when both
-							Arr and Seerr can handle the title.
+							Choose which provider owns the visible browse-card button when
+							both Arr and Seerr can handle the title.
 						</p>
 						<SegmentedButtons
 							value={uiOptions.browseCards.primaryStatus}

@@ -15,10 +15,7 @@ import {
 	type SeerrMappingOutcome,
 } from "./effective-mapping";
 import { listEffectiveMappingsByProvider } from "./list-mappings";
-import {
-	getManualLayerRecord,
-	listAniListManualLayers,
-} from "./manual.store";
+import { getManualLayerRecord, listAniListManualLayers } from "./manual.store";
 import type { AutomaticResolver } from "./resolve/resolve";
 import type { SourceIdentity } from "./source-identity";
 import {

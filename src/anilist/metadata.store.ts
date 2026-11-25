@@ -10,10 +10,7 @@ import {
 	type AniListMetadataBundle,
 	type AniListMetadataChunkRef,
 } from "@/anilist/types";
-import {
-	logError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
 import { logger, type ScopedLogger } from "@/shared/utils/logger";
 
 const BAKED_METADATA_DB_NAME = "a2a-anilist-baked-metadata-db";

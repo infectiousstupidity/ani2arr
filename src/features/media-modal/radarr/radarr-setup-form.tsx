@@ -82,9 +82,7 @@ function getHeaderDescription(mode: "add" | "edit"): string {
 		: "Choose the root folder and add options for this movie.";
 }
 
-function getInitialValues(
-	target: RadarrSetupTarget | null,
-): RadarrFormState {
+function getInitialValues(target: RadarrSetupTarget | null): RadarrFormState {
 	return normalizeRadarrFormState(target?.initialFormValues);
 }
 
@@ -255,11 +253,7 @@ export function useRadarrSetupForm(
 		event.preventDefault();
 		if (!event.isTrusted) return;
 
-		if (
-			!canSubmit ||
-			target === null ||
-			providerPayloadTitle === undefined
-		) {
+		if (!canSubmit || target === null || providerPayloadTitle === undefined) {
 			return;
 		}
 

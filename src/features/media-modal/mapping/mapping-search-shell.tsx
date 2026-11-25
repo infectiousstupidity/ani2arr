@@ -40,7 +40,8 @@ export function MappingSearchShell(
 	let stateMessage: string | null = null;
 	if (errorMessage) stateMessage = errorMessage;
 	else if (isFetching && resultCount === 0) stateMessage = "Searching...";
-	else if (hasSearchTerm && resultCount === 0) stateMessage = "No results found.";
+	else if (hasSearchTerm && resultCount === 0)
+		stateMessage = "No results found.";
 	const stateMessageClass = errorMessage
 		? "border-error/30 bg-error/10 text-error"
 		: "border-border-primary/45 bg-bg-secondary/35 text-text-secondary";

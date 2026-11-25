@@ -223,20 +223,34 @@ describe("query invalidation", () => {
 		const malCard = { source: "mal", id: mal(3) } as const;
 		const affected = [
 			queryKeys.mappingIdentity(aid(1)),
-			queryKeys.providerMediaStatus("sonarr", normalizeSonarrStatusRequest({ source: changed })),
-			queryKeys.providerMediaStatus("radarr", normalizeRadarrStatusRequest({ source: malCard })),
-			queryKeys.mappingInspection(normalizeMappingInspectionRequest("sonarr", changed)),
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ source: changed }),
+			),
+			queryKeys.providerMediaStatus(
+				"radarr",
+				normalizeRadarrStatusRequest({ source: malCard }),
+			),
+			queryKeys.mappingInspection(
+				normalizeMappingInspectionRequest("sonarr", changed),
+			),
 		];
 		const unaffected = [
 			queryKeys.mappingIdentity(aid(2)),
-			queryKeys.providerMediaStatus("sonarr", normalizeSonarrStatusRequest({ source: unchanged })),
-			queryKeys.mappingInspection(normalizeMappingInspectionRequest("sonarr", unchanged)),
+			queryKeys.providerMediaStatus(
+				"sonarr",
+				normalizeSonarrStatusRequest({ source: unchanged }),
+			),
+			queryKeys.mappingInspection(
+				normalizeMappingInspectionRequest("sonarr", unchanged),
+			),
 		];
 		seed(client, [...affected, ...unaffected]);
 
 		invalidateAfterMappingsRevision(client, [aid(1)]);
 
 		for (const key of affected) expect(isInvalidated(client, key)).toBe(true);
-		for (const key of unaffected) expect(isInvalidated(client, key)).toBe(false);
+		for (const key of unaffected)
+			expect(isInvalidated(client, key)).toBe(false);
 	});
 });

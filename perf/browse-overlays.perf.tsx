@@ -15,9 +15,15 @@ import { BrowseOverlays } from "@/content/browse/browse-overlays";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import { queryKeys } from "@/queries/query-keys";
 import { createDefaultPublicOptions } from "@/settings/schema";
-import { buildAniListCards, report, stubVisibleIntersectionObserver } from "./helpers";
+import {
+	buildAniListCards,
+	report,
+	stubVisibleIntersectionObserver,
+} from "./helpers";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+	globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const calls = new Map<string, number>();
 const messages = { count: 0 };
@@ -33,25 +39,59 @@ const fakeApi: Record<string, (...args: unknown[]) => Promise<unknown>> = {
 		await new Promise((resolve) => setTimeout(resolve, 200));
 		return (ids as AniListId[]).flatMap((anilistId) =>
 			radarrOnly(anilistId)
-				? [{ anilistId, source: { source: "anilist", id: anilistId }, provider: "radarr", result: { kind: "mapped", source: "upstream", providerId: anilistId } }]
-				: [{ anilistId, source: { source: "anilist", id: anilistId }, provider: "sonarr", result: { kind: "mapped", source: "upstream", providerId: anilistId } }],
+				? [
+						{
+							anilistId,
+							source: { source: "anilist", id: anilistId },
+							provider: "radarr",
+							result: {
+								kind: "mapped",
+								source: "upstream",
+								providerId: anilistId,
+							},
+						},
+					]
+				: [
+						{
+							anilistId,
+							source: { source: "anilist", id: anilistId },
+							provider: "sonarr",
+							result: {
+								kind: "mapped",
+								source: "upstream",
+								providerId: anilistId,
+							},
+						},
+					],
 		);
 	},
 	async getSeriesStatus() {
 		await delay();
-		return { mapping: { kind: "mapped", source: "upstream", providerId: 1 }, isInLibrary: false };
+		return {
+			mapping: { kind: "mapped", source: "upstream", providerId: 1 },
+			isInLibrary: false,
+		};
 	},
 	async getMovieStatus() {
 		await delay();
-		return { mapping: { kind: "mapped", source: "upstream", providerId: 1 }, isInLibrary: false };
+		return {
+			mapping: { kind: "mapped", source: "upstream", providerId: 1 },
+			isInLibrary: false,
+		};
 	},
 	async getSeriesStatuses(inputs) {
 		await delay();
-		return (inputs as unknown[]).map(() => ({ mapping: { kind: "mapped", source: "upstream", providerId: 1 }, isInLibrary: false }));
+		return (inputs as unknown[]).map(() => ({
+			mapping: { kind: "mapped", source: "upstream", providerId: 1 },
+			isInLibrary: false,
+		}));
 	},
 	async getMovieStatuses(inputs) {
 		await delay();
-		return (inputs as unknown[]).map(() => ({ mapping: { kind: "mapped", source: "upstream", providerId: 1 }, isInLibrary: false }));
+		return (inputs as unknown[]).map(() => ({
+			mapping: { kind: "mapped", source: "upstream", providerId: 1 },
+			isInLibrary: false,
+		}));
 	},
 	async getAniListMetadata() {
 		await delay();
@@ -72,13 +112,15 @@ vi.mock("@/rpc", () => ({
 		new Proxy(
 			{},
 			{
-				get: (_target, property: string) => (...args: unknown[]) => {
-					calls.set(property, (calls.get(property) ?? 0) + 1);
-					messages.count += 1;
-					const fn = fakeApi[property];
-					if (!fn) throw new Error(`unexpected RPC ${property}`);
-					return fn(...args);
-				},
+				get:
+					(_target, property: string) =>
+					(...args: unknown[]) => {
+						calls.set(property, (calls.get(property) ?? 0) + 1);
+						messages.count += 1;
+						const fn = fakeApi[property];
+						if (!fn) throw new Error(`unexpected RPC ${property}`);
+						return fn(...args);
+					},
 			},
 		),
 }));
@@ -105,7 +147,10 @@ async function run(seerr: boolean) {
 	options.providers.radarr.isConfigured = true;
 	options.seerr.isConfigured = seerr;
 	options.ui.browseCards.seerr.enabled = seerr;
-	const client = createExtensionQueryClient({ staleTime: Infinity, retry: false });
+	const client = createExtensionQueryClient({
+		staleTime: Infinity,
+		retry: false,
+	});
 	client.setQueryData(queryKeys.publicOptions(), options);
 
 	const host = document.createElement("div");
@@ -115,14 +160,20 @@ async function run(seerr: boolean) {
 		root.render(
 			<QueryClientProvider client={client}>
 				<Tooltip.Provider>
-					<BrowseOverlays adapter={anilistBrowseAdapter} portalContainer={host} />
+					<BrowseOverlays
+						adapter={anilistBrowseAdapter}
+						portalContainer={host}
+					/>
 				</Tooltip.Provider>
 			</QueryClientProvider>,
 		),
 	);
 	await settle();
 	const label = seerr ? "arr+seerr" : "arr only";
-	report(`[${label}] first 50 cards: RPC messages`, `${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`);
+	report(
+		`[${label}] first 50 cards: RPC messages`,
+		`${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`,
+	);
 
 	calls.clear();
 	messages.count = 0;
@@ -131,8 +182,14 @@ async function run(seerr: boolean) {
 		grid.append(...buildAniListCards(51, 100, formatFor));
 	});
 	await settle();
-	report(`[${label}] scroll append 50 more: RPC messages`, `${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`);
-	report(`[${label}] AniList IDs sent in identity requests on append`, identityIdsRequested.count);
+	report(
+		`[${label}] scroll append 50 more: RPC messages`,
+		`${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`,
+	);
+	report(
+		`[${label}] AniList IDs sent in identity requests on append`,
+		identityIdsRequested.count,
+	);
 
 	// One automatic mapping found elsewhere bumps the revision once (L4-03, debounced 1 s).
 	calls.clear();
@@ -141,16 +198,24 @@ async function run(seerr: boolean) {
 		await browser.storage.local.set({ mappingsRevision: crypto.randomUUID() });
 	});
 	await settle();
-	report(`[${label}] one global mappings revision bump with 100 cards on screen: RPC messages`, `${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`);
+	report(
+		`[${label}] one global mappings revision bump with 100 cards on screen: RPC messages`,
+		`${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`,
+	);
 
 	// Automatic results now name the AniList IDs they changed.
 	calls.clear();
 	messages.count = 0;
 	await act(async () => {
-		await browser.storage.local.set({ mappingsRevision: { id: crypto.randomUUID(), anilistIds: [7, 42] } });
+		await browser.storage.local.set({
+			mappingsRevision: { id: crypto.randomUUID(), anilistIds: [7, 42] },
+		});
 	});
 	await settle();
-	report(`[${label}] one automatic bump (2 AniList IDs) with 100 cards on screen: RPC messages`, `${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`);
+	report(
+		`[${label}] one automatic bump (2 AniList IDs) with 100 cards on screen: RPC messages`,
+		`${messages.count} ${JSON.stringify(Object.fromEntries(calls))}`,
+	);
 	await act(async () => root.unmount());
 }
 

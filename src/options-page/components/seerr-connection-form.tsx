@@ -209,8 +209,8 @@ function SeerrSessionConnectionFields(props: {
 					className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
 					role="alert"
 				>
-					This Seerr connection uses unencrypted HTTP. Use HTTPS outside
-					trusted localhost or LAN setups.
+					This Seerr connection uses unencrypted HTTP. Use HTTPS outside trusted
+					localhost or LAN setups.
 				</p>
 			) : null}
 
@@ -220,8 +220,8 @@ function SeerrSessionConnectionFields(props: {
 						Connected as {props.savedConnection.account?.displayName}
 					</p>
 					<p className="mt-1 text-xs text-text-secondary">
-						Using your existing Seerr browser login. ani2arr does not store
-						the session cookie.
+						Using your existing Seerr browser login. ani2arr does not store the
+						session cookie.
 					</p>
 				</div>
 			) : null}
@@ -248,8 +248,8 @@ function SeerrApiKeyConnectionFields(props: {
 	return (
 		<>
 			<p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-				The global Seerr API key is a privileged server credential. Do not
-				share it with untrusted users.
+				The global Seerr API key is a privileged server credential. Do not share
+				it with untrusted users.
 			</p>
 
 			<SettingsRow
@@ -318,11 +318,7 @@ function SeerrConnectionActionRow(props: {
 					Open Seerr login
 				</Button>
 			) : null}
-			<Button
-				type="submit"
-				variant="primary"
-				disabled={props.isSubmitDisabled}
-			>
+			<Button type="submit" variant="primary" disabled={props.isSubmitDisabled}>
 				{props.connectionMethod === "session" ? (
 					<LogIn className="mr-2 h-4 w-4" />
 				) : (
@@ -352,8 +348,7 @@ const SeerrConnectionDraft = ({
 	const [draftApiKey, setDraftApiKey] = useState(savedApiKey);
 	const [connectionMethod, setConnectionMethod] = useState(savedMethod);
 	const hasUrlChanges = draftUrl !== savedUrl;
-	const hasValueChanges =
-		draftUrl !== savedUrl || draftApiKey !== savedApiKey;
+	const hasValueChanges = draftUrl !== savedUrl || draftApiKey !== savedApiKey;
 	const activeFailure =
 		failure?.scope === "global" || failure?.scope === connectionMethod
 			? failure

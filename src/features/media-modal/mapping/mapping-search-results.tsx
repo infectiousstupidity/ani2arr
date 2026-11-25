@@ -66,13 +66,9 @@ export function MappingCandidateRow(
 	};
 
 	return (
-		<div
-			className="group relative h-[120px] overflow-hidden rounded-lg border border-transparent p-0 transition-[background-color,border-color] hover:border-border-primary/45 hover:bg-bg-tertiary/50 focus-within:border-accent-primary/45 focus-within:bg-bg-tertiary/45"
-		>
+		<div className="group relative h-[120px] overflow-hidden rounded-lg border border-transparent p-0 transition-[background-color,border-color] hover:border-border-primary/45 hover:bg-bg-tertiary/50 focus-within:border-accent-primary/45 focus-within:bg-bg-tertiary/45">
 			{isSelected ? (
-				<div
-					className="pointer-events-none absolute inset-0 rounded-lg border border-accent-primary/45 bg-accent-primary/10 transition-[background-color,border-color]"
-				/>
+				<div className="pointer-events-none absolute inset-0 rounded-lg border border-accent-primary/45 bg-accent-primary/10 transition-[background-color,border-color]" />
 			) : null}
 			<button
 				type="button"

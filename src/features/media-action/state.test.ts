@@ -82,10 +82,18 @@ describe("getMediaActionStatus", () => {
 	it("opens setup for in-library media and for adds without usable defaults", () => {
 		expect(
 			getMediaActionStatus({ ...baseInput, isInLibrary: true }),
-		).toMatchObject({ state: "in-library", action: "open-setup", disabled: false });
+		).toMatchObject({
+			state: "in-library",
+			action: "open-setup",
+			disabled: false,
+		});
 
 		expect(
 			getMediaActionStatus({ ...baseInput, canQuickAdd: false }),
-		).toMatchObject({ state: "can-add", action: "open-setup", disabled: false });
+		).toMatchObject({
+			state: "can-add",
+			action: "open-setup",
+			disabled: false,
+		});
 	});
 });

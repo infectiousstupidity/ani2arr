@@ -65,10 +65,7 @@ describe("getMappingInspection", () => {
 		);
 
 		await expect(
-			getMappingInspection(
-				{ provider: "sonarr", source },
-				deps,
-			),
+			getMappingInspection({ provider: "sonarr", source }, deps),
 		).resolves.toEqual({
 			source,
 			mapping: { kind: "mapped", source: "manual", providerId: 100 },

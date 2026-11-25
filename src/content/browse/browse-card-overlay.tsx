@@ -61,8 +61,7 @@ function getModalMetadataHint(input: {
 	return {
 		title: input.title,
 		format: input.parsedFormat ?? input.metadata?.format ?? null,
-		coverImage:
-			input.metadata?.coverImage ?? input.parsedCoverImage ?? null,
+		coverImage: input.metadata?.coverImage ?? input.parsedCoverImage ?? null,
 	};
 }
 

@@ -10,9 +10,21 @@ describe("worker wake breakdown (caches warm, so CPU only)", () => {
 		useRealisticStorage();
 		await seedUpstream();
 		await migrateMappingStorage();
-		const { result: aliases } = await time("getSourceAliasesByAniListId", () => getSourceAliasesByAniListId(), 5);
-		await time("consolidateManualAliases", () => consolidateManualAliases(aliases), 5);
-		await time("consolidateAutomaticAliases", () => consolidateAutomaticAliases(aliases), 5);
+		const { result: aliases } = await time(
+			"getSourceAliasesByAniListId",
+			() => getSourceAliasesByAniListId(),
+			5,
+		);
+		await time(
+			"consolidateManualAliases",
+			() => consolidateManualAliases(aliases),
+			5,
+		);
+		await time(
+			"consolidateAutomaticAliases",
+			() => consolidateAutomaticAliases(aliases),
+			5,
+		);
 		await time("migrateMappingStorage warm", () => migrateMappingStorage(), 5);
 	});
 });

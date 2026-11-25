@@ -6,10 +6,7 @@ import {
 	sonarrLibrary,
 } from "@/background/api-services";
 import type { EffectiveMappingRecord } from "@/mapping/effective-mapping";
-import {
-	setIgnored,
-	setManualMapping,
-} from "@/mapping/manual.store";
+import { setIgnored, setManualMapping } from "@/mapping/manual.store";
 import {
 	getSourceAliasesByAniListId,
 	getUniqueAniListIdForSource,

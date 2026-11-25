@@ -6,10 +6,7 @@ import { getProviderCredentials } from "@/settings/provider-config";
 import { getSeerrConnection } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import type { SeerrConnection } from "@/providers/seerr/types";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
@@ -20,9 +17,7 @@ export type ConfiguredProvider = {
 	options: ExtensionOptions;
 };
 
-function createProviderNotConfiguredError(
-	provider: Provider,
-): ExtensionError {
+function createProviderNotConfiguredError(provider: Provider): ExtensionError {
 	const label = getProviderLabel(provider);
 	const code =
 		provider === "sonarr"

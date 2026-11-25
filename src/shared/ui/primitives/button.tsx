@@ -30,7 +30,8 @@ const variantClasses = {
 		"border border-border-primary bg-transparent text-text-primary hover:bg-bg-tertiary",
 	ghost:
 		"bg-transparent text-text-secondary hover:bg-bg-tertiary/50 hover:text-text-primary",
-	destructive: "border border-error/20 bg-error/10 text-error hover:bg-error/20",
+	destructive:
+		"border border-error/20 bg-error/10 text-error hover:bg-error/20",
 } as const;
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(

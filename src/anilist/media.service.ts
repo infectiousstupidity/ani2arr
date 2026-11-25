@@ -122,7 +122,11 @@ export class AniListMediaService {
 		media: AniListMedia,
 	): Promise<void> {
 		try {
-			await this.caches?.media.write(String(id), media, ANILIST_MEDIA_CACHE_TTL);
+			await this.caches?.media.write(
+				String(id),
+				media,
+				ANILIST_MEDIA_CACHE_TTL,
+			);
 		} catch (error) {
 			const name = (error as { name?: string } | null | undefined)?.name ?? "";
 			if (name !== "DataCloneError") throw error;
@@ -187,7 +191,9 @@ export class AniListMediaService {
 
 	private shouldAbortRetry(error: unknown): error is AniListError {
 		if (!(error instanceof AniListError)) return false;
-		return error.status !== undefined && error.status !== 429 && error.status < 500;
+		return (
+			error.status !== undefined && error.status !== 429 && error.status < 500
+		);
 	}
 
 	private createMissingMediaError(id: AniListId) {

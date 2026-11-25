@@ -11,13 +11,7 @@ import Pill from "@/shared/ui/primitives/pill";
 import { summarizeSeerrSeasonAvailability } from "./seerr-selection";
 
 type PillTone =
-	| "muted"
-	| "success"
-	| "warning"
-	| "info"
-	| "accent"
-	| "blue"
-	| "default";
+	"muted" | "success" | "warning" | "info" | "accent" | "blue" | "default";
 
 function getStatusLabel(
 	status: SeerrMediaDetails["status"] | undefined,
@@ -112,9 +106,7 @@ export function SeerrDetailCard(props: {
 				<p className="line-clamp-2 text-sm font-semibold text-text-primary">
 					{title}
 				</p>
-				{year ? (
-					<p className="text-xs text-text-secondary">{year}</p>
-				) : null}
+				{year ? <p className="text-xs text-text-secondary">{year}</p> : null}
 			</div>
 
 			<div className="mt-3 flex flex-wrap gap-2">

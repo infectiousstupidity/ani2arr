@@ -146,7 +146,11 @@ describe("list mappings", () => {
 		const validateUpstream = vi.spyOn(mappingRecord, "isUpstreamMappingRecord");
 		const storageRead = vi.spyOn(browser.storage.local, "get");
 		const identities = await getMappingIdentities([
-			aid(3), aid(1), aid(4), aid(5), aid(3),
+			aid(3),
+			aid(1),
+			aid(4),
+			aid(5),
+			aid(3),
 		]);
 		// The full list above already decoded all three stores; lookups reuse them.
 		expect(storageRead).not.toHaveBeenCalled();

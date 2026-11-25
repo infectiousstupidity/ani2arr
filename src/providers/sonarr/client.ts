@@ -69,7 +69,10 @@ export class SonarrClient extends ProviderApiClient {
 		seriesId: SonarrSeriesId,
 		credentials: ProviderCredentials,
 	): Promise<SonarrGeneratedFolder> {
-		const json = await this.requestJson(`series/${seriesId}/folder`, credentials);
+		const json = await this.requestJson(
+			`series/${seriesId}/folder`,
+			credentials,
+		);
 		return v.parse(SonarrGeneratedFolderSchema, json);
 	}
 

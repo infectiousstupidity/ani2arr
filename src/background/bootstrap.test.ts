@@ -106,8 +106,12 @@ describe("bootstrapBackground", () => {
 
 		bootstrapBackground();
 
-		await vi.waitFor(() => expect(refreshMappingPipelineMock).toHaveBeenCalledOnce());
-		expect(alarmCreate).toHaveBeenCalledWith("a2a:refresh-static-mappings", { periodInMinutes: 360 });
+		await vi.waitFor(() =>
+			expect(refreshMappingPipelineMock).toHaveBeenCalledOnce(),
+		);
+		expect(alarmCreate).toHaveBeenCalledWith("a2a:refresh-static-mappings", {
+			periodInMinutes: 360,
+		});
 		alarmGet.mockRestore();
 		alarmCreate.mockRestore();
 	});

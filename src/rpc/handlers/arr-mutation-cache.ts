@@ -2,7 +2,11 @@ import { scheduleLibraryRefresh } from "@/background/api-services";
 import type { Provider } from "@/providers/types";
 import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
 import { ErrorCode } from "@/shared/errors/error.types";
-import { createError, logError, normalizeError } from "@/shared/errors/error-utils";
+import {
+	createError,
+	logError,
+	normalizeError,
+} from "@/shared/errors/error-utils";
 
 export async function maintainArrMutationCache(
 	provider: Provider,

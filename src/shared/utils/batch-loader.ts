@@ -20,7 +20,10 @@ export function createBatchLoader<Key, Value>(input: {
 	windowMs: number;
 	maxBatchSize?: number;
 }): BatchLoader<Key, Value> {
-	let pending = new Map<string | number, { key: Key; waiters: Waiter<Value>[] }>();
+	let pending = new Map<
+		string | number,
+		{ key: Key; waiters: Waiter<Value>[] }
+	>();
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
 	const send = (batch: typeof pending): void => {
@@ -49,7 +52,10 @@ export function createBatchLoader<Key, Value>(input: {
 		const batch = pending;
 		pending = new Map();
 		const max = input.maxBatchSize ?? Number.POSITIVE_INFINITY;
-		let chunk = new Map<string | number, { key: Key; waiters: Waiter<Value>[] }>();
+		let chunk = new Map<
+			string | number,
+			{ key: Key; waiters: Waiter<Value>[] }
+		>();
 		for (const [id, entry] of batch) {
 			chunk.set(id, entry);
 			if (chunk.size >= max) {

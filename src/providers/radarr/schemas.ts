@@ -34,9 +34,7 @@ export type RadarrMinimumAvailability = v.InferOutput<
 export const RadarrMovieMonitorSchema = v.picklist(
 	RADARR_MOVIE_MONITOR_OPTIONS,
 );
-export type RadarrMovieMonitor = v.InferOutput<
-	typeof RadarrMovieMonitorSchema
->;
+export type RadarrMovieMonitor = v.InferOutput<typeof RadarrMovieMonitorSchema>;
 
 const OptionalStringSchema = v.optional(v.nullable(v.string()));
 const OptionalNumberSchema = v.optional(v.nullable(v.number()));

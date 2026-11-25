@@ -74,7 +74,9 @@ export const PublicOptionsUpdateSchema = v.variant("type", [
 	}),
 ]);
 
-export type PublicOptionsUpdate = v.InferOutput<typeof PublicOptionsUpdateSchema>;
+export type PublicOptionsUpdate = v.InferOutput<
+	typeof PublicOptionsUpdateSchema
+>;
 
 const asRecord = (input: unknown): Record<string, unknown> =>
 	input && typeof input === "object" && !Array.isArray(input)

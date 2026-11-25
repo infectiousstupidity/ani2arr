@@ -91,8 +91,9 @@ describe("MappingService", () => {
 			target: { mediaType: "movie", tmdbId: tmdb(10) },
 		});
 		await rejectAutoCandidate("radarr", source, tmdb(10));
-		const service = new MappingService(async ({ writeToken, provider, identity }) =>
-			setAutoResult(writeToken, provider, identity, { kind: "unmapped" }),
+		const service = new MappingService(
+			async ({ writeToken, provider, identity }) =>
+				setAutoResult(writeToken, provider, identity, { kind: "unmapped" }),
 		);
 		await expect(
 			service.resolveMapping("radarr", source, source.id, { forceRetry: true }),
@@ -143,12 +144,18 @@ describe("MappingService", () => {
 				providerId: tvdb(100),
 			});
 		});
-		const pending = new MappingService(resolver).resolveMapping("sonarr", source, source.id);
+		const pending = new MappingService(resolver).resolveMapping(
+			"sonarr",
+			source,
+			source.id,
+		);
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalledOnce());
 		await setManualMapping("sonarr", source, { providerId: tvdb(200) });
 		search.resolve();
 		await expect(pending).resolves.toEqual({
-			kind: "mapped", source: "manual", providerId: tvdb(200),
+			kind: "mapped",
+			source: "manual",
+			providerId: tvdb(200),
 		});
 	});
 

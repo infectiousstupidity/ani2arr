@@ -8,7 +8,11 @@ import {
 	type AniListId,
 	type AniListMedia,
 } from "@/anilist/types";
-import type { CacheHit, CacheWriteOptions, TtlCache } from "@/shared/cache/ttl-cache";
+import type {
+	CacheHit,
+	CacheWriteOptions,
+	TtlCache,
+} from "@/shared/cache/ttl-cache";
 import { AniListMediaService } from "./media.service";
 
 const { fetchAniListMediaMock } = vi.hoisted(() => ({
@@ -160,9 +164,7 @@ describe("AniListMediaService", () => {
 		vi.useFakeTimers();
 		const id = parseAniListId(204);
 		fetchAniListMediaMock
-			.mockRejectedValueOnce(
-				new AniListError("Server error", { status: 500 }),
-			)
+			.mockRejectedValueOnce(new AniListError("Server error", { status: 500 }))
 			.mockResolvedValue(createMedia(id));
 		const service = new AniListMediaService();
 

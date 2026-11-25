@@ -5,10 +5,7 @@ import {
 	validateProviderConnectionApiKey,
 	validateProviderConnectionUrl,
 } from "@/providers/settings/provider-connection.validation";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 import type { ExtensionOptions } from "./types";
 
 export function getProviderConnectionDraft(

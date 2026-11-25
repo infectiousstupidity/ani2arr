@@ -2,10 +2,7 @@
 // src/features/media-modal/radarr/radarr-setup-values.ts
 
 import * as v from "valibot";
-import {
-	parseTmdbIdOrNull,
-	RadarrMovieIdSchema,
-} from "@/providers/schemas";
+import { parseTmdbIdOrNull, RadarrMovieIdSchema } from "@/providers/schemas";
 import type { RadarrMovie } from "@/providers/radarr/types";
 import type { TmdbId } from "@/providers/schemas";
 import {
@@ -135,10 +132,7 @@ export function getRadarrSetupTarget({
 		};
 	}
 
-	if (
-		status?.mapping.kind !== "mapped" ||
-		status.isInLibrary !== false
-	) {
+	if (status?.mapping.kind !== "mapped" || status.isInLibrary !== false) {
 		return null;
 	}
 

@@ -6,17 +6,17 @@ import { ListPlus } from "lucide-react";
 import type { ProviderFormResources } from "@/providers/types";
 import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
 import {
-  createDefaultSonarrFormState,
-  type SonarrFormState,
+	createDefaultSonarrFormState,
+	type SonarrFormState,
 } from "@/providers/sonarr/form-state";
 import type { ProviderTagSelection } from "@/features/provider-ui/provider-tag-selection";
 import {
-  SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
-  SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
+	SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
+	SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/providers/sonarr/form-options";
 import type {
-  SonarrMonitorOption,
-  SonarrSeriesType,
+	SonarrMonitorOption,
+	SonarrSeriesType,
 } from "@/providers/sonarr/schemas";
 import { usePublicOptions, useUpdatePublicOptions } from "@/queries/options";
 import { useSonarrFormResources } from "@/queries/sonarr";
@@ -24,314 +24,319 @@ import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Switch } from "@/shared/ui/primitives/switch";
-import { SettingsRow, SettingsSection } from "../../components/settings-section";
+import {
+	SettingsRow,
+	SettingsSection,
+} from "../../components/settings-section";
 import { ArrDefaultsResourceFields } from "../arr-defaults-resource-fields";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
-  "Configures default add options reused when adding series via the extension media modal and overlay.";
+	"Configures default add options reused when adding series via the extension media modal and overlay.";
 
 type SonarrDraftChange = <K extends keyof SonarrFormState>(
-  field: K,
-  value: SonarrFormState[K],
+	field: K,
+	value: SonarrFormState[K],
 ) => void;
 
 interface SonarrDefaultsFieldsProps {
-  formResources: ProviderFormResources | undefined;
-  resourceFieldsDisabled: boolean;
-  fieldsDisabled: boolean;
-  values: SonarrFormState;
-  onChange: SonarrDraftChange;
-  onTagsChange: (selection: ProviderTagSelection) => void;
+	formResources: ProviderFormResources | undefined;
+	resourceFieldsDisabled: boolean;
+	fieldsDisabled: boolean;
+	values: SonarrFormState;
+	onChange: SonarrDraftChange;
+	onTagsChange: (selection: ProviderTagSelection) => void;
 }
 
 const SonarrDefaultsFields = ({
-  fieldsDisabled,
-  formResources,
-  onChange,
-  onTagsChange,
-  resourceFieldsDisabled,
-  values,
+	fieldsDisabled,
+	formResources,
+	onChange,
+	onTagsChange,
+	resourceFieldsDisabled,
+	values,
 }: SonarrDefaultsFieldsProps) => {
-  return (
-    <>
-    <ArrDefaultsResourceFields
-      provider="sonarr"
-      formResources={formResources}
-      resourceFieldsDisabled={resourceFieldsDisabled}
-      values={values}
-      onRootFolderChange={(value) => onChange("rootFolderPath", value)}
-      onQualityProfileChange={(value) => onChange("qualityProfileId", value)}
-    />
+	return (
+		<>
+			<ArrDefaultsResourceFields
+				provider="sonarr"
+				formResources={formResources}
+				resourceFieldsDisabled={resourceFieldsDisabled}
+				values={values}
+				onRootFolderChange={(value) => onChange("rootFolderPath", value)}
+				onQualityProfileChange={(value) => onChange("qualityProfileId", value)}
+			/>
 
-    <SettingsRow id="sonarr-series-type" label="Series type">
-      <SelectControl
-        id="sonarr-series-type"
-        value={values.seriesType ?? ""}
-        onValueChange={(value) =>
-          onChange("seriesType", value as SonarrSeriesType)
-        }
-        options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
-        disabled={fieldsDisabled}
-      />
-    </SettingsRow>
+			<SettingsRow id="sonarr-series-type" label="Series type">
+				<SelectControl
+					id="sonarr-series-type"
+					value={values.seriesType ?? ""}
+					onValueChange={(value) =>
+						onChange("seriesType", value as SonarrSeriesType)
+					}
+					options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
+					disabled={fieldsDisabled}
+				/>
+			</SettingsRow>
 
-    <SettingsRow id="sonarr-tags" label="Tags">
-      <ProviderTagField
-        id="sonarr-tags"
-        availableTags={formResources?.tags ?? []}
-        selectedTagIds={values.tags}
-        selectedFreeformTags={values.freeformTags}
-        onChange={onTagsChange}
-        placeholder="Add tags..."
-        disabled={fieldsDisabled}
-      />
-    </SettingsRow>
+			<SettingsRow id="sonarr-tags" label="Tags">
+				<ProviderTagField
+					id="sonarr-tags"
+					availableTags={formResources?.tags ?? []}
+					selectedTagIds={values.tags}
+					selectedFreeformTags={values.freeformTags}
+					onChange={onTagsChange}
+					placeholder="Add tags..."
+					disabled={fieldsDisabled}
+				/>
+			</SettingsRow>
 
-    <SettingsRow id="sonarr-monitor" label="Monitor episodes">
-      <SelectControl
-        id="sonarr-monitor"
-        value={values.addOptions?.monitor ?? ""}
-        onValueChange={(value) =>
-          onChange("addOptions", {
-            ...values.addOptions,
-            monitor: value as SonarrMonitorOption,
-          })
-        }
-        options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
-        disabled={fieldsDisabled}
-      />
-    </SettingsRow>
+			<SettingsRow id="sonarr-monitor" label="Monitor episodes">
+				<SelectControl
+					id="sonarr-monitor"
+					value={values.addOptions?.monitor ?? ""}
+					onValueChange={(value) =>
+						onChange("addOptions", {
+							...values.addOptions,
+							monitor: value as SonarrMonitorOption,
+						})
+					}
+					options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
+					disabled={fieldsDisabled}
+				/>
+			</SettingsRow>
 
-    <div className="mt-4 flex flex-col divide-y divide-border-primary/20">
-      <div className="py-5">
-        <SettingsRow
-          id="sonarr-season-folder"
-          label="Season Folders"
-          description="Use season folders for downloaded episodes."
-          inlineOnMobile
-          controlClassName="lg:flex lg:justify-end"
-        >
-          <Switch
-            id="sonarr-season-folder"
-            checked={values.seasonFolder ?? false}
-            disabled={fieldsDisabled}
-            onCheckedChange={(checked) => onChange("seasonFolder", checked)}
-          />
-        </SettingsRow>
-      </div>
+			<div className="mt-4 flex flex-col divide-y divide-border-primary/20">
+				<div className="py-5">
+					<SettingsRow
+						id="sonarr-season-folder"
+						label="Season Folders"
+						description="Use season folders for downloaded episodes."
+						inlineOnMobile
+						controlClassName="lg:flex lg:justify-end"
+					>
+						<Switch
+							id="sonarr-season-folder"
+							checked={values.seasonFolder ?? false}
+							disabled={fieldsDisabled}
+							onCheckedChange={(checked) => onChange("seasonFolder", checked)}
+						/>
+					</SettingsRow>
+				</div>
 
-      <div className="py-5">
-        <SettingsRow
-          id="sonarr-search-missing"
-          label="Search Missing"
-          description="Automatically search for missing episodes when adding a series."
-          inlineOnMobile
-          controlClassName="lg:flex lg:justify-end"
-        >
-          <Switch
-            id="sonarr-search-missing"
-            checked={values.addOptions?.searchForMissingEpisodes ?? false}
-            disabled={fieldsDisabled}
-            onCheckedChange={(checked) =>
-              onChange("addOptions", {
-                ...values.addOptions,
-                searchForMissingEpisodes: checked,
-              })
-            }
-          />
-        </SettingsRow>
-      </div>
+				<div className="py-5">
+					<SettingsRow
+						id="sonarr-search-missing"
+						label="Search Missing"
+						description="Automatically search for missing episodes when adding a series."
+						inlineOnMobile
+						controlClassName="lg:flex lg:justify-end"
+					>
+						<Switch
+							id="sonarr-search-missing"
+							checked={values.addOptions?.searchForMissingEpisodes ?? false}
+							disabled={fieldsDisabled}
+							onCheckedChange={(checked) =>
+								onChange("addOptions", {
+									...values.addOptions,
+									searchForMissingEpisodes: checked,
+								})
+							}
+						/>
+					</SettingsRow>
+				</div>
 
-      <div className="py-5">
-        <SettingsRow
-          id="sonarr-search-cutoff"
-          label="Search Cutoff"
-          description="Search for episodes that haven't met the cutoff."
-          inlineOnMobile
-          controlClassName="lg:flex lg:justify-end"
-        >
-          <Switch
-            id="sonarr-search-cutoff"
-            checked={values.addOptions?.searchForCutoffUnmetEpisodes ?? false}
-            disabled={fieldsDisabled}
-            onCheckedChange={(checked) =>
-              onChange("addOptions", {
-                ...values.addOptions,
-                searchForCutoffUnmetEpisodes: checked,
-              })
-            }
-          />
-        </SettingsRow>
-      </div>
-    </div>
-  </>
-  );
+				<div className="py-5">
+					<SettingsRow
+						id="sonarr-search-cutoff"
+						label="Search Cutoff"
+						description="Search for episodes that haven't met the cutoff."
+						inlineOnMobile
+						controlClassName="lg:flex lg:justify-end"
+					>
+						<Switch
+							id="sonarr-search-cutoff"
+							checked={values.addOptions?.searchForCutoffUnmetEpisodes ?? false}
+							disabled={fieldsDisabled}
+							onCheckedChange={(checked) =>
+								onChange("addOptions", {
+									...values.addOptions,
+									searchForCutoffUnmetEpisodes: checked,
+								})
+							}
+						/>
+					</SettingsRow>
+				</div>
+			</div>
+		</>
+	);
 };
 
 const cloneSonarrDefaults = (defaults: SonarrFormState): SonarrFormState =>
-  structuredClone(defaults);
+	structuredClone(defaults);
 
 const getInitialSonarrDefaults = (
-  savedDefaults: SonarrFormState,
-  formResources: ProviderFormResources | undefined,
+	savedDefaults: SonarrFormState,
+	formResources: ProviderFormResources | undefined,
 ): SonarrFormState => {
-  const defaults = cloneSonarrDefaults(savedDefaults);
-  const firstRootFolder = formResources?.rootFolders[0];
-  const firstQualityProfile = formResources?.qualityProfiles[0];
+	const defaults = cloneSonarrDefaults(savedDefaults);
+	const firstRootFolder = formResources?.rootFolders[0];
+	const firstQualityProfile = formResources?.qualityProfiles[0];
 
-  return {
-    ...defaults,
-    ...(!defaults.rootFolderPath && firstRootFolder
-      ? { rootFolderPath: firstRootFolder.path }
-      : {}),
-    ...(defaults.qualityProfileId === undefined && firstQualityProfile
-      ? { qualityProfileId: firstQualityProfile.id }
-      : {}),
-  };
+	return {
+		...defaults,
+		...(!defaults.rootFolderPath && firstRootFolder
+			? { rootFolderPath: firstRootFolder.path }
+			: {}),
+		...(defaults.qualityProfileId === undefined && firstQualityProfile
+			? { qualityProfileId: firstQualityProfile.id }
+			: {}),
+	};
 };
 
 const getSonarrDefaultsKey = (
-  savedDefaults: SonarrFormState,
-  formResources: ProviderFormResources | undefined,
+	savedDefaults: SonarrFormState,
+	formResources: ProviderFormResources | undefined,
 ): string =>
-  JSON.stringify({
-    savedDefaults,
-    firstRootFolder: formResources?.rootFolders[0]?.path,
-    firstQualityProfile: formResources?.qualityProfiles[0]?.id,
-  });
+	JSON.stringify({
+		savedDefaults,
+		firstRootFolder: formResources?.rootFolders[0]?.path,
+		firstQualityProfile: formResources?.qualityProfiles[0]?.id,
+	});
 
 const areSonarrDefaultsEqual = (
-  left: SonarrFormState,
-  right: SonarrFormState,
+	left: SonarrFormState,
+	right: SonarrFormState,
 ): boolean => JSON.stringify(left) === JSON.stringify(right);
 
 export const SonarrDefaults = () => {
-  const { data: savedSettings } = usePublicOptions();
-  const saveOptions = useUpdatePublicOptions();
-  const isConfigured = savedSettings?.providers.sonarr.isConfigured === true;
+	const { data: savedSettings } = usePublicOptions();
+	const saveOptions = useUpdatePublicOptions();
+	const isConfigured = savedSettings?.providers.sonarr.isConfigured === true;
 
-  const { data: formResources, isFetching } = useSonarrFormResources({
-    enabled: isConfigured,
-  });
-  const resourceFieldsDisabled = !formResources || saveOptions.isPending;
+	const { data: formResources, isFetching } = useSonarrFormResources({
+		enabled: isConfigured,
+	});
+	const resourceFieldsDisabled = !formResources || saveOptions.isPending;
 
-  if (!isConfigured || !savedSettings) return null;
+	if (!isConfigured || !savedSettings) return null;
 
-  const savedDefaults =
-    savedSettings.providers.sonarr.defaults ?? createDefaultSonarrFormState();
-  const savedValues = cloneSonarrDefaults(savedDefaults);
-  const initialValues = getInitialSonarrDefaults(savedDefaults, formResources);
-  const draftKey = getSonarrDefaultsKey(savedDefaults, formResources);
+	const savedDefaults =
+		savedSettings.providers.sonarr.defaults ?? createDefaultSonarrFormState();
+	const savedValues = cloneSonarrDefaults(savedDefaults);
+	const initialValues = getInitialSonarrDefaults(savedDefaults, formResources);
+	const draftKey = getSonarrDefaultsKey(savedDefaults, formResources);
 
-  return (
-    <SonarrDefaultsDraft
-      key={draftKey}
-      formResources={formResources}
-      initialValues={initialValues}
-      isFetching={isFetching}
-      resourceFieldsDisabled={resourceFieldsDisabled}
-      savedValues={savedValues}
-      saveOptions={saveOptions}
-    />
-  );
+	return (
+		<SonarrDefaultsDraft
+			key={draftKey}
+			formResources={formResources}
+			initialValues={initialValues}
+			isFetching={isFetching}
+			resourceFieldsDisabled={resourceFieldsDisabled}
+			savedValues={savedValues}
+			saveOptions={saveOptions}
+		/>
+	);
 };
 
 const SonarrDefaultsDraft = ({
-  formResources,
-  initialValues,
-  isFetching,
-  resourceFieldsDisabled,
-  savedValues,
-  saveOptions,
+	formResources,
+	initialValues,
+	isFetching,
+	resourceFieldsDisabled,
+	savedValues,
+	saveOptions,
 }: {
-  formResources: ProviderFormResources | undefined;
-  initialValues: SonarrFormState;
-  isFetching: boolean;
-  resourceFieldsDisabled: boolean;
-  savedValues: SonarrFormState;
-  saveOptions: ReturnType<typeof useUpdatePublicOptions>;
+	formResources: ProviderFormResources | undefined;
+	initialValues: SonarrFormState;
+	isFetching: boolean;
+	resourceFieldsDisabled: boolean;
+	savedValues: SonarrFormState;
+	saveOptions: ReturnType<typeof useUpdatePublicOptions>;
 }) => {
-  const [values, setValues] = useState(() => cloneSonarrDefaults(initialValues));
-  const hasDraftChanges = !areSonarrDefaultsEqual(values, initialValues);
-  const hasPersistableChanges = !areSonarrDefaultsEqual(values, savedValues);
-  const saveError = saveOptions.error
-    ? getUserErrorMessage(saveOptions.error, "Failed to save Sonarr defaults.")
-    : null;
+	const [values, setValues] = useState(() =>
+		cloneSonarrDefaults(initialValues),
+	);
+	const hasDraftChanges = !areSonarrDefaultsEqual(values, initialValues);
+	const hasPersistableChanges = !areSonarrDefaultsEqual(values, savedValues);
+	const saveError = saveOptions.error
+		? getUserErrorMessage(saveOptions.error, "Failed to save Sonarr defaults.")
+		: null;
 
-  const updateDefaults: SonarrDraftChange = (field, value) => {
-    setValues((currentDefaults) => ({
-      ...currentDefaults,
-      [field]: value,
-    }));
-  };
+	const updateDefaults: SonarrDraftChange = (field, value) => {
+		setValues((currentDefaults) => ({
+			...currentDefaults,
+			[field]: value,
+		}));
+	};
 
-  const updateTags = ({ tagIds, freeformTags }: ProviderTagSelection) => {
-    setValues((currentDefaults) => {
-      const nextDefaults: SonarrFormState = {
-        ...currentDefaults,
-        freeformTags,
-      };
+	const updateTags = ({ tagIds, freeformTags }: ProviderTagSelection) => {
+		setValues((currentDefaults) => {
+			const nextDefaults: SonarrFormState = {
+				...currentDefaults,
+				freeformTags,
+			};
 
-      if (tagIds.length === 0) {
-        delete nextDefaults.tags;
-        return nextDefaults;
-      }
+			if (tagIds.length === 0) {
+				delete nextDefaults.tags;
+				return nextDefaults;
+			}
 
-      return {
-        ...nextDefaults,
-        tags: tagIds,
-      };
-    });
-  };
+			return {
+				...nextDefaults,
+				tags: tagIds,
+			};
+		});
+	};
 
-  const saveDefaults = (): void => {
-    saveOptions.mutate({ type: "sonarrDefaults", defaults: values });
-  };
+	const saveDefaults = (): void => {
+		saveOptions.mutate({ type: "sonarrDefaults", defaults: values });
+	};
 
-  return (
-    <SettingsSection
-      title="Default add options"
-      description={DEFAULT_OPTIONS_DESCRIPTION}
-      icon={<ListPlus className="h-4 w-4" />}
-      divider="top"
-    >
-      {!isFetching && !formResources ? (
-        <p className="text-sm text-text-secondary">
-          Sonarr folders, quality profiles, and existing tags are unavailable.
-          Static defaults remain editable.
-        </p>
-      ) : null}
-      <SonarrDefaultsFields
-        fieldsDisabled={saveOptions.isPending}
-        formResources={formResources}
-        resourceFieldsDisabled={resourceFieldsDisabled}
-        values={values}
-        onChange={updateDefaults}
-        onTagsChange={updateTags}
-      />
-      {saveError ? (
-        <p className="text-sm font-semibold text-error" role="alert">
-          {saveError}
-        </p>
-      ) : null}
-      <div className="mt-6 flex justify-end gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={!hasDraftChanges || saveOptions.isPending}
-          onClick={() => setValues(cloneSonarrDefaults(initialValues))}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          disabled={!hasPersistableChanges || saveOptions.isPending}
-          onClick={saveDefaults}
-        >
-          {saveOptions.isPending ? "Saving..." : "Save defaults"}
-        </Button>
-      </div>
-    </SettingsSection>
-  );
+	return (
+		<SettingsSection
+			title="Default add options"
+			description={DEFAULT_OPTIONS_DESCRIPTION}
+			icon={<ListPlus className="h-4 w-4" />}
+			divider="top"
+		>
+			{!isFetching && !formResources ? (
+				<p className="text-sm text-text-secondary">
+					Sonarr folders, quality profiles, and existing tags are unavailable.
+					Static defaults remain editable.
+				</p>
+			) : null}
+			<SonarrDefaultsFields
+				fieldsDisabled={saveOptions.isPending}
+				formResources={formResources}
+				resourceFieldsDisabled={resourceFieldsDisabled}
+				values={values}
+				onChange={updateDefaults}
+				onTagsChange={updateTags}
+			/>
+			{saveError ? (
+				<p className="text-sm font-semibold text-error" role="alert">
+					{saveError}
+				</p>
+			) : null}
+			<div className="mt-6 flex justify-end gap-3">
+				<Button
+					type="button"
+					variant="ghost"
+					disabled={!hasDraftChanges || saveOptions.isPending}
+					onClick={() => setValues(cloneSonarrDefaults(initialValues))}
+				>
+					Cancel
+				</Button>
+				<Button
+					type="button"
+					variant="primary"
+					disabled={!hasPersistableChanges || saveOptions.isPending}
+					onClick={saveDefaults}
+				>
+					{saveOptions.isPending ? "Saving..." : "Save defaults"}
+				</Button>
+			</div>
+		</SettingsSection>
+	);
 };

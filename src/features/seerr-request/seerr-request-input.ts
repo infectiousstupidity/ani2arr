@@ -1,9 +1,6 @@
 /** Converts one effective Seerr target into a request RPC input. */
 
-import type {
-	RequestInSeerrInput,
-	SeerrRequestTarget,
-} from "@/rpc/types";
+import type { RequestInSeerrInput, SeerrRequestTarget } from "@/rpc/types";
 
 export function toSeerrRequestInput(
 	target: SeerrRequestTarget | null,

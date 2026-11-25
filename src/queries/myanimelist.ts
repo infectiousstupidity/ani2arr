@@ -1,10 +1,7 @@
 /** React Query hook for normalized MyAnimeList metadata. */
 
 import { useQuery } from "@tanstack/react-query";
-import type {
-	MyAnimeListId,
-	MyAnimeListMetadata,
-} from "@/myanimelist/types";
+import type { MyAnimeListId, MyAnimeListMetadata } from "@/myanimelist/types";
 import { getAni2arrApi } from "@/rpc";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { queryKeys } from "./query-keys";

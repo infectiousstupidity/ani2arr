@@ -38,7 +38,9 @@ export function SeerrRequestMainPane(props: {
 	const seasons = (details?.seasons ?? []).filter(
 		(season) => enableSpecialEpisodes || season.seasonNumber !== 0,
 	);
-	const hasSelectableSeasons = seasons.some((season) => isSelectableSeerrSeason(season));
+	const hasSelectableSeasons = seasons.some((season) =>
+		isSelectableSeerrSeason(season),
+	);
 
 	return (
 		<div className="flex h-80 min-h-0 flex-col overflow-hidden pt-4 md:h-full">

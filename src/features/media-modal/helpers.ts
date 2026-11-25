@@ -52,7 +52,9 @@ export function pickProviderPoster(value: unknown): string | undefined {
 		return poster.remoteUrl;
 	}
 
-	return typeof value.remotePoster === "string" ? value.remotePoster : undefined;
+	return typeof value.remotePoster === "string"
+		? value.remotePoster
+		: undefined;
 }
 
 export function targetsEqual(
@@ -68,8 +70,14 @@ export function targetsEqual(
 }
 
 export function getOverwriteTargetTitle(
-	previewTarget: Pick<MediaModalTargetSummary, "provider" | "providerId"> | null,
-	currentTarget: Pick<MediaModalTargetSummary, "provider" | "providerId" | "title"> | null,
+	previewTarget: Pick<
+		MediaModalTargetSummary,
+		"provider" | "providerId"
+	> | null,
+	currentTarget: Pick<
+		MediaModalTargetSummary,
+		"provider" | "providerId" | "title"
+	> | null,
 ): string | null {
 	if (
 		previewTarget === null ||

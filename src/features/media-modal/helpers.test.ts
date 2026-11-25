@@ -11,9 +11,7 @@ describe("pickProviderPoster", () => {
 		[
 			"uses a poster's public remote URL",
 			{
-				images: [
-					{ coverType: "poster", remoteUrl: "https://poster.example" },
-				],
+				images: [{ coverType: "poster", remoteUrl: "https://poster.example" }],
 			},
 			"https://poster.example",
 		],

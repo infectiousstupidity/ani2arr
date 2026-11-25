@@ -1,105 +1,114 @@
 /** Shared confirmation dialog primitive for destructive and cancelable actions. */
 // src/shared/ui/primitives/confirm-dialog.tsx
-import React, { useCallback, useRef } from 'react';
-import Button from '@/shared/ui/primitives/button';
-import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { cn } from '@/shared/utils/cn';
-import type { FloatingPortalContainer } from '../portal-container';
+import React, { useCallback, useRef } from "react";
+import Button from "@/shared/ui/primitives/button";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import { cn } from "@/shared/utils/cn";
+import type { FloatingPortalContainer } from "../portal-container";
 
 const BASE_CONFIRM_Z_INDEX = 2_147_483_620;
 const CONFIRM_OVERLAY_Z_INDEX = BASE_CONFIRM_Z_INDEX;
 const CONFIRM_CONTENT_Z_INDEX = BASE_CONFIRM_Z_INDEX + 1;
 
 type ConfirmDialogProps = {
-  open: boolean;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  confirmText?: string;
-  cancelText?: string;
-  container?: FloatingPortalContainer;
-  onConfirm: () => void;
-  onCancel: () => void;
-  onOpenChange?: (open: boolean) => void;
+	open: boolean;
+	title?: React.ReactNode;
+	description?: React.ReactNode;
+	confirmText?: string;
+	cancelText?: string;
+	container?: FloatingPortalContainer;
+	onConfirm: () => void;
+	onCancel: () => void;
+	onOpenChange?: (open: boolean) => void;
 };
 
 export default function ConfirmDialog({
-  open,
-  title,
-  description,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  container,
-  onConfirm,
-  onCancel,
-  onOpenChange,
+	open,
+	title,
+	description,
+	confirmText = "Confirm",
+	cancelText = "Cancel",
+	container,
+	onConfirm,
+	onCancel,
+	onOpenChange,
 }: ConfirmDialogProps): React.ReactElement {
-  const closeIntentRef = useRef<'confirm' | 'cancel' | null>(null);
+	const closeIntentRef = useRef<"confirm" | "cancel" | null>(null);
 
-  const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      if (!nextOpen && closeIntentRef.current === null) {
-        onCancel();
-      }
-      onOpenChange?.(nextOpen);
-      if (!nextOpen) {
-        closeIntentRef.current = null;
-      }
-    },
-    [onCancel, onOpenChange],
-  );
+	const handleOpenChange = useCallback(
+		(nextOpen: boolean) => {
+			if (!nextOpen && closeIntentRef.current === null) {
+				onCancel();
+			}
+			onOpenChange?.(nextOpen);
+			if (!nextOpen) {
+				closeIntentRef.current = null;
+			}
+		},
+		[onCancel, onOpenChange],
+	);
 
-  const handleConfirm = useCallback(() => {
-    closeIntentRef.current = 'confirm';
-    onConfirm();
-  }, [onConfirm]);
+	const handleConfirm = useCallback(() => {
+		closeIntentRef.current = "confirm";
+		onConfirm();
+	}, [onConfirm]);
 
-  const handleCancel = useCallback(() => {
-    closeIntentRef.current = 'cancel';
-    onCancel();
-  }, [onCancel]);
+	const handleCancel = useCallback(() => {
+		closeIntentRef.current = "cancel";
+		onCancel();
+	}, [onCancel]);
 
-  return (
-    <AlertDialog.Root open={open} onOpenChange={handleOpenChange}>
-      <AlertDialog.Portal container={container}>
-        <AlertDialog.Overlay
-          className={cn(
-            'fixed inset-0 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out',
-          )}
-          style={{ zIndex: CONFIRM_OVERLAY_Z_INDEX }}
-        />
+	return (
+		<AlertDialog.Root open={open} onOpenChange={handleOpenChange}>
+			<AlertDialog.Portal container={container}>
+				<AlertDialog.Overlay
+					className={cn(
+						"fixed inset-0 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out",
+					)}
+					style={{ zIndex: CONFIRM_OVERLAY_Z_INDEX }}
+				/>
 
-        <AlertDialog.Content
-          className={cn(
-            'fixed left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto gap-4 bg-bg-primary p-6 shadow-lg outline-none sm:rounded-lg',
-          )}
-          style={{ zIndex: CONFIRM_CONTENT_Z_INDEX }}
-        >
-          {title ? (
-            <AlertDialog.Title className="text-lg font-semibold tracking-tight text-text-primary">
-              {title}
-            </AlertDialog.Title>
-          ) : null}
-          {description ? (
-            <AlertDialog.Description className="mt-2 text-sm text-text-secondary">
-              {description}
-            </AlertDialog.Description>
-          ) : null}
+				<AlertDialog.Content
+					className={cn(
+						"fixed left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto gap-4 bg-bg-primary p-6 shadow-lg outline-none sm:rounded-lg",
+					)}
+					style={{ zIndex: CONFIRM_CONTENT_Z_INDEX }}
+				>
+					{title ? (
+						<AlertDialog.Title className="text-lg font-semibold tracking-tight text-text-primary">
+							{title}
+						</AlertDialog.Title>
+					) : null}
+					{description ? (
+						<AlertDialog.Description className="mt-2 text-sm text-text-secondary">
+							{description}
+						</AlertDialog.Description>
+					) : null}
 
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
-            <AlertDialog.Cancel asChild>
-              <Button variant="secondary" type="button" onClick={handleCancel} autoFocus>
-                {cancelText}
-              </Button>
-            </AlertDialog.Cancel>
+					<div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2 sm:gap-0">
+						<AlertDialog.Cancel asChild>
+							<Button
+								variant="secondary"
+								type="button"
+								onClick={handleCancel}
+								autoFocus
+							>
+								{cancelText}
+							</Button>
+						</AlertDialog.Cancel>
 
-            <AlertDialog.Action asChild>
-              <Button type="button" onClick={handleConfirm} className="bg-error text-white">
-                {confirmText}
-              </Button>
-            </AlertDialog.Action>
-          </div>
-        </AlertDialog.Content>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
-  );
+						<AlertDialog.Action asChild>
+							<Button
+								type="button"
+								onClick={handleConfirm}
+								className="bg-error text-white"
+							>
+								{confirmText}
+							</Button>
+						</AlertDialog.Action>
+					</div>
+				</AlertDialog.Content>
+			</AlertDialog.Portal>
+		</AlertDialog.Root>
+	);
 }

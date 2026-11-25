@@ -85,13 +85,19 @@ describe("version-1 upstream lookups", () => {
 			"anilist:3": canonical,
 		});
 		await expect(getSourceUpstreamLayers(anilistSource(1))).resolves.toEqual({
-			anilistId: aid(1), direct: null, canonical: null,
+			anilistId: aid(1),
+			direct: null,
+			canonical: null,
 		});
 		await expect(getSourceUpstreamLayers(anilistSource(2))).resolves.toEqual({
-			anilistId: aid(2), direct: null, canonical: null,
+			anilistId: aid(2),
+			direct: null,
+			canonical: null,
 		});
 		await expect(getUniqueAniListIdForSource(source)).resolves.toBeNull();
-		await expect(listAniListUpstreamLayers()).resolves.toEqual([{ anilistId: aid(3), record: canonical }]);
+		await expect(listAniListUpstreamLayers()).resolves.toEqual([
+			{ anilistId: aid(3), record: canonical },
+		]);
 	});
 
 	it("skips writes when migrating a version-1 upstream snapshot", async () => {
@@ -150,7 +156,6 @@ describe("version-1 upstream lookups", () => {
 		).resolves.toBeNull();
 	});
 
-
 	it("groups only linked MAL aliases in source-key order", async () => {
 		await seedLayerSnapshot({
 			"mal:11": { facts: {}, linkedAniListId: aid(1) },
@@ -170,7 +175,6 @@ describe("refreshUpstreamMappings", () => {
 		vi.unstubAllGlobals();
 		await clearUpstreamMappings();
 	});
-
 
 	it.each([
 		{
@@ -196,7 +200,6 @@ describe("refreshUpstreamMappings", () => {
 
 		await expect(refreshUpstreamMappings()).rejects.toThrow(error);
 	});
-
 
 	it("persists normalized source records and refresh metadata", async () => {
 		mockAniBridgeResponse(
@@ -233,8 +236,6 @@ describe("refreshUpstreamMappings", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-
-
 	it("forces a full refresh for fresh legacy snapshots", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
@@ -255,7 +256,9 @@ describe("refreshUpstreamMappings", () => {
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(migrateUpstreamStore()).resolves.toBe(true);
-		await expect(browser.storage.local.get(UPSTREAM_STORAGE_KEY)).resolves.toEqual({});
+		await expect(
+			browser.storage.local.get(UPSTREAM_STORAGE_KEY),
+		).resolves.toEqual({});
 		await expect(refreshUpstreamMappings()).resolves.toBe(true);
 
 		expect(fetchMock).toHaveBeenCalledOnce();
@@ -367,12 +370,12 @@ describe("refreshUpstreamMappings", () => {
 		});
 	});
 
-
-
 	it("resolves a deduplicated alias batch with one pure storage read", async () => {
 		const mapped = { source: "mal", id: mal(5114) } as const;
 		const missing = { source: "mal", id: mal(59_571) } as const;
-		await seedLayerSnapshot({ "mal:5114": { facts: {}, linkedAniListId: aid(21) } });
+		await seedLayerSnapshot({
+			"mal:5114": { facts: {}, linkedAniListId: aid(21) },
+		});
 		const getSpy = vi.spyOn(browser.storage.local, "get");
 		const setSpy = vi.spyOn(browser.storage.local, "set");
 

@@ -25,7 +25,9 @@ export type DetailsPanelProps = {
 };
 
 function getPreviewHeading(provider: Provider): string {
-	return provider === "sonarr" ? "Preview Sonarr Series" : "Preview Radarr Movie";
+	return provider === "sonarr"
+		? "Preview Sonarr Series"
+		: "Preview Radarr Movie";
 }
 
 export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
@@ -43,13 +45,14 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 		? getPreviewHeading(provider)
 		: "Current Mapping Details";
 	const activeTarget = isInMappingMode ? previewMapping : effectiveMapping;
-	const activeProviderTarget = activeTarget && activeTarget.isInLibrary !== null
-		? getProviderOpenTarget({
-				isInLibrary: activeTarget.isInLibrary,
-				providerRouteSlug: activeTarget.providerRouteSlug,
-				searchTerm: activeTarget.title,
-			})
-		: null;
+	const activeProviderTarget =
+		activeTarget && activeTarget.isInLibrary !== null
+			? getProviderOpenTarget({
+					isInLibrary: activeTarget.isInLibrary,
+					providerRouteSlug: activeTarget.providerRouteSlug,
+					searchTerm: activeTarget.title,
+				})
+			: null;
 	const handleOpenProvider = (event: MouseEvent<HTMLButtonElement>): void => {
 		if (!event.isTrusted) return;
 		if (!activeProviderTarget) return;

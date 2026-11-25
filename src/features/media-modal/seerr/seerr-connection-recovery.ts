@@ -1,9 +1,6 @@
 /** Final Seerr modal recovery control derived from connection errors. */
 
-import {
-	ErrorCode,
-	type ExtensionError,
-} from "@/shared/errors/error.types";
+import { ErrorCode, type ExtensionError } from "@/shared/errors/error.types";
 
 export type SeerrConnectionRecovery = {
 	label: string;

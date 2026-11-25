@@ -9,9 +9,7 @@ import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";
 import Pill from "@/shared/ui/primitives/pill";
 import { cn } from "@/shared/utils/cn";
-import type {
-	MappingGroup,
-} from "./mapping-page-model";
+import type { MappingGroup } from "./mapping-page-model";
 import {
 	formatMappingGroupLibraryLabel,
 	formatMappingGroupTitle,
@@ -26,7 +24,11 @@ interface MappingsProviderGroupProps {
 	onToggle: (groupKey: string) => void;
 }
 
-const ProviderIcon = ({ group }: { group: MappingGroup }): React.JSX.Element => {
+const ProviderIcon = ({
+	group,
+}: {
+	group: MappingGroup;
+}): React.JSX.Element => {
 	if (isUnmappedMappingGroup(group)) {
 		return <CircleHelp className="h-5 w-5" />;
 	}
@@ -58,12 +60,7 @@ const getLibraryPillClass = (group: MappingGroup): string => {
 export function MappingsProviderGroup(
 	props: MappingsProviderGroupProps,
 ): React.JSX.Element {
-	const {
-		group,
-		isExpanded,
-		className,
-		onToggle,
-	} = props;
+	const { group, isExpanded, className, onToggle } = props;
 	const metaPillLabels = getMappingGroupMetaPillLabels(group);
 	const groupTitle = formatMappingGroupTitle(group);
 	const providerIdLabel =
@@ -80,18 +77,14 @@ export function MappingsProviderGroup(
 					providerRouteSlug: group.providerMeta?.providerRouteSlug,
 					searchTerm: groupTitle,
 				});
-	const handleToggleKeyDown = (
-		event: KeyboardEvent<HTMLDivElement>,
-	): void => {
+	const handleToggleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (event.target !== event.currentTarget) return;
 		if (event.key !== "Enter" && event.key !== " ") return;
 
 		event.preventDefault();
 		onToggle(group.key);
 	};
-	const handleOpenProvider = (
-		event: MouseEvent<HTMLButtonElement>,
-	): void => {
+	const handleOpenProvider = (event: MouseEvent<HTMLButtonElement>): void => {
 		event.stopPropagation();
 		if (!event.isTrusted || providerTarget === null) return;
 

@@ -6,7 +6,9 @@ import { createTtlCache, type CacheEntry } from "./ttl-cache";
 
 const idbMock = vi.hoisted(() => {
 	const entries = new Map<string, unknown>();
-	const get = vi.fn(async (_storeName: string, key: string) => entries.get(key));
+	const get = vi.fn(async (_storeName: string, key: string) =>
+		entries.get(key),
+	);
 	const remove = vi.fn(async (_storeName: string, key: string) => {
 		entries.delete(key);
 	});

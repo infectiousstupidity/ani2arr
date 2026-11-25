@@ -24,8 +24,7 @@ type NormalizedSeerrApiKeyConnection = {
 };
 
 export type NormalizedSeerrConnection =
-	| NormalizedSeerrSessionConnection
-	| NormalizedSeerrApiKeyConnection;
+	NormalizedSeerrSessionConnection | NormalizedSeerrApiKeyConnection;
 
 export function getSeerrConnectionDraft(
 	settings: ExtensionOptions | undefined,

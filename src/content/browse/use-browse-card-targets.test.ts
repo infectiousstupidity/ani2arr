@@ -52,7 +52,9 @@ function createAdapter(
 				input.presentation === "status-column" ? ".status" : ".cover",
 			);
 			if (!mountTarget) return null;
-			const anilistId = parseAniListId(Number((card as HTMLElement).dataset.id));
+			const anilistId = parseAniListId(
+				Number((card as HTMLElement).dataset.id),
+			);
 			return {
 				source: { source: "anilist", id: anilistId },
 				anilistId,
@@ -101,8 +103,12 @@ describe("scanBrowseCardTargets", () => {
 		createCard(147_105, "Tongari Boushi no Atelier");
 		const options = { adapter: createAdapter() };
 
-		const firstKeys = scanBrowseCardTargets(options).map((target) => target.key);
-		const secondKeys = scanBrowseCardTargets(options).map((target) => target.key);
+		const firstKeys = scanBrowseCardTargets(options).map(
+			(target) => target.key,
+		);
+		const secondKeys = scanBrowseCardTargets(options).map(
+			(target) => target.key,
+		);
 
 		expect(new Set(firstKeys).size).toBe(2);
 		expect(secondKeys).toEqual(firstKeys);
@@ -155,12 +161,20 @@ describe("scanBrowseCardTargets", () => {
 			records.length = 0;
 			mutate();
 			await Promise.resolve();
-			return records.some((record) => isRelevantBrowseMutation(record, ".card"));
+			return records.some((record) =>
+				isRelevantBrowseMutation(record, ".card"),
+			);
 		};
 
 		// Overlay portal renders and their container never trigger a rescan.
-		expect(await relevantAfter(() => target.container.append("status"))).toBe(false);
-		expect(await relevantAfter(() => getCover(card).append(document.createElement("div")))).toBe(true);
+		expect(await relevantAfter(() => target.container.append("status"))).toBe(
+			false,
+		);
+		expect(
+			await relevantAfter(() =>
+				getCover(card).append(document.createElement("div")),
+			),
+		).toBe(true);
 		expect(
 			await relevantAfter(() => {
 				target.container.remove();
@@ -170,7 +184,11 @@ describe("scanBrowseCardTargets", () => {
 		// Host changes outside cards are ignored unless they add or remove cards.
 		expect(await relevantAfter(() => outside.append("feed item"))).toBe(false);
 		expect(await relevantAfter(() => createCard(2))).toBe(true);
-		expect(await relevantAfter(() => getCover(card).setAttribute("href", "/anime/3"))).toBe(true);
+		expect(
+			await relevantAfter(() =>
+				getCover(card).setAttribute("href", "/anime/3"),
+			),
+		).toBe(true);
 		observer.disconnect();
 	});
 });

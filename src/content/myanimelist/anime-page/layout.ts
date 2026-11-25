@@ -3,9 +3,7 @@ import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** DOM readers and layout helpers for MyAnimeList anime detail pages. */
 // src/content/myanimelist/anime-page/layout.ts
 
-import {
-	type AniListMediaHint,
-} from "@/anilist/types";
+import { type AniListMediaHint } from "@/anilist/types";
 import { toMyAnimeListPosterUrl } from "@/myanimelist/url";
 
 export const TITLE_SELECTOR = "h1.title-name";

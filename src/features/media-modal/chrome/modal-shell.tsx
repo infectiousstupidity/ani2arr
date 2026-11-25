@@ -110,7 +110,10 @@ function attachModalScrollBoundary(
 	}
 
 	for (const eventName of MODAL_SCROLL_BOUNDARY_EVENTS) {
-		contentContainer.addEventListener(eventName, stopModalScrollLockPropagation);
+		contentContainer.addEventListener(
+			eventName,
+			stopModalScrollLockPropagation,
+		);
 	}
 
 	return () => {
@@ -127,14 +130,8 @@ const ModalContent = forwardRef<
 	ComponentRef<typeof Dialog.Content>,
 	ModalContentProps
 >(function ModalContent(props, ref): React.JSX.Element {
-	const {
-		className,
-		children,
-		container,
-		contentContainer,
-		style,
-		...rest
-	} = props;
+	const { className, children, container, contentContainer, style, ...rest } =
+		props;
 
 	const contentContainerOwner = getContentContainerOwner(container);
 
@@ -164,11 +161,7 @@ const ModalContent = forwardRef<
 				onTouchMove={stopModalScrollLockPropagation}
 				onWheel={stopModalScrollLockPropagation}
 			>
-				<div
-					className={cn("a2a-modal-shell", className)}
-				>
-					{children}
-				</div>
+				<div className={cn("a2a-modal-shell", className)}>{children}</div>
 			</Dialog.Content>
 		</Dialog.Portal>
 	);
@@ -206,14 +199,14 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 				onCloseAutoFocus={(event) => event.preventDefault()}
 				{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
 			>
-				<div className="a2a-modal-section a2a-delay-50 shrink-0">
-					{header}
-				</div>
+				<div className="a2a-modal-section a2a-delay-50 shrink-0">{header}</div>
 
 				<div className={FRAME_CLASS}>
 					<div className={WORKSPACE_CLASS}>
 						<div className={GRID_CLASS}>
-							<div className={cn("a2a-modal-section a2a-delay-100", leftPaneClass)}>
+							<div
+								className={cn("a2a-modal-section a2a-delay-100", leftPaneClass)}
+							>
 								{leftPane}
 							</div>
 
@@ -228,7 +221,12 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 								</div>
 							) : null}
 
-							<div className={cn("a2a-modal-section a2a-delay-140", rightPaneClass)}>
+							<div
+								className={cn(
+									"a2a-modal-section a2a-delay-140",
+									rightPaneClass,
+								)}
+							>
 								{rightPane}
 							</div>
 						</div>

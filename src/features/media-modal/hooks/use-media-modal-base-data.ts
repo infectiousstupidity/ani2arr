@@ -70,7 +70,9 @@ export function useMediaModalBaseData(input: {
 		fallbackLookupTitle,
 		statusMetadata: resolved.statusMetadata,
 		statusReady:
-			source.source === "mal" || metadataBatch.isFetched || metadataBatch.isError,
+			source.source === "mal" ||
+			metadataBatch.isFetched ||
+			metadataBatch.isError,
 		statusTitle: resolved.statusTitle,
 	};
 }

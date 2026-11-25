@@ -21,16 +21,14 @@ type CurrentTargetDetailsProps = {
 export function CurrentTargetDetails(
 	props: CurrentTargetDetailsProps,
 ): React.JSX.Element {
-	const {
-		provider,
-		aniListEntryId,
-		effectiveMapping,
-		linkedAniListEntries,
-	} = props;
+	const { provider, aniListEntryId, effectiveMapping, linkedAniListEntries } =
+		props;
 
 	return (
 		<div className="flex flex-col gap-4">
-			{effectiveMapping ? <TargetDetailsCard mapping={effectiveMapping} /> : null}
+			{effectiveMapping ? (
+				<TargetDetailsCard mapping={effectiveMapping} />
+			) : null}
 
 			<MappingLinkedEntries
 				provider={provider}

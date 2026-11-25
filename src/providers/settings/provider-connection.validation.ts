@@ -2,8 +2,7 @@
 // src/providers/settings/provider-connection.validation.ts
 
 export type ProviderConnectionResult<T> =
-	| { ok: true; value: T }
-	| { ok: false; error: string };
+	{ ok: true; value: T } | { ok: false; error: string };
 
 export type NormalizedProviderConnectionUrl = {
 	normalizedUrl: string;

@@ -76,7 +76,10 @@ export async function commitProviderConnection(
 ): Promise<void> {
 	const previousOptions = await getExtensionOptionsSnapshot();
 	const previousConnection = getProviderCredentials(previousOptions, provider);
-	const savedOptions = await saveProviderConnectionSnapshot(provider, credentials);
+	const savedOptions = await saveProviderConnectionSnapshot(
+		provider,
+		credentials,
+	);
 	const savedConnection = getProviderCredentials(savedOptions, provider);
 	if (sameProviderCredentials(previousConnection, savedConnection)) return;
 

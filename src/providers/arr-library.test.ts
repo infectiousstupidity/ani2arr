@@ -165,9 +165,15 @@ function createSonarrHarness(): LibraryHarness {
 				credentials,
 			}),
 		upsert: (inputCredentials = credentials) =>
-			library.upsertSeriesSnapshot(toSonarrSeriesSnapshot(entity), inputCredentials),
+			library.upsertSeriesSnapshot(
+				toSonarrSeriesSnapshot(entity),
+				inputCredentials,
+			),
 		upsertOther: () =>
-			library.upsertSeriesSnapshot(toSonarrSeriesSnapshot(otherEntity), equivalentCredentials),
+			library.upsertSeriesSnapshot(
+				toSonarrSeriesSnapshot(otherEntity),
+				equivalentCredentials,
+			),
 		remove: () => library.removeSeriesSnapshot(entity.tvdbId, credentials),
 		status: (providerId, onCacheChanged) =>
 			library.getSeriesLibraryStatusByTvdbId({
@@ -241,9 +247,15 @@ function createRadarrHarness(): LibraryHarness {
 				credentials,
 			}),
 		upsert: (inputCredentials = credentials) =>
-			library.upsertMovieSnapshot(toRadarrMovieSnapshot(entity), inputCredentials),
+			library.upsertMovieSnapshot(
+				toRadarrMovieSnapshot(entity),
+				inputCredentials,
+			),
 		upsertOther: () =>
-			library.upsertMovieSnapshot(toRadarrMovieSnapshot(otherEntity), equivalentCredentials),
+			library.upsertMovieSnapshot(
+				toRadarrMovieSnapshot(otherEntity),
+				equivalentCredentials,
+			),
 		remove: () => library.removeMovieSnapshot(entity.tmdbId, credentials),
 		status: (providerId, onCacheChanged) =>
 			library.getMovieLibraryStatusByTmdbId({
@@ -290,12 +302,18 @@ describe("Arr library cache contract", () => {
 			await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
 			const expected = [harness.snapshot, harness.otherSnapshot];
 			expect(harness.cache.value(harness.cacheKey)).toEqual(expected);
-			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(expected);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(
+				expected,
+			);
 		});
 
 		it("does not resurrect an entry removed during an upsert", async () => {
 			const harness = create();
-			await harness.cache.write(harness.cacheKey, [harness.snapshot], CACHE_TTL);
+			await harness.cache.write(
+				harness.cacheKey,
+				[harness.snapshot],
+				CACHE_TTL,
+			);
 			await harness.getSnapshots(harness.credentials);
 			const write = pauseNextWrite(harness.cache);
 
@@ -304,8 +322,13 @@ describe("Arr library cache contract", () => {
 			const remove = harness.remove();
 			write.resume();
 
-			await expect(Promise.all([upsert, remove])).resolves.toEqual([true, true]);
-			expect(harness.cache.value(harness.cacheKey)).toEqual([harness.otherSnapshot]);
+			await expect(Promise.all([upsert, remove])).resolves.toEqual([
+				true,
+				true,
+			]);
+			expect(harness.cache.value(harness.cacheKey)).toEqual([
+				harness.otherSnapshot,
+			]);
 			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
 				harness.otherSnapshot,
 			]);
@@ -315,7 +338,11 @@ describe("Arr library cache contract", () => {
 			"keeps a newer upsert when a %s refresh finishes",
 			async (outcome) => {
 				const harness = create();
-				await harness.cache.write(harness.cacheKey, [harness.snapshot], CACHE_TTL);
+				await harness.cache.write(
+					harness.cacheKey,
+					[harness.snapshot],
+					CACHE_TTL,
+				);
 				await harness.getSnapshots(harness.credentials);
 				const started = createDeferred<void>();
 				const finish = createDeferred<void>();
@@ -333,7 +360,9 @@ describe("Arr library cache contract", () => {
 				const expected = [harness.snapshot, harness.otherSnapshot];
 				await expect(refresh).resolves.toEqual(expected);
 				expect(harness.cache.value(harness.cacheKey)).toEqual(expected);
-				await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(expected);
+				await expect(
+					harness.getSnapshots(harness.credentials),
+				).resolves.toEqual(expected);
 				expect(harness.cache.write).toHaveBeenCalledTimes(2);
 			},
 		);
@@ -349,11 +378,16 @@ describe("Arr library cache contract", () => {
 			const clear = harness.clear();
 			write.resume();
 
-			await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+			await expect(Promise.all([first, second])).resolves.toEqual([
+				false,
+				false,
+			]);
 			await clear;
 			expect(harness.cache.keys()).toEqual([]);
 			harness.fetchAll.mockResolvedValue([]);
-			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([]);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(
+				[],
+			);
 			expect(harness.fetchAll).toHaveBeenCalledOnce();
 		});
 
@@ -369,16 +403,24 @@ describe("Arr library cache contract", () => {
 				throw new Error("storage unavailable");
 			});
 
-			const failed = expect(harness.upsert()).rejects.toThrow("storage unavailable");
+			const failed = expect(harness.upsert()).rejects.toThrow(
+				"storage unavailable",
+			);
 			await started.promise;
 			const queued = harness.upsertOther();
-			await expect(harness.upsert(harness.otherCredentials)).resolves.toBe(true);
+			await expect(harness.upsert(harness.otherCredentials)).resolves.toBe(
+				true,
+			);
 			finish.resolve();
 
 			await failed;
 			await expect(queued).resolves.toBe(true);
-			expect(harness.cache.value(harness.cacheKey)).toEqual([harness.otherSnapshot]);
-			expect(harness.cache.value(harness.otherCacheKey)).toEqual([harness.snapshot]);
+			expect(harness.cache.value(harness.cacheKey)).toEqual([
+				harness.otherSnapshot,
+			]);
+			expect(harness.cache.value(harness.otherCacheKey)).toEqual([
+				harness.snapshot,
+			]);
 			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual([
 				harness.otherSnapshot,
 			]);
@@ -397,7 +439,9 @@ describe("Arr library cache contract", () => {
 			await harness.refresh(harness.credentials);
 			const expected = [harness.snapshot, harness.otherSnapshot];
 			expect(harness.cache.value(harness.cacheKey)).toEqual(expected);
-			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(expected);
+			await expect(harness.getSnapshots(harness.credentials)).resolves.toEqual(
+				expected,
+			);
 			expect(harness.fetchAll).toHaveBeenCalledTimes(2);
 		});
 	});
@@ -620,7 +664,11 @@ describe("Arr library cache contract", () => {
 			async (failure) => {
 				const harness = create();
 				const onCacheChanged = vi.fn();
-				await harness.cache.write(harness.cacheKey, [harness.snapshot], CACHE_TTL);
+				await harness.cache.write(
+					harness.cacheKey,
+					[harness.snapshot],
+					CACHE_TTL,
+				);
 				harness.find.mockResolvedValueOnce(null);
 				harness.lookup.mockResolvedValueOnce(harness.lookupEntity);
 

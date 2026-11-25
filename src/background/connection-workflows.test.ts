@@ -27,8 +27,7 @@ vi.mock("@/settings/store", () => ({
 }));
 
 vi.mock("@/settings/provider-permissions", () => ({
-	cleanupUnusedProviderHostPermission:
-		cleanupUnusedProviderHostPermissionMock,
+	cleanupUnusedProviderHostPermission: cleanupUnusedProviderHostPermissionMock,
 	removeSeerrCsrfCookiePermission: removeSeerrCsrfCookiePermissionMock,
 }));
 

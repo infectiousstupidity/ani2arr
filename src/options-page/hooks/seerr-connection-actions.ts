@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { browser } from "wxt/browser";
 import type { SeerrConnection } from "@/providers/seerr/types";
-import {
-	useExtensionOptions,
-	useSaveSeerrConnection,
-} from "@/queries/options";
+import { useExtensionOptions, useSaveSeerrConnection } from "@/queries/options";
 import { getAni2arrApi } from "@/rpc";
 import {
 	requestProviderConnectionPermission,
@@ -62,9 +59,8 @@ export function useSeerrConnectionActions() {
 			const normalizedUrl = normalizeSeerrUrlInput(draftUrl);
 			if (!normalizedUrl) throw new Error("Please enter a valid Seerr URL.");
 
-			const permission = await requestProviderConnectionPermission(
-				normalizedUrl,
-			);
+			const permission =
+				await requestProviderConnectionPermission(normalizedUrl);
 			if (!permission.ok || !permission.value.granted) {
 				throw new Error("Host permission was denied.");
 			}
@@ -90,8 +86,7 @@ export function useSeerrConnectionActions() {
 					? normalizeSeerrUrlInput(draftUrl)
 					: null;
 			setFailure(
-				code === ErrorCode.SEERR_AUTH_REQUIRED &&
-				openedLoginUrl === checkedUrl
+				code === ErrorCode.SEERR_AUTH_REQUIRED && openedLoginUrl === checkedUrl
 					? {
 							code: ErrorCode.SEERR_SESSION_UNAVAILABLE,
 							message:

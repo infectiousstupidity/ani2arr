@@ -14,10 +14,7 @@ type PreviewTargetDetailsProps = {
 export function PreviewTargetDetails(
 	props: PreviewTargetDetailsProps,
 ): React.JSX.Element {
-	const {
-		aniListEntryId,
-		previewMapping,
-	} = props;
+	const { aniListEntryId, previewMapping } = props;
 
 	return (
 		<div className="flex min-h-full flex-col gap-4">

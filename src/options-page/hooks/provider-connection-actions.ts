@@ -2,10 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 import { queryKeys } from "@/queries/query-keys";
 import { useSaveProviderConnection } from "@/queries/options";
 import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
@@ -76,21 +73,13 @@ function useProviderConnectionActions({
 
 				return true;
 			} catch (error_) {
-				setError(
-					getUserErrorMessage(error_, `Failed to connect to ${label}.`),
-				);
+				setError(getUserErrorMessage(error_, `Failed to connect to ${label}.`));
 				return false;
 			} finally {
 				setIsConnecting(false);
 			}
 		},
-		[
-			fetchFormResources,
-			label,
-			provider,
-			queryClient,
-			saveProviderConnection,
-		],
+		[fetchFormResources, label, provider, queryClient, saveProviderConnection],
 	);
 
 	const disconnect = useCallback(async () => {
@@ -105,9 +94,7 @@ function useProviderConnectionActions({
 
 			return true;
 		} catch (error_) {
-			setError(
-				getUserErrorMessage(error_, `Failed to disconnect ${label}.`),
-			);
+			setError(getUserErrorMessage(error_, `Failed to disconnect ${label}.`));
 			return false;
 		} finally {
 			setIsConnecting(false);

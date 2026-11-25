@@ -17,10 +17,7 @@ import {
 	useSeerrMediaStatus,
 } from "@/queries/seerr";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type {
-	RequestInSeerrInput,
-	SeerrRequestTarget,
-} from "@/rpc/types";
+import type { RequestInSeerrInput, SeerrRequestTarget } from "@/rpc/types";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ModalShell } from "../chrome/modal-shell";
@@ -180,8 +177,7 @@ function getRequestSeasonSelection(input: {
 			? getDefaultSelectedSeasons({
 					mappedSeasons: input.target.seasons,
 					seasons: input.details.seasons,
-					enableSpecialEpisodes:
-						input.publicSettings.enableSpecialEpisodes,
+					enableSpecialEpisodes: input.publicSettings.enableSpecialEpisodes,
 				})
 			: [];
 

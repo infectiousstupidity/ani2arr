@@ -105,7 +105,9 @@ function buildCandidate(input: {
 		title: input.series.title,
 		isInLibrary,
 		...(input.series.folder ? { providerFolderName: input.series.folder } : {}),
-		...(typeof input.series.year === "number" ? { year: input.series.year } : {}),
+		...(typeof input.series.year === "number"
+			? { year: input.series.year }
+			: {}),
 		...(input.series.seriesType ? { typeLabel: input.series.seriesType } : {}),
 		...(providerRouteSlug ? { providerRouteSlug } : {}),
 		...(posterUrl === undefined ? {} : { posterUrl }),
@@ -179,7 +181,9 @@ export function SonarrMappingPanel(
 			searchPlaceholder="Search by series title or TVDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
-			errorMessage={search.error ? normalizeError(search.error).userMessage : null}
+			errorMessage={
+				search.error ? normalizeError(search.error).userMessage : null
+			}
 			resultCount={candidates.length}
 			onQueryChange={handleQueryChange}
 			onSearch={setSearchTerm}

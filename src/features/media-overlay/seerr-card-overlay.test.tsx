@@ -13,8 +13,9 @@ import {
 	SeerrStandaloneCardOverlay,
 } from "./seerr-card-overlay";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-	.IS_REACT_ACT_ENVIRONMENT = true;
+(
+	globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mediaActionMock = vi.hoisted(() =>
 	vi.fn(() => ({
@@ -71,7 +72,9 @@ it("passes viewport enablement to the shared action", () => {
 	);
 
 	viewportMock.mockReturnValue(true);
-	renderToStaticMarkup(<SeerrCardStackActions {...props} presentation="status-column" />);
+	renderToStaticMarkup(
+		<SeerrCardStackActions {...props} presentation="status-column" />,
+	);
 	expect(useSeerrMediaAction).toHaveBeenLastCalledWith(
 		expect.objectContaining({ enabled: true }),
 	);

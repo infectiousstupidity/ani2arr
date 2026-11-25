@@ -661,9 +661,15 @@ function applyYearScore(
 	if (targetYear === undefined || candidateYear === undefined) return score;
 	const distance = Math.abs(targetYear - candidateYear);
 	if (distance === 0)
-		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + YEAR_EXACT_SCORE_BONUS));
+		return Math.max(
+			score,
+			Math.min(YEAR_SCORE_CAP, score + YEAR_EXACT_SCORE_BONUS),
+		);
 	if (distance === 1)
-		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + YEAR_NEAR_SCORE_BONUS));
+		return Math.max(
+			score,
+			Math.min(YEAR_SCORE_CAP, score + YEAR_NEAR_SCORE_BONUS),
+		);
 	return score;
 }
 
@@ -709,9 +715,15 @@ function applyYearWeightingForProvider(
 	const profile = getTitleMatchProfile(provider);
 	const distance = Math.abs(targetYear - candidateYear);
 	if (distance === 0)
-		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + profile.yearExactBonus));
+		return Math.max(
+			score,
+			Math.min(YEAR_SCORE_CAP, score + profile.yearExactBonus),
+		);
 	if (distance === 1)
-		return Math.max(score, Math.min(YEAR_SCORE_CAP, score + profile.yearOneOffBonus));
+		return Math.max(
+			score,
+			Math.min(YEAR_SCORE_CAP, score + profile.yearOneOffBonus),
+		);
 	if (distance === 2) return score * profile.yearMismatchFactor;
 	return score * profile.yearFarMismatchFactor;
 }

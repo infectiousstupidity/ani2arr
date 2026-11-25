@@ -13,11 +13,7 @@ import type {
 	RadarrRootFolderSchema,
 	RadarrTagSchema,
 } from "./schemas";
-import type {
-	ProviderQualityProfileId,
-	ProviderTagId,
-} from "../schemas";
-
+import type { ProviderQualityProfileId, ProviderTagId } from "../schemas";
 
 export type RadarrMovie = v.InferOutput<typeof RadarrMovieSchema>;
 export type RadarrLookupMovie = v.InferOutput<typeof RadarrLookupMovieSchema>;

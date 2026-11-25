@@ -77,7 +77,8 @@ const ProviderConnectionDraft = ({
 	const [draftUrl, setDraftUrl] = useState(savedUrl);
 	const [draftApiKey, setDraftApiKey] = useState(savedApiKey);
 	const hasDraftChanges = draftUrl !== savedUrl || draftApiKey !== savedApiKey;
-	const showConnectionActions = !isConfigured || hasDraftChanges || Boolean(error);
+	const showConnectionActions =
+		!isConfigured || hasDraftChanges || Boolean(error);
 	const showPublicHttpWarning = isPublicHttpProviderUrl(draftUrl);
 	let connectButtonLabel = "Connect and save";
 

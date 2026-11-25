@@ -50,7 +50,11 @@ describe("radarr setup values", () => {
 
 	it("does not create an edit target from a lean in-library item", () => {
 		const status: GetMovieStatusOutput = {
-			mapping: { kind: "mapped", source: "manual", providerId: parseTmdbId(22) },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: parseTmdbId(22),
+			},
 			isInLibrary: true,
 			movie: {
 				id: parseRadarrMovieId(11),
@@ -71,7 +75,11 @@ describe("radarr setup values", () => {
 
 	it("creates an edit target from a full in-library item", () => {
 		const status: GetMovieStatusOutput = {
-			mapping: { kind: "mapped", source: "manual", providerId: parseTmdbId(22) },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: parseTmdbId(22),
+			},
 			isInLibrary: true,
 			movie,
 		};
@@ -102,7 +110,11 @@ describe("radarr setup values", () => {
 
 	it("creates an add target from mapped not-in-library status", () => {
 		const status: GetMovieStatusOutput = {
-			mapping: { kind: "mapped", source: "manual", providerId: parseTmdbId(22) },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: parseTmdbId(22),
+			},
 			isInLibrary: false,
 		};
 

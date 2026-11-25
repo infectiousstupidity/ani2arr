@@ -54,7 +54,9 @@ function isLocalIpv4(host: string): boolean {
 		return Number(part);
 	});
 
-	if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+	if (
+		octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
+	) {
 		return false;
 	}
 

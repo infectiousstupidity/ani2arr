@@ -3,10 +3,7 @@ import type { AnimeFormat } from "@/shared/types/anime-format";
 // src/myanimelist/types.ts
 
 import type { Brand } from "@/shared/types/brand";
-import type {
-	AniListMediaHint,
-	AniListTitles,
-} from "@/anilist/types";
+import type { AniListMediaHint, AniListTitles } from "@/anilist/types";
 
 export type MyAnimeListId = Brand<number, "MyAnimeListId">;
 
@@ -50,8 +47,7 @@ export function metadataHintFromMyAnimeListMetadata(
 	if (!metadata) return null;
 
 	return {
-		titles:
-			Object.keys(metadata.titles).length > 0 ? metadata.titles : null,
+		titles: Object.keys(metadata.titles).length > 0 ? metadata.titles : null,
 		synonyms: metadata.synonyms.length > 0 ? metadata.synonyms : null,
 		startYear: metadata.year,
 		format: metadata.format,

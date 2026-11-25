@@ -34,13 +34,10 @@ export class MyAnimeListMediaService {
 	>();
 
 	constructor(
-		private readonly cache: TtlCache<MyAnimeListMetadata> =
-			myAnimeListMetadataCache,
+		private readonly cache: TtlCache<MyAnimeListMetadata> = myAnimeListMetadataCache,
 	) {}
 
-	public async getMetadata(
-		malId: MyAnimeListId,
-	): Promise<MyAnimeListMetadata> {
+	public async getMetadata(malId: MyAnimeListId): Promise<MyAnimeListMetadata> {
 		if (!isMyAnimeListId(malId)) {
 			throw createError(
 				ErrorCode.VALIDATION_ERROR,

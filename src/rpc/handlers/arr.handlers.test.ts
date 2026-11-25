@@ -167,10 +167,23 @@ describe("Arr RPC handlers", () => {
 
 	it.each(searches)(
 		"preserves $provider results and linked IDs when the library is unavailable",
-		async ({ provider, result, id, idsKey, linkedKey, lookup, library, run }) => {
-			providerConfigMock.requireProviderCredentials.mockResolvedValue(credentials);
+		async ({
+			provider,
+			result,
+			id,
+			idsKey,
+			linkedKey,
+			lookup,
+			library,
+			run,
+		}) => {
+			providerConfigMock.requireProviderCredentials.mockResolvedValue(
+				credentials,
+			);
 			lookup.mockResolvedValue([result]);
-			library.mockRejectedValue(new Error(`library failure ${credentials.apiKey}`));
+			library.mockRejectedValue(
+				new Error(`library failure ${credentials.apiKey}`),
+			);
 			apiServicesMock.mappingService.getLinkedAniListIdsByProviderIds.mockResolvedValue(
 				new Map([[id, [aid(100)]]]),
 			);
@@ -181,35 +194,41 @@ describe("Arr RPC handlers", () => {
 				[idsKey]: null,
 				[linkedKey]: { [id]: [100] },
 			});
-			expect(apiServicesMock.mappingService.getLinkedAniListIdsByProviderIds)
-				.toHaveBeenCalledWith(provider, new Set([id]));
+			expect(
+				apiServicesMock.mappingService.getLinkedAniListIdsByProviderIds,
+			).toHaveBeenCalledWith(provider, new Set([id]));
 			expect(log).toHaveBeenCalled();
 			expect(JSON.stringify(log.mock.calls)).not.toContain(credentials.apiKey);
 		},
 	);
 
-	it.each(searches)("propagates $provider lookup errors", async ({ lookup, library, run }) => {
-		providerConfigMock.requireProviderCredentials.mockResolvedValue(credentials);
-		const error = new Error("lookup failed");
-		lookup.mockRejectedValue(error);
-		library.mockResolvedValue([]);
+	it.each(searches)(
+		"propagates $provider lookup errors",
+		async ({ lookup, library, run }) => {
+			providerConfigMock.requireProviderCredentials.mockResolvedValue(
+				credentials,
+			);
+			const error = new Error("lookup failed");
+			lookup.mockRejectedValue(error);
+			library.mockResolvedValue([]);
 
-		await expect(run()).rejects.toBe(error);
-	});
+			await expect(run()).rejects.toBe(error);
+		},
+	);
 
 	it.each([
 		{
 			name: "Sonarr",
-				run: () =>
-					sonarrHandlers.getSeriesStatus({
-						source: { source: "anilist", id: aid(100) },
+			run: () =>
+				sonarrHandlers.getSeriesStatus({
+					source: { source: "anilist", id: aid(100) },
 				}),
 		},
 		{
 			name: "Radarr",
-				run: () =>
-					radarrHandlers.getMovieStatus({
-						source: { source: "anilist", id: aid(100) },
+			run: () =>
+				radarrHandlers.getMovieStatus({
+					source: { source: "anilist", id: aid(100) },
 				}),
 		},
 	])(
@@ -239,9 +258,9 @@ describe("Arr RPC handlers", () => {
 			setup: () => {
 				addSonarrSeriesMock.mockResolvedValue(createdSeries);
 			},
-				run: () =>
-					sonarrHandlers.addToSonarr({
-						source: { source: "anilist", id: aid(100) },
+			run: () =>
+				sonarrHandlers.addToSonarr({
+					source: { source: "anilist", id: aid(100) },
 					tvdbId: createdSeries.tvdbId,
 					title: createdSeries.title,
 					form: sonarrAddForm,
@@ -266,9 +285,9 @@ describe("Arr RPC handlers", () => {
 			setup: () => {
 				addRadarrMovieMock.mockResolvedValue(createdMovie);
 			},
-				run: () =>
-					radarrHandlers.addToRadarr({
-						source: { source: "anilist", id: aid(100) },
+			run: () =>
+				radarrHandlers.addToRadarr({
+					source: { source: "anilist", id: aid(100) },
 					tmdbId: createdMovie.tmdbId,
 					title: createdMovie.title,
 					form: radarrAddForm,

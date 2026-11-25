@@ -12,10 +12,7 @@ import type { ExtensionError } from "@/shared/errors/error.types";
 import { logger } from "@/shared/utils/logger";
 import { resetAfterProviderConnectionChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 import type { SeerrConnection } from "@/providers/seerr/types";
 import { getAni2arrApi } from "@/rpc";
 import {

@@ -14,7 +14,7 @@ import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { GetSeerrTargetInput } from "@/rpc/types";
 
-	interface SeerrMediaActionInput {
+interface SeerrMediaActionInput {
 	source: SourceIdentity;
 	title: string | null;
 	metadata: AniListMediaHint | null;

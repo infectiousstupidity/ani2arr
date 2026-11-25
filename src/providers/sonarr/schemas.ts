@@ -47,7 +47,9 @@ export type SonarrSeriesType = v.InferOutput<typeof SonarrSeriesTypeSchema>;
 
 // Add-time monitoring choice. Sonarr supports "unknown", but ani2arr never sends it.
 export const SonarrMonitorOptionSchema = v.picklist(SONARR_MONITOR_OPTIONS);
-export type SonarrMonitorOption = v.InferOutput<typeof SonarrMonitorOptionSchema>;
+export type SonarrMonitorOption = v.InferOutput<
+	typeof SonarrMonitorOptionSchema
+>;
 
 // UI-only edit action for applying Sonarr's season pass monitoring endpoint.
 export const SonarrEditMonitoringActionSchema = v.picklist(

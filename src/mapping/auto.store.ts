@@ -101,9 +101,12 @@ export async function getAutomaticLayerRecord(
 ): Promise<AutomaticMappingRecord | null> {
 	const source = normalizeSourceIdentity(identity);
 	const { store } = await readAutomaticStore();
-	const canonicalValue = store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
+	const canonicalValue =
+		store.records[sourceIdentityKey(storageIdentity(source, anilistId))];
 	const aliasValue = store.records[sourceIdentityKey(source)];
-	const canonical = isAutomaticMappingRecord(canonicalValue) ? canonicalValue : undefined;
+	const canonical = isAutomaticMappingRecord(canonicalValue)
+		? canonicalValue
+		: undefined;
 	const alias = isAutomaticMappingRecord(aliasValue) ? aliasValue : undefined;
 	const record =
 		canonical && alias && canonical !== alias
@@ -119,7 +122,8 @@ export async function listAniListAutomaticLayers(): Promise<AutomaticRecord[]> {
 	const now = Date.now();
 	return Object.entries(store.records).flatMap(([rawKey, record]) => {
 		const identity = parseSourceIdentityKey(rawKey);
-		if (identity?.source !== "anilist" || !isAutomaticMappingRecord(record)) return [];
+		if (identity?.source !== "anilist" || !isAutomaticMappingRecord(record))
+			return [];
 		const active = activeRecord(record, now);
 		return isEmptyRecord(active)
 			? []
@@ -260,10 +264,15 @@ export async function setSeerrAutoResult(
 
 export async function migrateAutomaticStore(): Promise<void> {
 	await enqueueAutomaticStoreUpdate(async () => {
-		const stored = await browser.storage.local.get([AUTO_KEY, LEGACY_SEERR_AUTO_KEY]);
+		const stored = await browser.storage.local.get([
+			AUTO_KEY,
+			LEGACY_SEERR_AUTO_KEY,
+		]);
 		const keys: string[] = [];
-		if (stored[AUTO_KEY] != null && !isMappingStore(stored[AUTO_KEY])) keys.push(AUTO_KEY);
-		if (stored[LEGACY_SEERR_AUTO_KEY] !== undefined) keys.push(LEGACY_SEERR_AUTO_KEY);
+		if (stored[AUTO_KEY] != null && !isMappingStore(stored[AUTO_KEY]))
+			keys.push(AUTO_KEY);
+		if (stored[LEGACY_SEERR_AUTO_KEY] !== undefined)
+			keys.push(LEGACY_SEERR_AUTO_KEY);
 		if (keys.length === 0) return;
 		await browser.storage.local.remove(keys);
 		automaticStateCache.clear();

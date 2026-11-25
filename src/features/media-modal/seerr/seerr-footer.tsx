@@ -2,10 +2,7 @@
 // src/features/media-modal/seerr/seerr-footer.tsx
 
 import Button from "@/shared/ui/primitives/button";
-import {
-	AUX_BUTTON_CLASS,
-	FOOTER_BUTTON_CLASS,
-} from "./seerr-modal.constants";
+import { AUX_BUTTON_CLASS, FOOTER_BUTTON_CLASS } from "./seerr-modal.constants";
 
 type SeerrFooterProps =
 	| {
@@ -65,9 +62,7 @@ export function SeerrFooter(props: SeerrFooterProps): React.JSX.Element {
 						className={FOOTER_BUTTON_CLASS}
 						disabled={props.isBusy}
 						onClick={
-							props.view === "request"
-								? props.onClose
-								: props.onBackToRequest
+							props.view === "request" ? props.onClose : props.onBackToRequest
 						}
 					>
 						{props.view === "request" ? "Exit modal" : "Back to request"}

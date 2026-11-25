@@ -30,13 +30,13 @@ function createAniChartCard(heading: string): Element {
 
 describe("anichartBrowseAdapter", () => {
 	it("parses the direct section heading without nested filter text", () => {
-		expect(anichartBrowseAdapter.parseCard(createAniChartCard("TV"))).toMatchObject(
-			{
-				anilistId: 210_031,
-				title: "Example Title",
-				format: "TV",
-			},
-		);
+		expect(
+			anichartBrowseAdapter.parseCard(createAniChartCard("TV")),
+		).toMatchObject({
+			anilistId: 210_031,
+			title: "Example Title",
+			format: "TV",
+		});
 	});
 
 	it("skips music sections from direct heading text", () => {

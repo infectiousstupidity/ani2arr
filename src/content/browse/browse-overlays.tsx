@@ -97,7 +97,9 @@ export function BrowseOverlays({
 			resolvedTargets
 				.filter((target) => target.parsed.format === null)
 				.flatMap((target) =>
-					target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+					target.parsed.anilistId === undefined
+						? []
+						: [target.parsed.anilistId],
 				),
 		[resolvedTargets],
 	);
@@ -125,7 +127,7 @@ export function BrowseOverlays({
 	return (
 		<>
 			<div ref={hostRef} />
-			{resolvedTargets.map(target =>
+			{resolvedTargets.map((target) =>
 				createPortal(
 					<BrowseCardOverlay
 						parsed={target.parsed}

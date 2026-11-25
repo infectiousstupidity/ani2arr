@@ -15,7 +15,8 @@ vi.mock("@/settings/store", () => ({
 const ROOT_URL = "https://anilist.co/";
 const ANIME_URL = "https://anilist.co/anime/186497/Koori-no-Jouheki/";
 const MAL_GENRE_URL = "https://myanimelist.net/anime/genre/2/Adventure";
-const MAL_ANIME_URL = "https://myanimelist.net/anime/5114/Fullmetal_Alchemist_Brotherhood";
+const MAL_ANIME_URL =
+	"https://myanimelist.net/anime/5114/Fullmetal_Alchemist_Brotherhood";
 
 function createFakeContentScriptContext(): ContentScriptContext {
 	return {
@@ -35,7 +36,9 @@ function createFakeContentScriptContext(): ContentScriptContext {
 type ShellOptions = Parameters<typeof createContentEntrypointShell>[0];
 
 function startShell(options: ShellOptions): Promise<void> {
-	return createContentEntrypointShell(options)(createFakeContentScriptContext());
+	return createContentEntrypointShell(options)(
+		createFakeContentScriptContext(),
+	);
 }
 
 function dispatchLocationChange(url: string): void {
@@ -52,7 +55,9 @@ function dispatchPageShow(persisted: boolean): void {
 
 describe("createContentEntrypointShell", () => {
 	beforeEach(() => {
-		getPublicOptionsSnapshotMock.mockResolvedValue(createDefaultPublicOptions());
+		getPublicOptionsSnapshotMock.mockResolvedValue(
+			createDefaultPublicOptions(),
+		);
 		vi.stubGlobal("location", { href: ROOT_URL });
 		vi.stubGlobal("window", new EventTarget());
 	});
@@ -101,7 +106,9 @@ describe("createContentEntrypointShell", () => {
 		await vi.waitFor(() => {
 			expect(initialSignal?.aborted).toBe(true);
 			expect(mount).toHaveBeenCalledTimes(1);
-			expect(mount).toHaveBeenCalledWith(expect.objectContaining({ url: ANIME_URL }));
+			expect(mount).toHaveBeenCalledWith(
+				expect.objectContaining({ url: ANIME_URL }),
+			);
 		});
 	});
 

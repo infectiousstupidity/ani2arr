@@ -2,9 +2,7 @@ import type { AnimeFormat } from "@/shared/types/anime-format";
 import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** Jikan anime client and defensive response normalization. */
 
-import {
-	type AniListTitles,
-} from "@/anilist/types";
+import { type AniListTitles } from "@/anilist/types";
 import {
 	isMyAnimeListId,
 	type MyAnimeListId,

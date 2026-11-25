@@ -89,9 +89,7 @@ function getHeaderDescription(mode: "add" | "edit"): string {
 		: "Choose the root folder and monitoring settings for this series.";
 }
 
-function getInitialValues(
-	target: SonarrSetupTarget | null,
-): SonarrFormState {
+function getInitialValues(target: SonarrSetupTarget | null): SonarrFormState {
 	return normalizeSonarrFormState(target?.initialFormValues);
 }
 
@@ -284,11 +282,7 @@ export function useSonarrSetupForm(
 		event.preventDefault();
 		if (!event.isTrusted) return;
 
-		if (
-			!canSubmit ||
-			target === null ||
-			providerPayloadTitle === undefined
-		) {
+		if (!canSubmit || target === null || providerPayloadTitle === undefined) {
 			return;
 		}
 

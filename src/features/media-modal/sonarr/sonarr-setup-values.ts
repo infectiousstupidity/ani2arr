@@ -2,10 +2,7 @@
 // src/features/media-modal/sonarr/sonarr-setup-values.ts
 
 import * as v from "valibot";
-import {
-	parseTvdbIdOrNull,
-	SonarrSeriesIdSchema,
-} from "@/providers/schemas";
+import { parseTvdbIdOrNull, SonarrSeriesIdSchema } from "@/providers/schemas";
 import type { TvdbId } from "@/providers/schemas";
 import {
 	normalizeSonarrDefaults,
@@ -164,10 +161,7 @@ export function getSonarrSetupTarget({
 		};
 	}
 
-	if (
-		status?.mapping.kind !== "mapped" ||
-		status.isInLibrary !== false
-	) {
+	if (status?.mapping.kind !== "mapped" || status.isInLibrary !== false) {
 		return null;
 	}
 

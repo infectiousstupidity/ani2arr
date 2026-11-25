@@ -12,8 +12,9 @@ vi.mock("@/queries/options", () => ({
 	useExtensionOptions: useExtensionOptionsMock,
 }));
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-	.IS_REACT_ACT_ENVIRONMENT = true;
+(
+	globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;

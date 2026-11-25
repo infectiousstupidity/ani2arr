@@ -15,10 +15,7 @@ import {
 } from "@/settings/store";
 import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
 import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
-import {
-	logError,
-	normalizeError,
-} from "@/shared/errors/error-utils";
+import { logError, normalizeError } from "@/shared/errors/error-utils";
 
 const log = logger.create("Background");
 const MAPPING_REFRESH_ALARM = "a2a:refresh-static-mappings";
@@ -75,14 +72,16 @@ export const bootstrapBackground = (): void => {
 
 	registerAni2arrApi(apiHandlers);
 	const mappingInitialization = migrateMappingStorage();
-	void mappingInitialization.then(async (deletedUpstream) => {
-		if (!deletedUpstream) return;
-		await ensurePeriodicRefresh();
-		await settingsInitialization;
-		if (await shouldWarmMappingsCache()) await refreshMappingPipeline();
-	}).catch((error) => {
-		logError(normalizeError(error), "Background:migrateMappingStorage");
-	});
+	void mappingInitialization
+		.then(async (deletedUpstream) => {
+			if (!deletedUpstream) return;
+			await ensurePeriodicRefresh();
+			await settingsInitialization;
+			if (await shouldWarmMappingsCache()) await refreshMappingPipeline();
+		})
+		.catch((error) => {
+			logError(normalizeError(error), "Background:migrateMappingStorage");
+		});
 
 	browser.runtime.onInstalled.addListener(async (details) => {
 		try {
@@ -123,7 +122,10 @@ export const bootstrapBackground = (): void => {
 					await refreshMappingPipeline();
 				}
 			} catch (error) {
-				logError(normalizeError(error), "Background:refreshMappingPipeline:alarm");
+				logError(
+					normalizeError(error),
+					"Background:refreshMappingPipeline:alarm",
+				);
 			}
 		})();
 	});

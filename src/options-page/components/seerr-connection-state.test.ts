@@ -48,22 +48,24 @@ describe("Seerr connection controls", () => {
 		});
 	});
 
-	it.each([
-		ErrorCode.SEERR_AUTH_REQUIRED,
-		ErrorCode.SEERR_SESSION_UNAVAILABLE,
-	])("shows login actions for %s", (errorCode) => {
-		expect(control({ connection: sessionConnection, errorCode })).toEqual({
-			buttonLabel: "I have signed in — check again",
-			showLoginActions: true,
-		});
-	});
+	it.each([ErrorCode.SEERR_AUTH_REQUIRED, ErrorCode.SEERR_SESSION_UNAVAILABLE])(
+		"shows login actions for %s",
+		(errorCode) => {
+			expect(control({ connection: sessionConnection, errorCode })).toEqual({
+				buttonLabel: "I have signed in — check again",
+				showLoginActions: true,
+			});
+		},
+	);
 
 	it("distinguishes stable sessions from new or changed URLs", () => {
 		expect(control({ connection: sessionConnection })).toEqual({
 			buttonLabel: "Re-check account",
 			showLoginActions: false,
 		});
-		expect(control({ connection: sessionConnection, hasUrlChanges: true })).toEqual({
+		expect(
+			control({ connection: sessionConnection, hasUrlChanges: true }),
+		).toEqual({
 			buttonLabel: "Check Seerr session",
 			showLoginActions: false,
 		});

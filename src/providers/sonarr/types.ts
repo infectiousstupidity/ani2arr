@@ -17,12 +17,7 @@ import type {
 	SonarrTagSchema,
 	UpdateSonarrSeriesInputSchema,
 } from "./schemas";
-import type {
-	ProviderQualityProfileId,
-	ProviderTagId,
-} from "../schemas";
-
-
+import type { ProviderQualityProfileId, ProviderTagId } from "../schemas";
 
 export type SonarrSeries = v.InferOutput<typeof SonarrSeriesSchema>;
 export type SonarrLookupSeries = v.InferOutput<typeof SonarrLookupSeriesSchema>;

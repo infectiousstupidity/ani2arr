@@ -67,25 +67,39 @@ describe("auto mapping store", () => {
 
 	it("discards malformed current records on reads and writes", async () => {
 		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: { version: 1, records: {
-				"anilist:1": { facts: null },
-				"anilist:2": { facts: { tmdbShow: 10 }, scopes: { tmdbShow: { id: 10, seasons: null } } },
-				"anilist:3": { facts: {}, attempts: { sonarrTvdb: null } },
-			} },
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: {
+					"anilist:1": { facts: null },
+					"anilist:2": {
+						facts: { tmdbShow: 10 },
+						scopes: { tmdbShow: { id: 10, seasons: null } },
+					},
+					"anilist:3": { facts: {}, attempts: { sonarrTvdb: null } },
+				},
+			},
 		});
 		await expect(getAutomaticLayerRecord(aid(1))).resolves.toBeNull();
 		await expect(getAutomaticLayerRecord(aid(2))).resolves.toBeNull();
 		await expect(listAniListAutomaticLayers()).resolves.toEqual([]);
 		await setAutoResult(captureAutomaticWriteToken(), "radarr", aid(1), {
-			kind: "mapped", providerId: tmdb(10),
+			kind: "mapped",
+			providerId: tmdb(10),
 		});
-		await expect(getAutomaticLayerRecord(aid(1))).resolves.toMatchObject({ facts: { tmdbMovie: 10 } });
+		await expect(getAutomaticLayerRecord(aid(1))).resolves.toMatchObject({
+			facts: { tmdbMovie: 10 },
+		});
 	});
 
 	it("preserves a Radarr movie mapping when Seerr misses", async () => {
 		const identity = { source: "anilist", id: aid(1) } as const;
-		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, { kind: "mapped", providerId: tmdb(10) });
-		await setSeerrAutoResult(captureAutomaticWriteToken(), identity, "movie", { kind: "unmapped" });
+		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, {
+			kind: "mapped",
+			providerId: tmdb(10),
+		});
+		await setSeerrAutoResult(captureAutomaticWriteToken(), identity, "movie", {
+			kind: "unmapped",
+		});
 		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
 			facts: { tmdbMovie: tmdb(10) },
 			attempts: { seerrTmdbMovie: expect.anything() },
@@ -98,9 +112,7 @@ describe("auto mapping store", () => {
 			kind: "mapped",
 			providerId: tmdb(10),
 		});
-		await expect(
-			readPersisted(AUTO_STORAGE_KEY),
-		).resolves.toMatchObject({
+		await expect(readPersisted(AUTO_STORAGE_KEY)).resolves.toMatchObject({
 			[AUTO_STORAGE_KEY]: {
 				version: 1,
 				records: {
@@ -137,8 +149,6 @@ describe("auto mapping store", () => {
 		await expect(getAutomaticLayerRecord(identity)).resolves.toBeNull();
 	});
 
-
-
 	it("round-trips MAL results under a source-aware key", async () => {
 		const identity = { source: "mal", id: mal(63_816) } as const;
 		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, {
@@ -149,9 +159,7 @@ describe("auto mapping store", () => {
 		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
 			facts: { tmdbMovie: tmdb(1_400_000) },
 		});
-		await expect(
-			readPersisted(AUTO_STORAGE_KEY),
-		).resolves.toMatchObject({
+		await expect(readPersisted(AUTO_STORAGE_KEY)).resolves.toMatchObject({
 			[AUTO_STORAGE_KEY]: {
 				version: 1,
 				records: {
@@ -260,21 +268,28 @@ describe("auto mapping store", () => {
 		});
 	});
 
-
 	it("deletes legacy cache keys while preserving current records", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: { radarr: { 1: { kind: "mapped" } } },
 			"mapping:seerr-auto": { 1: { kind: "unmapped" } },
 		});
 		await migrateAutomaticStore();
-		expect(await readPersisted([AUTO_STORAGE_KEY, "mapping:seerr-auto"])).toEqual({});
+		expect(
+			await readPersisted([AUTO_STORAGE_KEY, "mapping:seerr-auto"]),
+		).toEqual({});
 		await browser.storage.local.set({
-			[AUTO_STORAGE_KEY]: { version: 1, records: { "anilist:1": { facts: {} } } },
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: { "anilist:1": { facts: {} } },
+			},
 			"mapping:seerr-auto": {},
 		});
 		await migrateAutomaticStore();
 		expect(await readPersisted(AUTO_STORAGE_KEY)).toEqual({
-			[AUTO_STORAGE_KEY]: { version: 1, records: { "anilist:1": { facts: {} } } },
+			[AUTO_STORAGE_KEY]: {
+				version: 1,
+				records: { "anilist:1": { facts: {} } },
+			},
 		});
 		expect(await browser.storage.local.get("mapping:seerr-auto")).toEqual({});
 	});
@@ -292,9 +307,6 @@ describe("auto mapping store", () => {
 
 		expect(setSpy).not.toHaveBeenCalled();
 	});
-
-
-
 
 	it("updates one slot without refreshing another slot or attempt lane", async () => {
 		const identity = { source: "anilist", id: aid(1) } as const;

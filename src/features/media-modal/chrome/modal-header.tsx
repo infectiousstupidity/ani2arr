@@ -86,12 +86,7 @@ function SourceCard(props: {
 	source: SourceIdentity;
 }): React.JSX.Element {
 	const {
-		anilistHeaderData: {
-			title,
-			coverImage,
-			format,
-			year,
-		},
+		anilistHeaderData: { title, coverImage, format, year },
 		source,
 	} = props;
 
@@ -260,13 +255,14 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 		? `${getProviderExternalIdLabel(target.provider)} ID: ${target.providerId}`
 		: null;
 
-	const providerOpenTarget = target && target.isInLibrary !== null
-		? getProviderOpenTarget({
-				isInLibrary: target.isInLibrary,
-				providerRouteSlug: target.providerRouteSlug,
-				searchTerm: target.title,
-			})
-		: null;
+	const providerOpenTarget =
+		target && target.isInLibrary !== null
+			? getProviderOpenTarget({
+					isInLibrary: target.isInLibrary,
+					providerRouteSlug: target.providerRouteSlug,
+					searchTerm: target.title,
+				})
+			: null;
 	const openProvider = providerOpenTarget
 		? (event: MouseEvent<HTMLButtonElement>): void => {
 				if (!event.isTrusted) return;

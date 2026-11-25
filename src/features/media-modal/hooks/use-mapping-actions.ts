@@ -2,16 +2,10 @@
 // src/features/media-modal/hooks/use-mapping-actions.ts
 
 import { useState } from "react";
-import {
-	parseTmdbIdOrNull,
-	parseTvdbIdOrNull,
-} from "@/providers/schemas";
+import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
-import type {
-	TmdbId,
-	TvdbId,
-} from "@/providers/schemas";
+import type { TmdbId, TvdbId } from "@/providers/schemas";
 import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
@@ -75,7 +69,10 @@ export function useMappingActions({
 	const setIgnore = useSetMappingIgnore();
 	const setRejectedCandidate = useSetMappingRejectedCandidate();
 	const clearRejectedCandidate = useClearMappingRejectedCandidate();
-	const selectedTarget = createProviderMappingTarget(provider, selectedProviderId);
+	const selectedTarget = createProviderMappingTarget(
+		provider,
+		selectedProviderId,
+	);
 	const rejectTarget = createProviderMappingTarget(provider, rejectProviderId);
 	const clearRejectedTarget = createProviderMappingTarget(
 		provider,
@@ -192,7 +189,10 @@ export function useMappingActions({
 	};
 
 	return {
-		applyMapping, resetMapping, ignoreTitle, rejectCandidate,
+		applyMapping,
+		resetMapping,
+		ignoreTitle,
+		rejectCandidate,
 		clearRejectedCandidate: clearRejectedCandidateAction,
 		actionError,
 		isSubmittingMapping: setManualMapping.isPending,

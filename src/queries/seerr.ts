@@ -22,10 +22,7 @@ import type {
 	SetManualSeerrTargetInput,
 	ClearManualSeerrTargetInput,
 } from "@/rpc/types";
-import {
-	ErrorCode,
-	type ExtensionError,
-} from "@/shared/errors/error.types";
+import { ErrorCode, type ExtensionError } from "@/shared/errors/error.types";
 import {
 	normalizeSeerrMediaStatusRequest,
 	normalizeSeerrSearchRequest,
@@ -67,8 +64,7 @@ export const useConfiguredSeerrConnectionCheck = (options: {
 				: "configured",
 		),
 		queryFn: () => getAni2arrApi().checkConfiguredSeerrConnection(),
-		enabled:
-			(options.enabled ?? true) && Boolean(options.configuredConnection),
+		enabled: (options.enabled ?? true) && Boolean(options.configuredConnection),
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		refetchOnMount: "always",
@@ -88,7 +84,9 @@ export const useSeerrMediaStatus = (options: {
 		queryKey: queryKeys.seerrMediaStatus(request),
 		queryFn: async () => {
 			if (request === null) {
-				throw new Error("Seerr request input is required to check media status.");
+				throw new Error(
+					"Seerr request input is required to check media status.",
+				);
 			}
 
 			return getAni2arrApi().getSeerrMediaStatus(request);
@@ -202,33 +200,35 @@ export const useSetManualSeerrTarget = () => {
 export const useClearManualSeerrTarget = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<
-		{ ok: true },
-		ExtensionError,
-		ClearManualSeerrTargetInput
-	>({
-		mutationFn: (input) => getAni2arrApi().clearManualSeerrTarget(input),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
-			});
+	return useMutation<{ ok: true }, ExtensionError, ClearManualSeerrTargetInput>(
+		{
+			mutationFn: (input) => getAni2arrApi().clearManualSeerrTarget(input),
+			onSuccess: () => {
+				queryClient.invalidateQueries({
+					queryKey: queryKeys.seerrTargetsRoot(),
+				});
+				queryClient.invalidateQueries({
+					queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
+				});
+			},
 		},
-	});
+	);
 };
 
 export const useRequestInSeerr = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<RequestInSeerrOutput, ExtensionError, RequestInSeerrInput>({
-		mutationFn: (input) => getAni2arrApi().requestInSeerr(input),
-		onSuccess: (_request, variables) => {
-			const statusRequest = normalizeSeerrMediaStatusRequest(variables);
-			queryClient.setQueryData(queryKeys.seerrMediaStatus(statusRequest), {
-				target: "pending",
-				overall: "pending",
-			} satisfies GetSeerrMediaStatusOutput);
-			invalidateAfterSeerrRequest(queryClient, variables);
+	return useMutation<RequestInSeerrOutput, ExtensionError, RequestInSeerrInput>(
+		{
+			mutationFn: (input) => getAni2arrApi().requestInSeerr(input),
+			onSuccess: (_request, variables) => {
+				const statusRequest = normalizeSeerrMediaStatusRequest(variables);
+				queryClient.setQueryData(queryKeys.seerrMediaStatus(statusRequest), {
+					target: "pending",
+					overall: "pending",
+				} satisfies GetSeerrMediaStatusOutput);
+				invalidateAfterSeerrRequest(queryClient, variables);
+			},
 		},
-	});
+	);
 };

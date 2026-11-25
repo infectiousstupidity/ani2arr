@@ -11,7 +11,10 @@ import {
 import { listAniListManualLayers, readManualRecords } from "./manual.store";
 import { sourceIdentityKey, type SourceIdentity } from "./source-identity";
 import type { MappingResult } from "./types";
-import { listAniListUpstreamLayers, readSnapshotRecords } from "./upstream.store";
+import {
+	listAniListUpstreamLayers,
+	readSnapshotRecords,
+} from "./upstream.store";
 
 export interface ActiveMappingIdentity {
 	source: SourceIdentity;

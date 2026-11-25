@@ -53,10 +53,12 @@ export function SonarrEditOptionsFields(
 		pathPreview,
 	} = props;
 
-	const qualityProfileOptions = formResources.qualityProfiles.map((profile) => ({
-		value: String(profile.id),
-		label: profile.name,
-	}));
+	const qualityProfileOptions = formResources.qualityProfiles.map(
+		(profile) => ({
+			value: String(profile.id),
+			label: profile.name,
+		}),
+	);
 
 	return (
 		<div className={cn("flex flex-col gap-4", className)}>

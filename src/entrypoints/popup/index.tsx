@@ -119,7 +119,11 @@ export function QuickSettings(): React.JSX.Element {
 		provider: ConnectionId,
 		visibility: BadgeVisibility,
 	): void => {
-		void updateSettings({ type: "browseCard", provider, patch: { visibility } });
+		void updateSettings({
+			type: "browseCard",
+			provider,
+			patch: { visibility },
+		});
 	};
 
 	const setAnimePageEnabled = (
@@ -310,10 +314,7 @@ export function QuickSettings(): React.JSX.Element {
 									checked={enabled}
 									disabled={isSaving}
 									onChange={(event) => {
-										setAnimePageEnabled(
-											provider,
-											event.currentTarget.checked,
-										);
+										setAnimePageEnabled(provider, event.currentTarget.checked);
 									}}
 								/>
 							</div>

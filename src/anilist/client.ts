@@ -49,7 +49,9 @@ const FETCH_MEDIA_QUERY = `
 `;
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-	value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+	value && typeof value === "object"
+		? (value as Record<string, unknown>)
+		: null;
 
 const stringOrNull = (value: unknown): string | null =>
 	typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -107,7 +109,9 @@ const normalizeRelationNode = (
 	};
 };
 
-const normalizeRelations = (value: unknown): AniListMedia["relations"] | undefined => {
+const normalizeRelations = (
+	value: unknown,
+): AniListMedia["relations"] | undefined => {
 	const raw = asRecord(value);
 	const edges = raw?.edges;
 	if (!Array.isArray(edges)) return undefined;
@@ -164,7 +168,10 @@ const mapMedia = (value: unknown): AniListMedia => {
 	};
 };
 
-const parseRetryAfterMs = (header: string | null, now = Date.now()): number | null => {
+const parseRetryAfterMs = (
+	header: string | null,
+	now = Date.now(),
+): number | null => {
 	if (!header) return null;
 
 	const seconds = Number(header);
@@ -253,9 +260,7 @@ const normalizeMetadataCover = (
 	};
 };
 
-function parseMetadataEntry(
-	value: unknown,
-): AniListMetadata | null {
+function parseMetadataEntry(value: unknown): AniListMetadata | null {
 	const raw = asRecord(value);
 	if (!raw || !isAniListId(raw.id)) return null;
 

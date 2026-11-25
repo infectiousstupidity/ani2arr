@@ -2,7 +2,6 @@ import { parseAnimeFormatLabel } from "@/shared/types/anime-format";
 /** MyAnimeList browse surface adapter for seasonal, ranking, and search cards. */
 // src/content/myanimelist/browse/adapter.ts
 
-
 import {
 	readMyAnimeListIdFromUrl,
 	toMyAnimeListPosterUrl,
@@ -267,7 +266,8 @@ export const myAnimeListBrowseAdapter: BrowseAdapter = {
 		document.querySelector("#content") ??
 		document.body ??
 		document.documentElement,
-	getScanRoot: () => document.querySelector("#content") ?? document.body ?? null,
+	getScanRoot: () =>
+		document.querySelector("#content") ?? document.body ?? null,
 	anchorCorner: "top-left",
 	stackDirection: "down",
 };

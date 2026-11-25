@@ -56,7 +56,8 @@ export function SeerrChangeTargetInfoPane(props: {
 				/>
 			) : (
 				<p className="rounded-lg border border-border-primary/50 bg-bg-tertiary/45 px-3 py-4 text-sm text-text-secondary">
-					Select a result. Movie results save immediately. TV results need seasons.
+					Select a result. Movie results save immediately. TV results need
+					seasons.
 				</p>
 			)}
 			{selectedResult?.mediaType === "tv" ? (

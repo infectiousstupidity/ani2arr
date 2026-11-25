@@ -86,15 +86,18 @@ export const resolveTitlePreference = (params: {
 		primary = "Unknown title";
 	}
 
-	const alternates = TITLE_LANGUAGE_ORDER
-		.filter((language) => language !== usedLanguage)
+	const alternates = TITLE_LANGUAGE_ORDER.filter(
+		(language) => language !== usedLanguage,
+	)
 		.map((language) => {
 			const value = normalizeTitle(titleMap[language]);
 			return value && value !== primary
 				? { label: getAniListTitleLanguageLabel(language), value }
 				: null;
 		})
-		.filter((entry): entry is { label: string; value: string } => entry !== null);
+		.filter(
+			(entry): entry is { label: string; value: string } => entry !== null,
+		);
 
 	return { primary, usedLanguage, alternates };
 };

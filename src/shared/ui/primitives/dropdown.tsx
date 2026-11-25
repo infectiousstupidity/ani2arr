@@ -1,50 +1,54 @@
 /** Shared dropdown primitives for menu triggers and item content. */
 // src/shared/ui/primitives/dropdown.tsx
-import React from 'react';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import type { FloatingPortalContainer } from '../portal-container';
+import React from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import type { FloatingPortalContainer } from "../portal-container";
 
 interface DropdownProps {
-  trigger: React.ReactNode;
-  children: React.ReactNode;
-  container?: FloatingPortalContainer | undefined;
+	trigger: React.ReactNode;
+	children: React.ReactNode;
+	container?: FloatingPortalContainer | undefined;
 }
 
-export const Dropdown: React.FC<DropdownProps> = ({ trigger, children, container }) => {
-  return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
-      <DropdownMenu.Portal container={container}>
-        <DropdownMenu.Content
-          className="rounded-md bg-[#ffffff] text-(--text-secondary) border-0 shadow-[0_1px_10px_rgba(49,54,68,0.15)] py-1.5 z-99999"
-          side="bottom"
-          align="end"
-          sideOffset={6}
-        >
-          {children}
-          <DropdownMenu.Arrow className="fill-[#ffffff] stroke-transparent" />
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
+export const Dropdown: React.FC<DropdownProps> = ({
+	trigger,
+	children,
+	container,
+}) => {
+	return (
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
+			<DropdownMenu.Portal container={container}>
+				<DropdownMenu.Content
+					className="rounded-md bg-[#ffffff] text-(--text-secondary) border-0 shadow-[0_1px_10px_rgba(49,54,68,0.15)] py-1.5 z-99999"
+					side="bottom"
+					align="end"
+					sideOffset={6}
+				>
+					{children}
+					<DropdownMenu.Arrow className="fill-[#ffffff] stroke-transparent" />
+				</DropdownMenu.Content>
+			</DropdownMenu.Portal>
+		</DropdownMenu.Root>
+	);
 };
 
 export const DropdownItem: React.FC<{
-  onSelect?: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
+	onSelect?: () => void;
+	disabled?: boolean;
+	children: React.ReactNode;
 }> = ({ onSelect, disabled, children }) => (
-  <DropdownMenu.Item
-    className={`text-[14px] leading-7.5 rounded-sm flex items-center px-4.25 select-none ${
-      disabled
-        ? 'opacity-50 cursor-not-allowed text-text-secondary'
-        : 'text-text-secondary cursor-pointer hover:bg-accent-primary hover:text-white'
-    }`}
-    onSelect={() => {
-      if (!disabled) onSelect?.();
-    }}
-    disabled={!!disabled}
-  >
-    {children}
-  </DropdownMenu.Item>
+	<DropdownMenu.Item
+		className={`text-[14px] leading-7.5 rounded-sm flex items-center px-4.25 select-none ${
+			disabled
+				? "opacity-50 cursor-not-allowed text-text-secondary"
+				: "text-text-secondary cursor-pointer hover:bg-accent-primary hover:text-white"
+		}`}
+		onSelect={() => {
+			if (!disabled) onSelect?.();
+		}}
+		disabled={!!disabled}
+	>
+		{children}
+	</DropdownMenu.Item>
 );

@@ -13,7 +13,10 @@ import type { UpstreamMappingRecord } from "@/mapping/mapping-record";
 const reads = new Map<string, number>();
 let realisticStorageInstalled = false;
 
-export function useRealisticStorage(): { reads: Map<string, number>; reset(): void } {
+export function useRealisticStorage(): {
+	reads: Map<string, number>;
+	reset(): void;
+} {
 	if (realisticStorageInstalled) return { reads, reset: () => reads.clear() };
 	realisticStorageInstalled = true;
 	for (const area of ["local", "sync"] as const) {
@@ -51,7 +54,10 @@ export function loadUpstreamRecords(): Record<string, UpstreamMappingRecord> {
 	const records: Record<string, UpstreamMappingRecord> = {};
 	for (let id = 1; id <= 40_000; id += 1) {
 		records[`anilist:${id}`] = {
-			facts: { tvdbShow: (100_000 + id) as never, tmdbShow: (200_000 + id) as never },
+			facts: {
+				tvdbShow: (100_000 + id) as never,
+				tmdbShow: (200_000 + id) as never,
+			},
 		};
 		records[`mal:${id}`] = {
 			facts: { tvdbShow: (100_000 + id) as never },
@@ -84,7 +90,9 @@ export async function time<T>(
 	}
 	samples.sort((a, b) => a - b);
 	const medianMs = samples[Math.floor(samples.length / 2)] ?? 0;
-	process.stdout.write(`[perf] ${label}: median ${medianMs.toFixed(2)} ms (n=${iterations})\n`);
+	process.stdout.write(
+		`[perf] ${label}: median ${medianMs.toFixed(2)} ms (n=${iterations})\n`,
+	);
 	return { label, medianMs, result };
 }
 
@@ -135,7 +143,13 @@ export function stubVisibleIntersectionObserver(): void {
 			queueMicrotask(() =>
 				// SAFETY: the overlay hook reads only target, isIntersecting and intersectionRatio.
 				this.callback(
-					[{ target, isIntersecting: true, intersectionRatio: 1 } as IntersectionObserverEntry],
+					[
+						{
+							target,
+							isIntersecting: true,
+							intersectionRatio: 1,
+						} as IntersectionObserverEntry,
+					],
 					this as unknown as IntersectionObserver,
 				),
 			);
@@ -147,5 +161,6 @@ export function stubVisibleIntersectionObserver(): void {
 		}
 	}
 	// SAFETY: implements every IntersectionObserver method the app calls.
-	globalThis.IntersectionObserver = VisibleObserver as unknown as typeof IntersectionObserver;
+	globalThis.IntersectionObserver =
+		VisibleObserver as unknown as typeof IntersectionObserver;
 }

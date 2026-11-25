@@ -259,7 +259,9 @@ describe("options store helpers", () => {
 		async (reverse) => {
 			const original = createDefaultPublicOptions();
 			original.providers.radarr.defaults.rootFolderPath = "/movies";
-			await browser.storage.local.set({ [PUBLIC_OPTIONS_STORAGE_KEY]: original });
+			await browser.storage.local.set({
+				[PUBLIC_OPTIONS_STORAGE_KEY]: original,
+			});
 			const edits: PublicOptionsUpdate[] = [
 				{
 					type: "sonarrDefaults",
@@ -285,7 +287,11 @@ describe("options store helpers", () => {
 		async (reverse) => {
 			const edits: PublicOptionsUpdate[] = [
 				{ type: "browseCard", provider: "sonarr", patch: { enabled: false } },
-				{ type: "browseCard", provider: "sonarr", patch: { visibility: "hover" } },
+				{
+					type: "browseCard",
+					provider: "sonarr",
+					patch: { visibility: "hover" },
+				},
 			];
 			if (reverse) edits.reverse();
 			await Promise.all(edits.map((edit) => updatePublicOptions(edit)));
@@ -301,7 +307,10 @@ describe("options store helpers", () => {
 	it.each([
 		{ type: "browseCard", provider: "sonarr", patch: { visibility: "hidden" } },
 		{ type: "browseCard", provider: "sonarr", patch: { enabled: undefined } },
-		{ type: "radarrDefaults", defaults: { freeformTags: [], rootFolderPath: 123 } },
+		{
+			type: "radarrDefaults",
+			defaults: { freeformTags: [], rootFolderPath: 123 },
+		},
 		{ type: "sonarrDefaults", defaults: { freeformTags: "anime" } },
 		{
 			type: "debugLogging",

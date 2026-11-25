@@ -2,7 +2,10 @@
 import { describe, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import type { AniListId } from "@/anilist/types";
-import { captureAutomaticWriteToken, setAutoResult } from "@/mapping/auto.store";
+import {
+	captureAutomaticWriteToken,
+	setAutoResult,
+} from "@/mapping/auto.store";
 import { report, time, useRealisticStorage } from "./helpers";
 
 async function seedAutomaticStore(entries: number): Promise<void> {
@@ -11,12 +14,18 @@ async function seedAutomaticStore(entries: number): Promise<void> {
 	for (let index = 0; index < entries; index += 1) {
 		records[`anilist:${900_000 + index}`] = {
 			facts: { tvdbShow: 500_000 + index },
-			slotMeta: { tvdbShow: { expiresAt, matchedTitle: `Some Long Anime Title ${index}` } },
+			slotMeta: {
+				tvdbShow: { expiresAt, matchedTitle: `Some Long Anime Title ${index}` },
+			},
 			attempts: { sonarrTvdb: { expiresAt } },
 		};
 	}
 	await browser.storage.local.set({ "mapping:auto": { version: 1, records } });
-	report(`auto store JSON size (${entries} records)`, (JSON.stringify(records).length / 1024).toFixed(0), "KB");
+	report(
+		`auto store JSON size (${entries} records)`,
+		(JSON.stringify(records).length / 1024).toFixed(0),
+		"KB",
+	);
 }
 
 describe("automatic store writes", () => {
@@ -30,9 +39,14 @@ describe("automatic store writes", () => {
 			async () => {
 				await Promise.all(
 					Array.from({ length: 50 }, () =>
-						setAutoResult(captureAutomaticWriteToken(), "sonarr", (next++) as AniListId, {
-							kind: "unmapped",
-						}),
+						setAutoResult(
+							captureAutomaticWriteToken(),
+							"sonarr",
+							next++ as AniListId,
+							{
+								kind: "unmapped",
+							},
+						),
 					),
 				);
 			},
@@ -40,7 +54,12 @@ describe("automatic store writes", () => {
 		);
 		// Write-behind flushes on a timer; let it run, then count broadcasts.
 		await new Promise((resolve) => setTimeout(resolve, 1100));
-		const autoWrites = writes.mock.calls.filter(([items]) => "mapping:auto" in (items as object)).length;
-		report("storage.local writes of mapping:auto for 150 results (3 batches)", autoWrites);
+		const autoWrites = writes.mock.calls.filter(
+			([items]) => "mapping:auto" in (items as object),
+		).length;
+		report(
+			"storage.local writes of mapping:auto for 150 results (3 batches)",
+			autoWrites,
+		);
 	});
 });

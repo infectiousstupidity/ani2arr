@@ -221,7 +221,8 @@ function containsCards(node: Node, cardSelector: string): boolean {
 	const element = asElement(node);
 	if (!element || isOverlayContainer(element)) return false;
 	return (
-		element.matches(cardSelector) || element.querySelector(cardSelector) !== null
+		element.matches(cardSelector) ||
+		element.querySelector(cardSelector) !== null
 	);
 }
 
@@ -273,7 +274,9 @@ export function scanBrowseCardTargets(
 		});
 
 		const sourceKey = sourceIdentityKey(parsed.source);
-		if (parsed.mountTarget.getAttribute(BROWSE_PROCESSED_ATTRIBUTE) !== sourceKey) {
+		if (
+			parsed.mountTarget.getAttribute(BROWSE_PROCESSED_ATTRIBUTE) !== sourceKey
+		) {
 			parsed.mountTarget.setAttribute(BROWSE_PROCESSED_ATTRIBUTE, sourceKey);
 		}
 

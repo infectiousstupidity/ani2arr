@@ -490,11 +490,7 @@ export const mappingHandlers = {
 		const source = requireSourceIdentity(input.source);
 		const provider = requireProvider(input.provider);
 		const linkedAniListId = await getUniqueAniListIdForSource(source);
-		await setManualIgnored(
-			provider,
-			source,
-			linkedAniListId ?? undefined,
-		);
+		await setManualIgnored(provider, source, linkedAniListId ?? undefined);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
@@ -503,11 +499,7 @@ export const mappingHandlers = {
 		const source = requireSourceIdentity(input.source);
 		const provider = requireProvider(input.provider);
 		const linkedAniListId = await getUniqueAniListIdForSource(source);
-		await clearManualIgnored(
-			provider,
-			source,
-			linkedAniListId ?? undefined,
-		);
+		await clearManualIgnored(provider, source, linkedAniListId ?? undefined);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
