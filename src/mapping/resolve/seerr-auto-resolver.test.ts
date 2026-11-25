@@ -12,6 +12,7 @@ import {
 	setSeerrAutoResult,
 	type SeerrAutoResult,
 } from "@/mapping/auto.store";
+import { MappingService } from "@/mapping/mapping.service";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { createSeerrAutoResolver } from "./seerr-auto-resolver";
@@ -126,7 +127,16 @@ describe("Seerr automatic resolver", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		cached = null;
-		getEffectiveTarget.mockResolvedValue({ kind: "missing" });
+		getEffectiveTarget.mockImplementation(async ({ anilistId }) =>
+			cached?.kind === "mapped"
+				? {
+						kind: "mapped",
+						source: "automatic",
+						target: cached.target,
+						anilistId,
+					}
+				: { kind: "missing" },
+		);
 		getAutoResult.mockImplementation(async () => cached);
 		setAutoResult.mockImplementation(
 			async (
@@ -222,6 +232,65 @@ describe("Seerr automatic resolver", () => {
 		expect(searchMedia).toHaveBeenCalledTimes(2);
 	});
 
+	it.each([
+		{ name: "match", results: [movie()], conflict: false },
+		{ name: "match", results: [movie()], conflict: true },
+		{ name: "miss", results: [], conflict: false },
+	])(
+		"rechecks a pending $name (conflict: $conflict)",
+		async ({ results, conflict }) => {
+			const lookup = createDeferred<ReturnType<typeof movie>[]>();
+			const started = createDeferred<void>();
+			searchMedia.mockImplementation(async () => {
+				started.resolve();
+				return lookup.promise;
+			});
+			loadAniListMedia.mockResolvedValue({
+				id: source.id,
+				format: "MOVIE",
+				title: { english: "Perfect Blue" },
+				synonyms: [],
+			});
+			const pending = resolve(request("Perfect Blue", { format: "MOVIE" }));
+			await started.promise;
+			const target = { mediaType: "movie", tmdbId: tmdb(11_111) };
+			getEffectiveTarget.mockResolvedValue(
+				conflict
+					? { kind: "conflict" }
+					: { kind: "mapped", source: "manual", target },
+			);
+			lookup.resolve(results);
+
+			await expect(pending).resolves.toEqual(
+				conflict ? null : { source: "manual", ...target },
+			);
+		},
+	);
+
+	it.each<SeerrAutoResult>([
+		{ kind: "mapped", target: { mediaType: "movie", tmdbId: tmdb(10_494) } },
+		{ kind: "unmapped" },
+	])("rechecks precedence after a cached $kind result", async (result) => {
+		const cacheRead = createDeferred<SeerrAutoResult>();
+		const started = createDeferred<void>();
+		getAutoResult.mockImplementation(async () => {
+			started.resolve();
+			return cacheRead.promise;
+		});
+		const pending = resolve(request("Perfect Blue", { format: "MOVIE" }));
+		await started.promise;
+		const target = { mediaType: "movie", tmdbId: tmdb(11_111) };
+		getEffectiveTarget.mockResolvedValue({
+			kind: "mapped",
+			source: "upstream",
+			target,
+		});
+		cacheRead.resolve(result);
+
+		await expect(pending).resolves.toEqual({ source: "anibridge", ...target });
+		expect(searchMedia).not.toHaveBeenCalled();
+	});
+
 	it("returns null when a mapped automatic write is rejected", async () => {
 		searchMedia.mockResolvedValue([movie()]);
 		setAutoResult.mockResolvedValue(false);
@@ -259,11 +328,12 @@ describe("Seerr automatic resolver", () => {
 			"movie",
 			{ kind: "mapped", target: movie(11_111) },
 		);
-		const getAutoResultReal = vi.fn(getSeerrAutoResult);
+		const mappingService = new MappingService(vi.fn());
 		const setAutoResultReal = vi.fn(setSeerrAutoResult);
 		const realResolve = createSeerrAutoResolver({
-			getEffectiveTarget: vi.fn().mockResolvedValue({ kind: "missing" }),
-			getAutoResult: getAutoResultReal,
+			getEffectiveTarget: ({ identity, mediaType, anilistId }) =>
+				mappingService.getSeerrMappingOutcome(identity, mediaType, anilistId),
+			getAutoResult: getSeerrAutoResult,
 			setAutoResult: setAutoResultReal,
 			loadAniListMedia,
 			loadMyAnimeListMetadata,
@@ -286,10 +356,7 @@ describe("Seerr automatic resolver", () => {
 			}),
 		).resolves.toMatchObject({ tmdbId: tmdb(11_111) });
 
-		expect(getAutoResultReal.mock.calls).toEqual([
-			[linkedSource, "movie", linkedAniListId],
-			[unlinkedSource, "movie", undefined],
-		]);
+		expect(searchMedia).not.toHaveBeenCalled();
 		expect(setAutoResultReal).not.toHaveBeenCalled();
 	});
 
@@ -311,9 +378,11 @@ describe("Seerr automatic resolver", () => {
 		async ({ malId, anilistId, expectedKey }) => {
 			await clearAutoResults();
 			const malSource = { source: "mal", id: malId } as const;
-			const getEffectiveTargetReal = vi
-				.fn()
-				.mockResolvedValue({ kind: "missing" });
+			const mappingService = new MappingService(vi.fn());
+			const getEffectiveTargetReal = vi.fn(
+				({ identity, mediaType, anilistId }) =>
+					mappingService.getSeerrMappingOutcome(identity, mediaType, anilistId),
+			);
 			const getAutoResultReal = vi.fn(getSeerrAutoResult);
 			const setAutoResultReal = vi.fn(setSeerrAutoResult);
 			const realResolve = createSeerrAutoResolver({

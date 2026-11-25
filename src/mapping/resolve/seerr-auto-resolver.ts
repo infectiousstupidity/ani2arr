@@ -67,13 +67,15 @@ type SearchMatch = {
 };
 
 function toEffectiveTarget(
-	input: SeerrAutoResolverInput,
-	target: SeerrTarget,
-): EffectiveSeerrTarget {
+	outcome: SeerrMappingOutcome & { anilistId?: AniListId },
+): EffectiveSeerrTarget | null {
+	if (outcome.kind !== "mapped") return null;
 	return {
-		...(input.anilistId === null ? {} : { anilistId: input.anilistId }),
-		source: "automatic",
-		...target,
+		...(outcome.anilistId === undefined
+			? {}
+			: { anilistId: outcome.anilistId }),
+		source: outcome.source === "upstream" ? "anibridge" : outcome.source,
+		...outcome.target,
 	};
 }
 
@@ -222,29 +224,18 @@ export function createSeerrAutoResolver(
 			anilistId: input.anilistId,
 		};
 		const effective = await dependencies.getEffectiveTarget(identity);
-		if (effective.kind === "conflict") return null;
-		if (effective.kind === "mapped") {
-			return {
-				...(effective.anilistId === undefined
-					? {}
-					: { anilistId: effective.anilistId }),
-				source:
-					effective.source === "upstream" ? "anibridge" : effective.source,
-				...effective.target,
-			};
-		}
+		if (effective.kind !== "missing") return toEffectiveTarget(effective);
+
+		// A concurrent edit or lookup may change the winner while this work is pending.
+		const readCurrentTarget = async () =>
+			toEffectiveTarget(await dependencies.getEffectiveTarget(identity));
 
 		const cached = await dependencies.getAutoResult(
 			input.source,
 			input.mediaType,
 			canonicalAniListId,
 		);
-		if (cached?.kind === "mapped") {
-			return toEffectiveTarget(input, cached.target);
-		}
-		if (cached?.kind === "unmapped") {
-			return null;
-		}
+		if (cached) return readCurrentTarget();
 
 		const searchedTitleKeys = new Set<string>();
 		const hintMedia = searchMediaFromHint({
@@ -263,7 +254,7 @@ export function createSeerrAutoResolver(
 
 		if (!match) {
 			enrichedMedia = await loadEnrichedMedia(input, dependencies);
-			if (enrichedMedia === undefined) return null;
+			if (enrichedMedia === undefined) return readCurrentTarget();
 			if (enrichedMedia) {
 				match = await searchSeerrCandidate({
 					media: enrichedMedia,
@@ -282,7 +273,7 @@ export function createSeerrAutoResolver(
 				{ kind: "unmapped" },
 				canonicalAniListId,
 			);
-			return null;
+			return readCurrentTarget();
 		}
 
 		const target = await buildMatchedTarget({
@@ -292,7 +283,7 @@ export function createSeerrAutoResolver(
 			dependencies,
 		});
 
-		const stored = await dependencies.setAutoResult(
+		await dependencies.setAutoResult(
 			writeToken,
 			input.source,
 			input.mediaType,
@@ -303,6 +294,6 @@ export function createSeerrAutoResolver(
 			},
 			canonicalAniListId,
 		);
-		return stored ? toEffectiveTarget(input, target) : null;
+		return readCurrentTarget();
 	};
 }
