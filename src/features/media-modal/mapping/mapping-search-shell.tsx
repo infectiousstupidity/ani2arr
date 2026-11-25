@@ -3,7 +3,7 @@
 
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import Button from "@/shared/ui/primitives/button";
 
 type MappingSearchShellProps = {
@@ -13,69 +13,10 @@ type MappingSearchShellProps = {
 	isFetching: boolean;
 	errorMessage?: string | null | undefined;
 	resultCount: number;
-	resultImageUrls?: readonly string[] | undefined;
 	onQueryChange: () => void;
 	onSearch: (term: string) => void;
 	children: React.ReactNode;
 };
-
-const EMPTY_IMAGE_URLS_KEY = "[]";
-const IMAGE_PRELOAD_TIMEOUT_MS = 5000;
-
-function normalizeImageUrls(urls: readonly string[] | undefined): string[] {
-	if (!urls?.length) return [];
-
-	const normalized = new Set<string>();
-	for (const url of urls) {
-		const trimmed = url.trim();
-		if (trimmed) normalized.add(trimmed);
-	}
-
-	return [...normalized];
-}
-
-function preloadImage(url: string): Promise<void> {
-	if (typeof Image === "undefined") return Promise.resolve();
-
-	return new Promise((resolve) => {
-		const image = new Image();
-		let settled = false;
-		const timeout = setTimeout(settle, IMAGE_PRELOAD_TIMEOUT_MS);
-
-		function settle(): void {
-			if (settled) return;
-			settled = true;
-			clearTimeout(timeout);
-			image.removeEventListener("load", handleLoad);
-			image.removeEventListener("error", settle);
-			resolve();
-		}
-
-		function decodeAndSettle(): void {
-			const decoded = image.decode?.();
-			if (decoded) {
-				void decoded.then(settle, settle);
-				return;
-			}
-
-			settle();
-		}
-
-		function handleLoad(): void {
-			decodeAndSettle();
-		}
-
-		image.addEventListener("load", handleLoad);
-		image.addEventListener("error", settle);
-		image.decoding = "async";
-		image.loading = "eager";
-		image.src = url;
-
-		if (image.complete) {
-			decodeAndSettle();
-		}
-	});
-}
 
 export function MappingSearchShell(
 	props: MappingSearchShellProps,
@@ -87,7 +28,6 @@ export function MappingSearchShell(
 		isFetching,
 		errorMessage,
 		resultCount,
-		resultImageUrls,
 		onQueryChange,
 		onSearch,
 		children,
@@ -95,24 +35,12 @@ export function MappingSearchShell(
 	const [query, setQuery] = useState("");
 	const [resultListKey, setResultListKey] = useState(0);
 	const searchInputRef = useRef<HTMLInputElement>(null);
-	const imageUrlsKey = useMemo(
-		() => JSON.stringify(normalizeImageUrls(resultImageUrls)),
-		[resultImageUrls],
-	);
-	const [readyImageUrlsKey, setReadyImageUrlsKey] = useState(
-		EMPTY_IMAGE_URLS_KEY,
-	);
-	const shouldPreloadImages =
-		imageUrlsKey !== EMPTY_IMAGE_URLS_KEY && typeof Image !== "undefined";
-	const areResultImagesReady =
-		!shouldPreloadImages || readyImageUrlsKey === imageUrlsKey;
 	const trimmedQuery = query.trim();
 	const canSearch = trimmedQuery.length > 0;
 	let stateMessage: string | null = null;
 	if (errorMessage) stateMessage = errorMessage;
 	else if (isFetching && resultCount === 0) stateMessage = "Searching...";
 	else if (hasSearchTerm && resultCount === 0) stateMessage = "No results found.";
-	else if (hasSearchTerm && !areResultImagesReady) stateMessage = "Preparing results...";
 	const stateMessageClass = errorMessage
 		? "border-error/30 bg-error/10 text-error"
 		: "border-border-primary/45 bg-bg-secondary/35 text-text-secondary";
@@ -130,21 +58,6 @@ export function MappingSearchShell(
 
 		return () => cancelAnimationFrame(frameId);
 	}, []);
-
-	useEffect(() => {
-		if (!shouldPreloadImages) return;
-
-		let cancelled = false;
-		const imageUrls = JSON.parse(imageUrlsKey) as string[];
-
-		void Promise.all(imageUrls.map((url) => preloadImage(url))).then(() => {
-			if (!cancelled) setReadyImageUrlsKey(imageUrlsKey);
-		});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [imageUrlsKey, shouldPreloadImages]);
 
 	const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
 		event.preventDefault();

@@ -30,6 +30,7 @@ vi.mock("./mapping-search-shell", async (importOriginal) => {
 
 const title = "Example title";
 const overview = "Lookup overview";
+const posterUrl = "https://posters.example.invalid/cover.jpg";
 const id = 123;
 
 describe.each([
@@ -106,11 +107,18 @@ describe.each([
 			{ libraryIds: [], membership: false, state: "absent" },
 			{ libraryIds: [id], membership: true, state: "present" },
 		])(
-			"renders and selects a candidate with $state membership",
+			"renders and selects a candidate with $state membership without waiting for its poster",
 			({ libraryIds, membership }) => {
+				// Simulate a poster request that never emits load or error.
+				vi.stubGlobal(
+					"Image",
+					class extends EventTarget {
+						complete = false;
+					},
+				);
 				lookup.mockReturnValue({
 					data: {
-						results: [result],
+						results: [{ ...result, remotePoster: posterUrl }],
 						[idsKey]: libraryIds,
 						[linkedKey]: { [id]: [21] },
 						...stats,
@@ -140,6 +148,7 @@ describe.each([
 					title,
 					overview,
 					isInLibrary: membership,
+					posterUrl,
 					linkedAniListIds: [21],
 				});
 				expect(summary?.providerRouteSlug).toBe(
