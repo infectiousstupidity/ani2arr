@@ -1,9 +1,6 @@
 /** Radarr provider default add-options form section for the options page. */
 // src/options-page/pages/radarr/radarr-defaults.tsx
 
-import { useState } from "react";
-import { ListPlus } from "lucide-react";
-import type { ProviderFormResources } from "@/providers/types";
 import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
 import { createDefaultRadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
@@ -11,59 +8,34 @@ import type {
 	RadarrMinimumAvailability,
 	RadarrMovieMonitor,
 } from "@/providers/radarr/schemas";
-import type { ProviderTagSelection } from "@/features/provider-ui/provider-tag-selection";
 import {
 	RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
 	RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/providers/radarr/form-options";
 import { usePublicOptions, useUpdatePublicOptions } from "@/queries/options";
 import { useRadarrFormResources } from "@/queries/radarr";
-import { getUserErrorMessage } from "@/shared/errors/error-utils";
-import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Switch } from "@/shared/ui/primitives/switch";
+import { SettingsRow } from "../../components/settings-section";
 import {
-	SettingsRow,
-	SettingsSection,
-} from "../../components/settings-section";
-import { ArrDefaultsResourceFields } from "../arr-defaults-resource-fields";
+	ArrDefaultsSection,
+	type ArrDefaultsFieldsProps,
+} from "../arr-defaults-section";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
 	"Configures default add options reused when adding movies via the extension media modal and overlay.";
 
-type RadarrDraftChange = <K extends keyof RadarrFormState>(
-	field: K,
-	value: RadarrFormState[K],
-) => void;
-
-interface RadarrDefaultsFieldsProps {
-	formResources: ProviderFormResources | undefined;
-	resourceFieldsDisabled: boolean;
-	fieldsDisabled: boolean;
-	values: RadarrFormState;
-	onChange: RadarrDraftChange;
-	onTagsChange: (selection: ProviderTagSelection) => void;
-}
+type RadarrDefaultsFieldsProps = ArrDefaultsFieldsProps<RadarrFormState>;
 
 const RadarrDefaultsFields = ({
 	fieldsDisabled,
 	formResources,
 	onChange,
 	onTagsChange,
-	resourceFieldsDisabled,
 	values,
 }: RadarrDefaultsFieldsProps) => {
 	return (
 		<>
-			<ArrDefaultsResourceFields
-				provider="radarr"
-				formResources={formResources}
-				resourceFieldsDisabled={resourceFieldsDisabled}
-				values={values}
-				onRootFolderChange={(value) => onChange("rootFolderPath", value)}
-				onQualityProfileChange={(value) => onChange("qualityProfileId", value)}
-			/>
-
 			<SettingsRow
 				id="radarr-minimum-availability"
 				label="Minimum availability"
@@ -133,172 +105,29 @@ const RadarrDefaultsFields = ({
 	);
 };
 
-const cloneRadarrDefaults = (defaults: RadarrFormState): RadarrFormState =>
-	structuredClone(defaults);
-
-const getInitialRadarrDefaults = (
-	savedDefaults: RadarrFormState,
-	formResources: ProviderFormResources | undefined,
-): RadarrFormState => {
-	const defaults = cloneRadarrDefaults(savedDefaults);
-	const firstRootFolder = formResources?.rootFolders[0];
-	const firstQualityProfile = formResources?.qualityProfiles[0];
-
-	return {
-		...defaults,
-		...(!defaults.rootFolderPath && firstRootFolder
-			? { rootFolderPath: firstRootFolder.path }
-			: {}),
-		...(defaults.qualityProfileId === undefined && firstQualityProfile
-			? { qualityProfileId: firstQualityProfile.id }
-			: {}),
-	};
-};
-
-const getRadarrDefaultsKey = (
-	savedDefaults: RadarrFormState,
-	formResources: ProviderFormResources | undefined,
-): string =>
-	JSON.stringify({
-		savedDefaults,
-		firstRootFolder: formResources?.rootFolders[0]?.path,
-		firstQualityProfile: formResources?.qualityProfiles[0]?.id,
-	});
-
-const areRadarrDefaultsEqual = (
-	left: RadarrFormState,
-	right: RadarrFormState,
-): boolean => JSON.stringify(left) === JSON.stringify(right);
-
 export const RadarrDefaults = () => {
 	const { data: savedSettings } = usePublicOptions();
 	const saveOptions = useUpdatePublicOptions();
 	const isConfigured = savedSettings?.providers.radarr.isConfigured === true;
-
 	const { data: formResources, isFetching } = useRadarrFormResources({
 		enabled: isConfigured,
 	});
-	const resourceFieldsDisabled = !formResources || saveOptions.isPending;
 
 	if (!isConfigured || !savedSettings) return null;
 
-	const savedDefaults =
-		savedSettings.providers.radarr.defaults ?? createDefaultRadarrFormState();
-	const savedValues = cloneRadarrDefaults(savedDefaults);
-	const initialValues = getInitialRadarrDefaults(savedDefaults, formResources);
-	const draftKey = getRadarrDefaultsKey(savedDefaults, formResources);
-
 	return (
-		<RadarrDefaultsDraft
-			key={draftKey}
-			formResources={formResources}
-			initialValues={initialValues}
-			isFetching={isFetching}
-			resourceFieldsDisabled={resourceFieldsDisabled}
-			savedValues={savedValues}
-			saveOptions={saveOptions}
-		/>
-	);
-};
-
-const RadarrDefaultsDraft = ({
-	formResources,
-	initialValues,
-	isFetching,
-	resourceFieldsDisabled,
-	savedValues,
-	saveOptions,
-}: {
-	formResources: ProviderFormResources | undefined;
-	initialValues: RadarrFormState;
-	isFetching: boolean;
-	resourceFieldsDisabled: boolean;
-	savedValues: RadarrFormState;
-	saveOptions: ReturnType<typeof useUpdatePublicOptions>;
-}) => {
-	const [values, setValues] = useState(() =>
-		cloneRadarrDefaults(initialValues),
-	);
-	const hasDraftChanges = !areRadarrDefaultsEqual(values, initialValues);
-	const hasPersistableChanges = !areRadarrDefaultsEqual(values, savedValues);
-	const saveError = saveOptions.error
-		? getUserErrorMessage(saveOptions.error, "Failed to save Radarr defaults.")
-		: null;
-
-	const updateDefaults: RadarrDraftChange = (field, value) => {
-		setValues((currentDefaults) => ({
-			...currentDefaults,
-			[field]: value,
-		}));
-	};
-
-	const updateTags = ({ tagIds, freeformTags }: ProviderTagSelection) => {
-		setValues((currentDefaults) => {
-			const nextDefaults: RadarrFormState = {
-				...currentDefaults,
-				freeformTags,
-			};
-
-			if (tagIds.length === 0) {
-				delete nextDefaults.tags;
-				return nextDefaults;
-			}
-
-			return {
-				...nextDefaults,
-				tags: tagIds,
-			};
-		});
-	};
-
-	const saveDefaults = (): void => {
-		saveOptions.mutate({ type: "radarrDefaults", defaults: values });
-	};
-
-	return (
-		<SettingsSection
-			title="Default add options"
+		<ArrDefaultsSection
+			provider="radarr"
 			description={DEFAULT_OPTIONS_DESCRIPTION}
-			icon={<ListPlus className="h-4 w-4" />}
-			divider="top"
-		>
-			{!isFetching && !formResources ? (
-				<p className="text-sm text-text-secondary">
-					Radarr folders, quality profiles, and existing tags are unavailable.
-					Static defaults remain editable.
-				</p>
-			) : null}
-			<RadarrDefaultsFields
-				fieldsDisabled={saveOptions.isPending}
-				formResources={formResources}
-				resourceFieldsDisabled={resourceFieldsDisabled}
-				values={values}
-				onChange={updateDefaults}
-				onTagsChange={updateTags}
-			/>
-			{saveError ? (
-				<p className="text-sm font-semibold text-error" role="alert">
-					{saveError}
-				</p>
-			) : null}
-			<div className="mt-6 flex justify-end gap-3">
-				<Button
-					type="button"
-					variant="ghost"
-					disabled={!hasDraftChanges || saveOptions.isPending}
-					onClick={() => setValues(cloneRadarrDefaults(initialValues))}
-				>
-					Cancel
-				</Button>
-				<Button
-					type="button"
-					variant="primary"
-					disabled={!hasPersistableChanges || saveOptions.isPending}
-					onClick={saveDefaults}
-				>
-					{saveOptions.isPending ? "Saving..." : "Save defaults"}
-				</Button>
-			</div>
-		</SettingsSection>
+			savedDefaults={
+				savedSettings.providers.radarr.defaults ??
+				createDefaultRadarrFormState()
+			}
+			formResources={formResources}
+			isFetching={isFetching}
+			saveOptions={saveOptions}
+			toUpdate={(defaults) => ({ type: "radarrDefaults", defaults })}
+			renderFields={(props) => <RadarrDefaultsFields {...props} />}
+		/>
 	);
 };
