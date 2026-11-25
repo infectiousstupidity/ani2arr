@@ -108,11 +108,18 @@ describe("createAutomaticResolver", () => {
 			"Kagurabachi",
 		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_000,
-			matchedTitle: "Kagurabachi",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 450_000,
+				matchedTitle: "Kagurabachi",
+			},
+			undefined,
+			[],
+		);
 	});
 
 	it("keeps a distinct page title and metadata title in the same search", async () => {
@@ -200,11 +207,18 @@ describe("createAutomaticResolver", () => {
 			"Next Title",
 		);
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_001,
-			matchedTitle: "Next Title",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 450_001,
+				matchedTitle: "Next Title",
+			},
+			undefined,
+			[],
+		);
 	});
 
 	it("stores unmapped after page and AniList fallback miss", async () => {
@@ -220,9 +234,16 @@ describe("createAutomaticResolver", () => {
 		await resolve();
 
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(3);
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "unmapped",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "unmapped",
+			},
+			undefined,
+			[],
+		);
 	});
 
 	it("filters rejected provider IDs before matching", async () => {
@@ -237,11 +258,18 @@ describe("createAutomaticResolver", () => {
 
 		await resolve();
 
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_001,
-			matchedTitle: "Kagurabachi",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 450_001,
+				matchedTitle: "Kagurabachi",
+			},
+			undefined,
+			[450_000],
+		);
 	});
 
 	it("maps the real MAL 63816 title hint after removing the arc suffix", async () => {
@@ -269,11 +297,18 @@ describe("createAutomaticResolver", () => {
 		]);
 		expect(deps.loadMyAnimeListMetadata).not.toHaveBeenCalled();
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 424_536,
-			matchedTitle: "Frieren: Beyond Journeys End",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 424_536,
+				matchedTitle: "Frieren: Beyond Journeys End",
+			},
+			undefined,
+			[],
+		);
 	});
 
 	it("uses MAL metadata after the page hint misses without an AniList ID", async () => {
@@ -309,11 +344,18 @@ describe("createAutomaticResolver", () => {
 		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_020,
-			matchedTitle: "Jikan Match",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 450_020,
+				matchedTitle: "Jikan Match",
+			},
+			undefined,
+			[],
+		);
 	});
 
 	it("uses canonical prequel relations only for Sonarr", async () => {
@@ -346,11 +388,18 @@ describe("createAutomaticResolver", () => {
 		await expect(resolve()).resolves.toBe(true);
 
 		expect(deps.anilistMedia.iteratePrequelChain).toHaveBeenCalledWith(media);
-		expect(setAutoResultMock).toHaveBeenLastCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_002,
-			matchedTitle: "Matching Prequel",
-		});
+		expect(setAutoResultMock).toHaveBeenLastCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 450_002,
+				matchedTitle: "Matching Prequel",
+			},
+			undefined,
+			[],
+		);
 
 		deps.anilistMedia.iteratePrequelChain.mockClear();
 		setAutoResultMock.mockClear();
@@ -358,9 +407,16 @@ describe("createAutomaticResolver", () => {
 		await expect(resolve({ provider: "radarr" })).resolves.toBe(true);
 
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "radarr", identity, {
-			kind: "unmapped",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"radarr",
+			identity,
+			{
+				kind: "unmapped",
+			},
+			undefined,
+			[],
+		);
 	});
 
 	it("uses relation IDs without sending the source identity to AniList", async () => {
@@ -387,10 +443,17 @@ describe("createAutomaticResolver", () => {
 			prequelId,
 		);
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith(0, "sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_003,
-			matchedTitle: "Matching Prequel",
-		});
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			0,
+			"sonarr",
+			identity,
+			{
+				kind: "mapped",
+				providerId: 450_003,
+				matchedTitle: "Matching Prequel",
+			},
+			undefined,
+			[],
+		);
 	});
 });

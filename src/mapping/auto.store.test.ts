@@ -456,6 +456,74 @@ describe("auto mapping store", () => {
 		await expect(getAutomaticLayerRecord(identity)).resolves.toBeNull();
 	});
 
+	it("keeps an accepted result when a concurrent pending result commits later", async () => {
+		const identity = { source: "anilist", id: aid(4) } as const;
+		const radarrToken = captureAutomaticWriteToken();
+		const seerrToken = captureAutomaticWriteToken();
+
+		await expect(
+			setAutoResult(radarrToken, "radarr", identity, {
+				kind: "mapped",
+				providerId: tmdb(40),
+			}),
+		).resolves.toBe(true);
+		// Radarr and Seerr share the tmdbMovie slot.
+		await expect(
+			setSeerrAutoResult(seerrToken, identity, "movie", {
+				kind: "mapped",
+				target: { mediaType: "movie", tmdbId: tmdb(41) },
+			}),
+		).resolves.toBe(false);
+		await expect(
+			setAutoResult(captureAutomaticWriteToken(), "sonarr", identity, {
+				kind: "mapped",
+				providerId: tvdb(42),
+			}),
+		).resolves.toBe(true);
+		await expect(
+			setAutoResult(radarrToken, "sonarr", identity, {
+				kind: "mapped",
+				providerId: tvdb(43),
+			}),
+		).resolves.toBe(false);
+		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
+			facts: { tmdbMovie: tmdb(40), tvdbShow: tvdb(42) },
+		});
+	});
+
+	it("replaces rejected and expired results but not accepted ones", async () => {
+		const identity = { source: "anilist", id: aid(5) } as const;
+		await setAutoResult(captureAutomaticWriteToken(), "radarr", identity, {
+			kind: "mapped",
+			providerId: tmdb(50),
+		});
+
+		await expect(
+			setAutoResult(
+				captureAutomaticWriteToken(),
+				"radarr",
+				identity,
+				{ kind: "mapped", providerId: tmdb(51) },
+				undefined,
+				[50],
+			),
+		).resolves.toBe(true);
+		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
+			facts: { tmdbMovie: tmdb(51) },
+		});
+
+		vi.setSystemTime(new Date(start.getTime() + 31 * 24 * 60 * 60 * 1000));
+		await expect(
+			setAutoResult(captureAutomaticWriteToken(), "radarr", identity, {
+				kind: "mapped",
+				providerId: tmdb(52),
+			}),
+		).resolves.toBe(true);
+		await expect(getAutomaticLayerRecord(identity)).resolves.toMatchObject({
+			facts: { tmdbMovie: tmdb(52) },
+		});
+	});
+
 	it("allows automatic writes captured after a full clear", async () => {
 		const identity = { source: "anilist", id: aid(3) } as const;
 

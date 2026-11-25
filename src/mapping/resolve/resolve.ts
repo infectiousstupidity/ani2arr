@@ -188,6 +188,8 @@ export function createAutomaticResolver(dependencies: {
 			provider,
 			storageIdentity(identity, anilistId ?? undefined),
 			result,
+			undefined,
+			rejectedProviderIds,
 		);
 	};
 }

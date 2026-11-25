@@ -146,6 +146,23 @@ export async function readAutomaticRecords(): Promise<
 	};
 }
 
+/**
+ * A pending result must not replace a mapping accepted while it was resolving.
+ * Rejected, expired and absent values stay replaceable.
+ */
+function hasAcceptedSlot(
+	record: AutomaticMappingRecord,
+	slot: "tmdbMovie" | "tmdbShow" | "tvdbShow",
+	rejectedProviderIds: readonly number[] = [],
+): boolean {
+	const id = record.facts[slot];
+	return (
+		id !== undefined &&
+		(record.slotMeta?.[slot]?.expiresAt ?? 0) > Date.now() &&
+		!rejectedProviderIds.includes(id)
+	);
+}
+
 function hasAutomaticAttempt(
 	record: AutomaticMappingRecord | null,
 	lane: AutomaticAttemptLane,
@@ -160,17 +177,24 @@ export async function setAutoResult(
 		identity: SourceIdentity | AniListId,
 		result: AutoResult,
 		anilistId?: AniListId,
+		rejectedProviderIds?: readonly number[],
 	]
 ): Promise<boolean> {
 	return updateAutomaticStoreGuarded(token, (store) => {
-		const [provider, identity, result, anilistId] = args;
+		const [provider, identity, result, anilistId, rejectedProviderIds] = args;
 		const record = getMutableRecord(store, identity, anilistId);
 		const slot = provider === "sonarr" ? "tvdbShow" : "tmdbMovie";
 		const lane = provider === "sonarr" ? "sonarrTvdb" : "radarrTmdbMovie";
+		if (
+			result.kind === "mapped" &&
+			hasAcceptedSlot(record, slot, rejectedProviderIds)
+		) {
+			return false;
+		}
 		delete record.attempts?.[lane];
 		if (result.kind === "unmapped") {
 			setAttempt(record, lane, Date.now() + ATTEMPT_TTL_MS);
-			return;
+			return true;
 		}
 		clearSlot(record, slot);
 		if (provider === "sonarr") {
@@ -189,6 +213,7 @@ export async function setAutoResult(
 				? { matchedTitle: result.matchedTitle.trim() }
 				: {}),
 		});
+		return true;
 	});
 }
 
@@ -237,10 +262,11 @@ export async function setSeerrAutoResult(
 		const record = getMutableRecord(store, identity, anilistId);
 		const slot = mediaType === "movie" ? "tmdbMovie" : "tmdbShow";
 		const lane = mediaType === "movie" ? "seerrTmdbMovie" : "seerrTmdbShow";
+		if (result.kind === "mapped" && hasAcceptedSlot(record, slot)) return false;
 		delete record.attempts?.[lane];
 		if (result.kind === "unmapped") {
 			setAttempt(record, lane, Date.now() + ATTEMPT_TTL_MS);
-			return;
+			return true;
 		}
 		clearSlot(record, slot);
 		const target = normalizeSeerrTarget(result.target);
@@ -259,6 +285,7 @@ export async function setSeerrAutoResult(
 				? { matchedTitle: result.matchedTitle.trim() }
 				: {}),
 		});
+		return true;
 	});
 }
 
@@ -337,27 +364,27 @@ export async function flushAutomaticStore(): Promise<void> {
 	await enqueueAutomaticStoreUpdate(persistDirtyState);
 }
 
+/** Resolves false when the token is stale or `update` returns false to keep the store unchanged. */
 async function updateAutomaticStoreGuarded(
 	token: AutomaticWriteToken,
-	update: (store: MappingStore<AutomaticMappingRecord>) => void,
+	update: (store: MappingStore<AutomaticMappingRecord>) => boolean,
 ): Promise<boolean> {
 	return enqueueAutomaticStoreUpdate(async () => {
 		const state = await readAutomaticStore();
 		if (token !== automaticWriteToken) return false;
-		await applyAutomaticStoreUpdate(state, update);
-		return true;
+		return applyAutomaticStoreUpdate(state, update);
 	});
 }
 
 // Serializes the store once per write instead of cloning and stringifying it repeatedly.
 async function applyAutomaticStoreUpdate(
 	state: AutomaticStoreState,
-	update: (store: MappingStore<AutomaticMappingRecord>) => void,
-): Promise<void> {
+	update: (store: MappingStore<AutomaticMappingRecord>) => boolean | void,
+): Promise<boolean> {
 	const store = JSON.parse(state.json) as MappingStore<AutomaticMappingRecord>;
-	update(store);
+	if (update(store) === false) return false;
 	let after = JSON.stringify(store);
-	if (after === state.json && !state.hasMalformedRecords) return;
+	if (after === state.json && !state.hasMalformedRecords) return true;
 	let removedEmpty = false;
 	for (const [key, record] of Object.entries(store.records)) {
 		if (!isEmptyRecord(record)) continue;
@@ -365,7 +392,7 @@ async function applyAutomaticStoreUpdate(
 		removedEmpty = true;
 	}
 	if (removedEmpty) after = JSON.stringify(store);
-	if (after === state.json && !state.hasMalformedRecords) return;
+	if (after === state.json && !state.hasMalformedRecords) return true;
 	// Parse the JSON so in-memory state matches a fresh read (storage drops undefined).
 	dirtyState = {
 		store: JSON.parse(after) as MappingStore<AutomaticMappingRecord>,
@@ -373,6 +400,7 @@ async function applyAutomaticStoreUpdate(
 		hasMalformedRecords: false,
 	};
 	scheduleFlush();
+	return true;
 }
 
 function scheduleFlush(): void {
