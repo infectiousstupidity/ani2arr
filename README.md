@@ -270,6 +270,8 @@ pnpm run dev
 pnpm run dev:chrome
 
 pnpm run audit
+pnpm run format
+pnpm run format:check
 pnpm run lint
 pnpm run compile
 pnpm run test
@@ -283,6 +285,11 @@ pnpm run zip
 pnpm run zip:chrome
 pnpm run zip:all
 ```
+
+`pnpm format` applies Prettier to source, tests, perf harnesses, scripts, and
+root JS/TS tooling and configuration. `pnpm format:check` checks the same files
+without writing and runs as part of `pnpm validate` in CI. Generated metadata,
+the lockfile, build output, and docs are outside the formatting scope.
 
 Firefox is the default browser target. Chrome commands use the `:chrome` suffix.
 Build and zip artifacts are created under `.output/`.
