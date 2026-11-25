@@ -7,6 +7,7 @@ import { parseAniListId } from "@/anilist/types";
 import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
+import { flushAutomaticStore } from "./auto.store";
 import { migrateMappingStorage } from "./migrate";
 import {
 	clearUpstreamMappings,
@@ -140,6 +141,44 @@ describe("version-1 upstream lookups", () => {
 		expect(setSpy).not.toHaveBeenCalled();
 		expect(localRemoveSpy).not.toHaveBeenCalled();
 		expect(syncRemoveSpy).not.toHaveBeenCalled();
+	});
+
+	it("consolidates only valid upstream aliases during mapping migration", async () => {
+		await seedLayerSnapshot({
+			"mal:10": { linkedAniListId: aid(1) },
+			"mal:11": { facts: {}, linkedAniListId: aid(2) },
+		});
+		const manual = { facts: { tvdbShow: tvdb(500) } };
+		const automatic = {
+			facts: { tmdbMovie: tmdb(300) },
+			slotMeta: { tmdbMovie: { expiresAt: Date.now() + 10_000 } },
+		};
+		await browser.storage.local.set({
+			"mapping:manual": {
+				version: 1,
+				records: { "mal:10": manual, "mal:11": manual },
+			},
+			"mapping:auto": {
+				version: 1,
+				records: { "mal:10": automatic, "mal:11": automatic },
+			},
+		});
+
+		await migrateMappingStorage();
+		await flushAutomaticStore();
+
+		await expect(
+			browser.storage.local.get(["mapping:manual", "mapping:auto"]),
+		).resolves.toEqual({
+			"mapping:manual": {
+				version: 1,
+				records: { "mal:10": manual, "anilist:2": manual },
+			},
+			"mapping:auto": {
+				version: 1,
+				records: { "mal:10": automatic, "anilist:2": automatic },
+			},
+		});
 	});
 
 	it("returns the direct MAL and canonical AniList layers", async () => {

@@ -2,7 +2,7 @@
 
 import { browser } from "wxt/browser";
 import { storage } from "wxt/utils/storage";
-import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import { createStorageReadCache } from "@/shared/storage-read-cache";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import {
@@ -115,9 +115,9 @@ export async function getSourceAliasesByAniListId(): Promise<
 	const aliasesByAniListId = new Map<AniListId, SourceIdentity[]>();
 	for (const [rawKey, record] of Object.entries(records)) {
 		const alias = parseSourceIdentityKey(rawKey);
-		if (alias?.source !== "mal" || !isObject(record)) continue;
-		const linkedAniListId = parseAniListIdOrNull(record.linkedAniListId);
-		if (linkedAniListId === null) continue;
+		if (alias?.source !== "mal" || !isUpstreamMappingRecord(record)) continue;
+		const { linkedAniListId } = record;
+		if (linkedAniListId === undefined) continue;
 		const aliases = aliasesByAniListId.get(linkedAniListId) ?? [];
 		aliases.push(alias);
 		aliasesByAniListId.set(linkedAniListId, aliases);
