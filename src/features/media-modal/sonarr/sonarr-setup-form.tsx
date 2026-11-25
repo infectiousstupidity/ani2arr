@@ -40,8 +40,6 @@ type SonarrSetupFooterState = {
 	isBusy: boolean;
 	isDirty: boolean;
 	isSubmitting: boolean;
-	setupMutationsBlocked: boolean;
-	setupUnavailable: boolean;
 	submitLabel: string;
 	actionError: string | null;
 };
@@ -246,8 +244,6 @@ export function useSonarrSetupForm(
 		isBusy,
 		isDirty,
 		isSubmitting,
-		setupMutationsBlocked,
-		setupUnavailable,
 		submitLabel: mode === "edit" ? "Save changes" : "Add series",
 		actionError,
 	} satisfies SonarrSetupFooterState;

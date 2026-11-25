@@ -1,88 +1,29 @@
-/** Concrete Sonarr media modal composition and direct data flow. */
+/** Sonarr media modal data and setup wiring; shared composition lives in ArrModalFrame. */
 // src/features/media-modal/sonarr/sonarr-modal.tsx
 
-import { useMemo, useState } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import { useMemo } from "react";
 import { sourceIdentityKey } from "@/mapping/source-identity";
-import { parseTvdbIdOrNull } from "@/providers/schemas";
-import type { ProviderFormResources } from "@/providers/types";
-import type { TvdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
-import { useMappingInspection, useSourceAniListIdMap } from "@/queries/mapping";
-import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
+import { parseTvdbIdOrNull } from "@/providers/schemas";
 import { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
+import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
 import type { GetSeriesStatusOutput } from "@/rpc/types";
-import { DetailsPanel } from "../details/details-panel";
+import { ArrModalFrame } from "../arr-modal-frame";
+import { pickProviderPoster } from "../helpers";
+import { useContentPortalContainer } from "../hooks/use-content-portal-container";
+import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
+import type { MediaModalTargetSummary, SonarrModalProps } from "../types";
 import { SonarrMappingPanel } from "./sonarr-mapping-panel";
 import { useSonarrSetupForm } from "./sonarr-setup-form";
 import {
 	canShowSonarrSetup,
 	getSonarrSetupTarget,
 } from "./sonarr-setup-values";
-import { useContentPortalContainer } from "../hooks/use-content-portal-container";
-import { useMappingActions } from "../hooks/use-mapping-actions";
-import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
-import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
-import {
-	getOverwriteTargetTitle,
-	isSetupTargetLoading,
-	shouldShowMappingView,
-	pickProviderPoster,
-	targetsEqual,
-} from "../helpers";
-import { MappingFooter, SetupFooter } from "../chrome/modal-footer";
-import { ModalHeader } from "../chrome/modal-header";
-import { ModalShell } from "../chrome/modal-shell";
-import type {
-	AniListHeaderData,
-	MediaModalMetadataHint,
-	MediaModalTargetSummary,
-	MediaModalView,
-	SonarrModalProps,
-} from "../types";
 
 const PROVIDER = "sonarr" as const;
 const SETUP_FORM_ID = "sonarr-setup-form";
 
 type SonarrStatusSeries = NonNullable<GetSeriesStatusOutput["series"]>;
-
-function getModalAniListId(
-	source: SonarrModalProps["state"]["source"],
-	idsBySource: Record<string, AniListId | null> | undefined,
-): AniListId | undefined {
-	if (source.source === "anilist") return source.id;
-	return idsBySource?.[sourceIdentityKey(source)] ?? undefined;
-}
-
-type SonarrModalData = {
-	isConfigured: boolean;
-	anilistHeaderData: AniListHeaderData;
-	manualMappingActive: boolean;
-	currentTarget: MediaModalTargetSummary | null;
-	resolvedMetadata: AniListMediaHint | null;
-	providerRequestTitle: string;
-	providerPayloadTitle: string | undefined;
-	fallbackLookupTitle: string | undefined;
-	rawProviderStatus: GetSeriesStatusOutput | null;
-	verificationSettled: boolean;
-	verificationFailed: boolean;
-	storedDefaults: ReturnType<typeof defaultSonarrFormState>;
-	providerFormResources: ProviderFormResources | null;
-};
-
-function getRejectCandidateTvdbId(input: {
-	inspection: ReturnType<typeof useMappingInspection>["data"];
-	manualMappingActive: boolean;
-}): TvdbId | null {
-	if (input.manualMappingActive) return null;
-
-	const mapping = input.inspection?.mapping;
-	if (mapping?.kind === "mapped" && mapping.source === "auto") {
-		return parseTvdbIdOrNull(mapping.providerId);
-	}
-
-	return null;
-}
 
 function getEpisodeCount(series: SonarrStatusSeries): number | undefined {
 	return (
@@ -147,20 +88,19 @@ function getCurrentTarget(input: {
 	};
 }
 
-function useSonarrModalData(input: {
-	source: SonarrModalProps["state"]["source"];
-	metadataHint: MediaModalMetadataHint | null;
-}): SonarrModalData {
-	const { source, metadataHint } = input;
+export function SonarrModal({
+	state,
+	onClose,
+	container,
+}: SonarrModalProps): React.JSX.Element {
+	const { source, metadataHint } = state;
+	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
 		source,
-		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
-		metadataHint,
+		metadataHint: metadataHint ?? null,
 	});
-	const options = base.options;
-	const isConfigured = options?.providers.sonarr.isConfigured === true;
-	const sonarrFormResources = useSonarrFormResources({ enabled: isConfigured });
-
+	const isConfigured = base.options?.providers.sonarr.isConfigured === true;
+	const formResources = useSonarrFormResources({ enabled: isConfigured });
 	const statusPayload = useMemo(
 		() => ({
 			source,
@@ -169,240 +109,63 @@ function useSonarrModalData(input: {
 		}),
 		[base.statusMetadata, base.statusTitle, source],
 	);
-	const sonarrStatus = useSeriesStatus(statusPayload, {
+	const status = useSeriesStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
 		force_verify: true,
 	});
-	const verificationSettled =
-		sonarrStatus.isFetchedAfterMount || sonarrStatus.isError;
-	const rawProviderStatus = sonarrStatus.data ?? null;
+	const verificationSettled = status.isFetchedAfterMount || status.isError;
+	const rawStatus = status.data ?? null;
 	const verificationFailed =
-		verificationSettled &&
-		(sonarrStatus.isError || rawProviderStatus?.isInLibrary === null);
-	const currentTarget = getCurrentTarget({
-		status: rawProviderStatus,
-	});
-	const manualMappingActive =
-		rawProviderStatus?.mapping.kind === "mapped" &&
-		rawProviderStatus.mapping.source === "manual";
-
-	return {
-		isConfigured,
-		anilistHeaderData: base.anilistHeaderData,
-		manualMappingActive,
-		currentTarget,
-		resolvedMetadata: base.resolvedMetadata,
-		providerRequestTitle: base.providerRequestTitle,
-		providerPayloadTitle: base.providerPayloadTitle,
-		fallbackLookupTitle: base.fallbackLookupTitle,
-		rawProviderStatus,
-		verificationSettled,
-		verificationFailed,
-		storedDefaults:
-			options?.providers.sonarr.defaults ?? defaultSonarrFormState(),
-		providerFormResources: sonarrFormResources.data ?? null,
-	};
-}
-
-export function SonarrModal({
-	state,
-	onClose,
-	container,
-}: SonarrModalProps): React.JSX.Element {
-	const { source, metadataHint, openSource, initialView } = state;
+		verificationSettled && (status.isError || rawStatus?.isInLibrary === null);
 	const identityKey = sourceIdentityKey(source);
-	const sourceAniListIds = useSourceAniListIdMap([source], {
-		enabled: source.source === "mal",
-	});
-	const anilistId = getModalAniListId(source, sourceAniListIds.data);
-	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
-	const [selectedCandidate, setSelectedCandidate] =
-		useState<MediaModalTargetSummary | null>(null);
-	const contentContainer = useContentPortalContainer();
-	const data = useSonarrModalData({
-		source,
-		metadataHint: metadataHint ?? null,
-	});
-	const inspection = useMappingInspection(PROVIDER, source);
+	const storedDefaults =
+		base.options?.providers.sonarr.defaults ?? defaultSonarrFormState();
 	const setupTarget = useMemo(
 		() =>
 			getSonarrSetupTarget({
 				identityKey,
-				status: data.rawProviderStatus,
-				targetTitle: data.providerRequestTitle,
-				storedDefaults: data.storedDefaults,
+				status: rawStatus,
+				targetTitle: base.providerRequestTitle,
+				storedDefaults,
 			}),
-		[
-			identityKey,
-			data.providerRequestTitle,
-			data.rawProviderStatus,
-			data.storedDefaults,
-		],
+		[identityKey, base.providerRequestTitle, rawStatus, storedDefaults],
 	);
-	const canShowSetup = canShowSonarrSetup({
-		isConfigured: data.isConfigured,
-		status: data.rawProviderStatus,
-	});
-	const isMappingView = shouldShowMappingView({
-		view,
-		verificationSettled: data.verificationSettled,
-		canShowSetup,
-	});
-	const setupTargetLoading = isSetupTargetLoading({
-		view,
-		isMappingView,
-		isConfigured: data.isConfigured,
-		hasSetupTarget: setupTarget !== null,
-		verificationSettled: data.verificationSettled,
-	});
+	const setupTargetLoading =
+		isConfigured && setupTarget === null && !verificationSettled;
 	const setupForm = useSonarrSetupForm({
 		formId: SETUP_FORM_ID,
 		source,
 		target: setupTarget,
-		providerPayloadTitle: data.providerPayloadTitle,
-		fallbackLookupTitle: data.fallbackLookupTitle,
-		resolvedMetadata: data.resolvedMetadata,
-		isConfigured: data.isConfigured,
-		formResources: data.providerFormResources,
+		providerPayloadTitle: base.providerPayloadTitle,
+		fallbackLookupTitle: base.fallbackLookupTitle,
+		resolvedMetadata: base.resolvedMetadata,
+		isConfigured,
+		formResources: formResources.data ?? null,
 		portalContainer: contentContainer,
 		targetLoading: setupTargetLoading,
-		verificationFailed: data.verificationFailed,
-		verificationSettled: data.verificationSettled,
+		verificationFailed,
+		verificationSettled,
 		onClose,
 	});
-	const previewTarget = isMappingView ? selectedCandidate : null;
-	const handleOpenSettings = useOpenMappingSettingsAction({
-		anilistId,
-		openSource,
-	});
-	const rejectCandidateTvdbId = getRejectCandidateTvdbId({
-		inspection: inspection.data,
-		manualMappingActive: data.manualMappingActive,
-	});
-	const clearRejectedCandidateTvdbId = parseTvdbIdOrNull(
-		inspection.data?.mapping.kind === "unmapped"
-			? inspection.data.mapping.rejectedProviderIds?.[0]
-			: undefined,
-	);
-	const canIgnoreTitle = inspection.data?.mapping.kind !== "ignored";
-	const canSubmitMapping =
-		selectedCandidate !== null &&
-		!targetsEqual(selectedCandidate, data.currentTarget);
-	const overwriteTargetTitle = getOverwriteTargetTitle(
-		previewTarget,
-		data.currentTarget,
-	);
-	const showSetupView = (): void => {
-		setSelectedCandidate(null);
-		setView("setup");
-	};
-	const mappingActions = useMappingActions({
-		source,
-		provider: PROVIDER,
-		selectedProviderId: selectedCandidate?.providerId ?? null,
-		rejectProviderId: rejectCandidateTvdbId,
-		clearRejectedProviderId: clearRejectedCandidateTvdbId,
-		requiresApplyConfirmation:
-			setupForm.footerState.isDirty && canSubmitMapping,
-		onMappingApplied: () => {
-			setSelectedCandidate(null);
-			showSetupView();
-		},
-		onMappingReset: () => {
-			setSelectedCandidate(null);
-			setView("mapping");
-		},
-		onIgnored: onClose,
-	});
-	const showMappingView = (): void => setView("mapping");
-	const handleEscapeKeyDown = (event: KeyboardEvent): void => {
-		if (!isMappingView || !canShowSetup) return;
-
-		event.preventDefault();
-		showSetupView();
-	};
 
 	return (
-		<ModalShell
-			contentContainer={contentContainer}
-			header={
-				<ModalHeader
-					provider={PROVIDER}
-					contentContainer={contentContainer}
-					anilistHeaderData={data.anilistHeaderData}
-					source={source}
-					isMappingView={isMappingView}
-					isProviderTargetLoading={setupTargetLoading}
-					currentTarget={data.currentTarget}
-					previewTarget={previewTarget}
-					onClose={onClose}
-					onOpenSettings={handleOpenSettings ?? undefined}
-				/>
-			}
-			leftPane={
-				isMappingView ? (
-					<SonarrMappingPanel
-						contentContainer={contentContainer}
-						currentTarget={data.currentTarget}
-						selectedCandidate={selectedCandidate}
-						onSelectCandidate={setSelectedCandidate}
-					/>
-				) : (
-					setupForm.content
-				)
-			}
-			rightPane={
-				<DetailsPanel
-					provider={PROVIDER}
-					contentContainer={contentContainer}
-					anilistId={anilistId}
-					effectiveMapping={data.currentTarget}
-					previewMapping={previewTarget}
-					isInMappingMode={isMappingView}
-					mappingDetails={inspection.data}
-				/>
-			}
-			footer={
-				isMappingView ? (
-					<MappingFooter
-						manualMappingActive={data.manualMappingActive}
-						isResettingMapping={mappingActions.isRevertingMapping}
-						canRejectCandidate={rejectCandidateTvdbId !== null}
-						canClearRejectedCandidate={clearRejectedCandidateTvdbId !== null}
-						canIgnoreTitle={canIgnoreTitle}
-						isRejectingCandidate={mappingActions.isRejectingCandidate}
-						isClearingRejectedCandidate={
-							mappingActions.isClearingRejectedCandidate
-						}
-						isIgnoring={mappingActions.isIgnoring}
-						canApplyMapping={canSubmitMapping}
-						isApplyingMapping={mappingActions.isSubmittingMapping}
-						leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
-						overwriteTargetTitle={overwriteTargetTitle}
-						actionError={mappingActions.actionError}
-						onRejectCandidate={mappingActions.rejectCandidate}
-						onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
-						onIgnoreTitle={mappingActions.ignoreTitle}
-						onLeaveMapping={canShowSetup ? showSetupView : onClose}
-						onResetMapping={mappingActions.resetMapping}
-						onApplyMapping={mappingActions.applyMapping}
-					/>
-				) : (
-					<SetupFooter
-						formId={SETUP_FORM_ID}
-						canSubmit={setupForm.footerState.canSubmit}
-						isBusy={setupForm.footerState.isBusy}
-						isSubmitting={setupForm.footerState.isSubmitting}
-						submitLabel={setupForm.footerState.submitLabel}
-						actionError={setupForm.footerState.actionError}
-						onCancel={onClose}
-						onOpenMapping={showMappingView}
-					/>
-				)
-			}
-			onOpenChange={(open) => !open && onClose()}
-			onEscapeKeyDown={handleEscapeKeyDown}
+		<ArrModalFrame
+			state={state}
+			onClose={onClose}
 			container={container}
+			contentContainer={contentContainer}
+			anilistHeaderData={base.anilistHeaderData}
+			currentTarget={getCurrentTarget({ status: rawStatus })}
+			manualMappingActive={
+				rawStatus?.mapping.kind === "mapped" &&
+				rawStatus.mapping.source === "manual"
+			}
+			verificationSettled={verificationSettled}
+			canShowSetup={canShowSonarrSetup({ isConfigured, status: rawStatus })}
+			setupTargetLoading={setupTargetLoading}
+			setupFormId={SETUP_FORM_ID}
+			setupForm={setupForm}
+			MappingPanel={SonarrMappingPanel}
 		/>
 	);
 }

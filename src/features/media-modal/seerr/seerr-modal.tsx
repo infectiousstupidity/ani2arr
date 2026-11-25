@@ -76,7 +76,6 @@ export function SeerrModal({
 	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
 		source,
-		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
 		metadataHint: metadataHint ?? null,
 	});
 	const isConfigured = base.options?.seerr.isConfigured === true;

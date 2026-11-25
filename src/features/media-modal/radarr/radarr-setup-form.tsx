@@ -29,8 +29,6 @@ type RadarrSetupFooterState = {
 	isBusy: boolean;
 	isDirty: boolean;
 	isSubmitting: boolean;
-	setupMutationsBlocked: boolean;
-	setupUnavailable: boolean;
 	submitLabel: string;
 	actionError: string | null;
 };
@@ -229,8 +227,6 @@ export function useRadarrSetupForm(
 		isBusy,
 		isDirty,
 		isSubmitting,
-		setupMutationsBlocked,
-		setupUnavailable,
 		submitLabel: mode === "edit" ? "Save changes" : "Add movie",
 		actionError,
 	} satisfies RadarrSetupFooterState;

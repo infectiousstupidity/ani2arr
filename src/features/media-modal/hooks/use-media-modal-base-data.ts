@@ -11,10 +11,10 @@ import type { MediaModalMetadataHint } from "../types";
 
 export function useMediaModalBaseData(input: {
 	source: SourceIdentity;
-	fallbackLabel?: string | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 }) {
-	const { source, fallbackLabel, metadataHint } = input;
+	const { source, metadataHint } = input;
+	const fallbackLabel = `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`;
 	const anilistId = source.source === "anilist" ? source.id : undefined;
 	const malId = source.source === "mal" ? source.id : undefined;
 	const { data: options } = usePublicOptions();
@@ -37,7 +37,7 @@ export function useMediaModalBaseData(input: {
 			resolveMediaModalMetadata({
 				source,
 				...(anilistId === undefined ? {} : { anilistId }),
-				...(fallbackLabel === undefined ? {} : { fallbackLabel }),
+				fallbackLabel,
 				anilistMedia,
 				metadataBatchData,
 				myAnimeListMetadata: myAnimeListMetadataQuery.data,

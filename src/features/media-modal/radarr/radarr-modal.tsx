@@ -1,86 +1,27 @@
-/** Concrete Radarr media modal composition and direct data flow. */
+/** Radarr media modal data and setup wiring; shared composition lives in ArrModalFrame. */
 // src/features/media-modal/radarr/radarr-modal.tsx
 
-import { useMemo, useState } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import { useMemo } from "react";
 import { sourceIdentityKey } from "@/mapping/source-identity";
-import { parseTmdbIdOrNull } from "@/providers/schemas";
-import type { ProviderFormResources } from "@/providers/types";
-import type { TmdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
-import { useMappingInspection, useSourceAniListIdMap } from "@/queries/mapping";
+import { createDefaultRadarrFormState as defaultRadarrFormState } from "@/providers/radarr/form-state";
+import { parseTmdbIdOrNull } from "@/providers/schemas";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
 import type { GetMovieStatusOutput } from "@/rpc/types";
-import { createDefaultRadarrFormState as defaultRadarrFormState } from "@/providers/radarr/form-state";
-import { DetailsPanel } from "../details/details-panel";
+import { ArrModalFrame } from "../arr-modal-frame";
+import { pickProviderPoster } from "../helpers";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
-import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
-import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
-import {
-	getOverwriteTargetTitle,
-	isSetupTargetLoading,
-	shouldShowMappingView,
-	pickProviderPoster,
-	targetsEqual,
-} from "../helpers";
-import { MappingFooter, SetupFooter } from "../chrome/modal-footer";
-import { ModalHeader } from "../chrome/modal-header";
-import { ModalShell } from "../chrome/modal-shell";
+import type { MediaModalTargetSummary, RadarrModalProps } from "../types";
 import { RadarrMappingPanel } from "./radarr-mapping-panel";
 import { useRadarrSetupForm } from "./radarr-setup-form";
 import {
 	canShowRadarrSetup,
 	getRadarrSetupTarget,
 } from "./radarr-setup-values";
-import type {
-	AniListHeaderData,
-	MediaModalMetadataHint,
-	MediaModalTargetSummary,
-	MediaModalView,
-	RadarrModalProps,
-} from "../types";
 
 const PROVIDER = "radarr" as const;
 const SETUP_FORM_ID = "radarr-setup-form";
-
-function getModalAniListId(
-	source: RadarrModalProps["state"]["source"],
-	idsBySource: Record<string, AniListId | null> | undefined,
-): AniListId | undefined {
-	if (source.source === "anilist") return source.id;
-	return idsBySource?.[sourceIdentityKey(source)] ?? undefined;
-}
-
-type RadarrModalData = {
-	isConfigured: boolean;
-	anilistHeaderData: AniListHeaderData;
-	manualMappingActive: boolean;
-	currentTarget: MediaModalTargetSummary | null;
-	resolvedMetadata: AniListMediaHint | null;
-	providerRequestTitle: string;
-	providerPayloadTitle: string | undefined;
-	fallbackLookupTitle: string | undefined;
-	rawProviderStatus: GetMovieStatusOutput | null;
-	verificationSettled: boolean;
-	verificationFailed: boolean;
-	storedDefaults: ReturnType<typeof defaultRadarrFormState>;
-	providerFormResources: ProviderFormResources | null;
-};
-
-function getRejectCandidateTmdbId(input: {
-	inspection: ReturnType<typeof useMappingInspection>["data"];
-	manualMappingActive: boolean;
-}): TmdbId | null {
-	if (input.manualMappingActive) return null;
-
-	const mapping = input.inspection?.mapping;
-	if (mapping?.kind === "mapped" && mapping.source === "auto") {
-		return parseTmdbIdOrNull(mapping.providerId);
-	}
-
-	return null;
-}
 
 function getCurrentTarget(input: {
 	status: GetMovieStatusOutput | null;
@@ -116,20 +57,19 @@ function getCurrentTarget(input: {
 	};
 }
 
-function useRadarrModalData(input: {
-	source: RadarrModalProps["state"]["source"];
-	metadataHint: MediaModalMetadataHint | null;
-}): RadarrModalData {
-	const { source, metadataHint } = input;
+export function RadarrModal({
+	state,
+	onClose,
+	container,
+}: RadarrModalProps): React.JSX.Element {
+	const { source, metadataHint } = state;
+	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
 		source,
-		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
-		metadataHint,
+		metadataHint: metadataHint ?? null,
 	});
-	const options = base.options;
-	const isConfigured = options?.providers.radarr.isConfigured === true;
-	const radarrFormResources = useRadarrFormResources({ enabled: isConfigured });
-
+	const isConfigured = base.options?.providers.radarr.isConfigured === true;
+	const formResources = useRadarrFormResources({ enabled: isConfigured });
 	const statusPayload = useMemo(
 		() => ({
 			source,
@@ -138,240 +78,63 @@ function useRadarrModalData(input: {
 		}),
 		[base.statusMetadata, base.statusTitle, source],
 	);
-	const radarrStatus = useMovieStatus(statusPayload, {
+	const status = useMovieStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
 		force_verify: true,
 	});
-	const verificationSettled =
-		radarrStatus.isFetchedAfterMount || radarrStatus.isError;
-	const rawProviderStatus = radarrStatus.data ?? null;
+	const verificationSettled = status.isFetchedAfterMount || status.isError;
+	const rawStatus = status.data ?? null;
 	const verificationFailed =
-		verificationSettled &&
-		(radarrStatus.isError || rawProviderStatus?.isInLibrary === null);
-	const currentTarget = getCurrentTarget({
-		status: rawProviderStatus,
-	});
-	const manualMappingActive =
-		rawProviderStatus?.mapping.kind === "mapped" &&
-		rawProviderStatus.mapping.source === "manual";
-
-	return {
-		isConfigured,
-		anilistHeaderData: base.anilistHeaderData,
-		manualMappingActive,
-		currentTarget,
-		resolvedMetadata: base.resolvedMetadata,
-		providerRequestTitle: base.providerRequestTitle,
-		providerPayloadTitle: base.providerPayloadTitle,
-		fallbackLookupTitle: base.fallbackLookupTitle,
-		rawProviderStatus,
-		verificationSettled,
-		verificationFailed,
-		storedDefaults:
-			options?.providers.radarr.defaults ?? defaultRadarrFormState(),
-		providerFormResources: radarrFormResources.data ?? null,
-	};
-}
-
-export function RadarrModal({
-	state,
-	onClose,
-	container,
-}: RadarrModalProps): React.JSX.Element {
-	const { source, metadataHint, openSource, initialView } = state;
+		verificationSettled && (status.isError || rawStatus?.isInLibrary === null);
 	const identityKey = sourceIdentityKey(source);
-	const sourceAniListIds = useSourceAniListIdMap([source], {
-		enabled: source.source === "mal",
-	});
-	const anilistId = getModalAniListId(source, sourceAniListIds.data);
-	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
-	const [selectedCandidate, setSelectedCandidate] =
-		useState<MediaModalTargetSummary | null>(null);
-	const contentContainer = useContentPortalContainer();
-	const data = useRadarrModalData({
-		source,
-		metadataHint: metadataHint ?? null,
-	});
-	const inspection = useMappingInspection(PROVIDER, source);
+	const storedDefaults =
+		base.options?.providers.radarr.defaults ?? defaultRadarrFormState();
 	const setupTarget = useMemo(
 		() =>
 			getRadarrSetupTarget({
 				identityKey,
-				status: data.rawProviderStatus,
-				targetTitle: data.providerRequestTitle,
-				storedDefaults: data.storedDefaults,
+				status: rawStatus,
+				targetTitle: base.providerRequestTitle,
+				storedDefaults,
 			}),
-		[
-			identityKey,
-			data.providerRequestTitle,
-			data.rawProviderStatus,
-			data.storedDefaults,
-		],
+		[identityKey, base.providerRequestTitle, rawStatus, storedDefaults],
 	);
-	const canShowSetup = canShowRadarrSetup({
-		isConfigured: data.isConfigured,
-		status: data.rawProviderStatus,
-	});
-	const isMappingView = shouldShowMappingView({
-		view,
-		verificationSettled: data.verificationSettled,
-		canShowSetup,
-	});
-	const setupTargetLoading = isSetupTargetLoading({
-		view,
-		isMappingView,
-		isConfigured: data.isConfigured,
-		hasSetupTarget: setupTarget !== null,
-		verificationSettled: data.verificationSettled,
-	});
+	const setupTargetLoading =
+		isConfigured && setupTarget === null && !verificationSettled;
 	const setupForm = useRadarrSetupForm({
 		formId: SETUP_FORM_ID,
 		source,
 		target: setupTarget,
-		providerPayloadTitle: data.providerPayloadTitle,
-		fallbackLookupTitle: data.fallbackLookupTitle,
-		resolvedMetadata: data.resolvedMetadata,
-		isConfigured: data.isConfigured,
-		formResources: data.providerFormResources,
+		providerPayloadTitle: base.providerPayloadTitle,
+		fallbackLookupTitle: base.fallbackLookupTitle,
+		resolvedMetadata: base.resolvedMetadata,
+		isConfigured,
+		formResources: formResources.data ?? null,
 		portalContainer: contentContainer,
 		targetLoading: setupTargetLoading,
-		verificationFailed: data.verificationFailed,
-		verificationSettled: data.verificationSettled,
+		verificationFailed,
+		verificationSettled,
 		onClose,
 	});
-	const previewTarget = isMappingView ? selectedCandidate : null;
-	const handleOpenSettings = useOpenMappingSettingsAction({
-		anilistId,
-		openSource,
-	});
-	const rejectCandidateTmdbId = getRejectCandidateTmdbId({
-		inspection: inspection.data,
-		manualMappingActive: data.manualMappingActive,
-	});
-	const clearRejectedCandidateTmdbId = parseTmdbIdOrNull(
-		inspection.data?.mapping.kind === "unmapped"
-			? inspection.data.mapping.rejectedProviderIds?.[0]
-			: undefined,
-	);
-	const canIgnoreTitle = inspection.data?.mapping.kind !== "ignored";
-	const canSubmitMapping =
-		selectedCandidate !== null &&
-		!targetsEqual(selectedCandidate, data.currentTarget);
-	const overwriteTargetTitle = getOverwriteTargetTitle(
-		previewTarget,
-		data.currentTarget,
-	);
-	const showSetupView = (): void => {
-		setSelectedCandidate(null);
-		setView("setup");
-	};
-	const mappingActions = useMappingActions({
-		source,
-		provider: PROVIDER,
-		selectedProviderId: selectedCandidate?.providerId ?? null,
-		rejectProviderId: rejectCandidateTmdbId,
-		clearRejectedProviderId: clearRejectedCandidateTmdbId,
-		requiresApplyConfirmation:
-			setupForm.footerState.isDirty && canSubmitMapping,
-		onMappingApplied: () => {
-			setSelectedCandidate(null);
-			showSetupView();
-		},
-		onMappingReset: () => {
-			setSelectedCandidate(null);
-			setView("mapping");
-		},
-		onIgnored: onClose,
-	});
-	const showMappingView = (): void => setView("mapping");
-	const handleEscapeKeyDown = (event: KeyboardEvent): void => {
-		if (!isMappingView || !canShowSetup) return;
-
-		event.preventDefault();
-		showSetupView();
-	};
 
 	return (
-		<ModalShell
-			contentContainer={contentContainer}
-			header={
-				<ModalHeader
-					provider={PROVIDER}
-					contentContainer={contentContainer}
-					anilistHeaderData={data.anilistHeaderData}
-					source={source}
-					isMappingView={isMappingView}
-					isProviderTargetLoading={setupTargetLoading}
-					currentTarget={data.currentTarget}
-					previewTarget={previewTarget}
-					onClose={onClose}
-					onOpenSettings={handleOpenSettings ?? undefined}
-				/>
-			}
-			leftPane={
-				isMappingView ? (
-					<RadarrMappingPanel
-						contentContainer={contentContainer}
-						currentTarget={data.currentTarget}
-						selectedCandidate={selectedCandidate}
-						onSelectCandidate={setSelectedCandidate}
-					/>
-				) : (
-					setupForm.content
-				)
-			}
-			rightPane={
-				<DetailsPanel
-					provider={PROVIDER}
-					contentContainer={contentContainer}
-					anilistId={anilistId}
-					effectiveMapping={data.currentTarget}
-					previewMapping={previewTarget}
-					isInMappingMode={isMappingView}
-					mappingDetails={inspection.data}
-				/>
-			}
-			footer={
-				isMappingView ? (
-					<MappingFooter
-						manualMappingActive={data.manualMappingActive}
-						isResettingMapping={mappingActions.isRevertingMapping}
-						canRejectCandidate={rejectCandidateTmdbId !== null}
-						canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
-						canIgnoreTitle={canIgnoreTitle}
-						isRejectingCandidate={mappingActions.isRejectingCandidate}
-						isClearingRejectedCandidate={
-							mappingActions.isClearingRejectedCandidate
-						}
-						isIgnoring={mappingActions.isIgnoring}
-						canApplyMapping={canSubmitMapping}
-						isApplyingMapping={mappingActions.isSubmittingMapping}
-						leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
-						overwriteTargetTitle={overwriteTargetTitle}
-						actionError={mappingActions.actionError}
-						onRejectCandidate={mappingActions.rejectCandidate}
-						onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
-						onIgnoreTitle={mappingActions.ignoreTitle}
-						onLeaveMapping={canShowSetup ? showSetupView : onClose}
-						onResetMapping={mappingActions.resetMapping}
-						onApplyMapping={mappingActions.applyMapping}
-					/>
-				) : (
-					<SetupFooter
-						formId={SETUP_FORM_ID}
-						canSubmit={setupForm.footerState.canSubmit}
-						isBusy={setupForm.footerState.isBusy}
-						isSubmitting={setupForm.footerState.isSubmitting}
-						submitLabel={setupForm.footerState.submitLabel}
-						actionError={setupForm.footerState.actionError}
-						onCancel={onClose}
-						onOpenMapping={showMappingView}
-					/>
-				)
-			}
-			onOpenChange={(open) => !open && onClose()}
-			onEscapeKeyDown={handleEscapeKeyDown}
+		<ArrModalFrame
+			state={state}
+			onClose={onClose}
 			container={container}
+			contentContainer={contentContainer}
+			anilistHeaderData={base.anilistHeaderData}
+			currentTarget={getCurrentTarget({ status: rawStatus })}
+			manualMappingActive={
+				rawStatus?.mapping.kind === "mapped" &&
+				rawStatus.mapping.source === "manual"
+			}
+			verificationSettled={verificationSettled}
+			canShowSetup={canShowRadarrSetup({ isConfigured, status: rawStatus })}
+			setupTargetLoading={setupTargetLoading}
+			setupFormId={SETUP_FORM_ID}
+			setupForm={setupForm}
+			MappingPanel={RadarrMappingPanel}
 		/>
 	);
 }
