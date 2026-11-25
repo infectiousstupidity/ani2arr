@@ -210,9 +210,7 @@ async function writeConnectionState(
 
 let connectionWrites: Promise<void> = Promise.resolve();
 
-async function enqueueConnectionWrite(
-	write: () => Promise<void>,
-): Promise<void> {
+function enqueueConnectionWrite<T>(write: () => Promise<T>): Promise<T> {
 	const next = connectionWrites.catch(() => {}).then(write);
 
 	connectionWrites = next.then(
@@ -220,7 +218,7 @@ async function enqueueConnectionWrite(
 		() => {},
 	);
 
-	await next;
+	return next;
 }
 
 async function updateProviderConnection(
@@ -439,12 +437,14 @@ export async function saveSeerrConnectionSnapshot(
 	return getExtensionOptionsSnapshot();
 }
 
-export async function resetAllSettingsSnapshot(): Promise<void> {
-	await enqueueConnectionWrite(async () => {
+export function resetAllSettingsSnapshot(): Promise<ExtensionOptions> {
+	return enqueueConnectionWrite(async () => {
+		const previous = await getExtensionOptionsSnapshot();
 		await writePublicOptions(createDefaultPublicOptions());
 		await writeConnectionState(createDefaultPrivateConnections());
+		await removeLegacyConnectionStorage();
+		return previous;
 	});
-	await removeLegacyConnectionStorage();
 }
 
 export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {

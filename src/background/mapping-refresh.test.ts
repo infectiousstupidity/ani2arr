@@ -3,6 +3,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { refreshMappingPipeline } from "./mapping-refresh";
 
+vi.mock("./api-services", () => ({
+	captureResetGuard: vi.fn().mockReturnValue(() => true),
+}));
+
 const refreshUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 const consolidateMappingAliasesMock = vi.hoisted(() => vi.fn());

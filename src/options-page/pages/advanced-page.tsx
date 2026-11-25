@@ -23,7 +23,7 @@ export const AdvancedPage = () => {
 	const resetStatus =
 		resetError ??
 		(resetSuccess
-			? "Settings, mappings, cached data, and permissions were reset."
+			? "Settings, mappings, and cached data were reset. Configured provider and cookie permissions were removed or already absent."
 			: null);
 	const diagnosticsStatus = saveOptions.error
 		? getUserErrorMessage(
@@ -125,9 +125,9 @@ export const AdvancedPage = () => {
 				<div className="flex flex-col gap-4 rounded-lg border border-error/20 bg-error/5 p-4 sm:flex-row sm:items-center sm:justify-between">
 					<div className="min-w-0">
 						<p className="mt-1 text-xs leading-relaxed text-text-secondary">
-							Clears provider configuration, stored manual mappings, cached page
-							data, granted permissions, and session state. Sonarr and Radarr
-							libraries are not affected.
+							Clears local settings, mappings, and cached data, and attempts to
+							remove provider and cookie permissions. Provider libraries and
+							browser sign-ins are not affected.
 						</p>
 						<div
 							role="status"
@@ -157,7 +157,7 @@ export const AdvancedPage = () => {
 				open={showResetDialog}
 				onOpenChange={setShowResetDialog}
 				title="Reset all settings?"
-				description="This clears ani2arr configuration, stored manual mappings, cached page data, granted permissions, and session state. Sonarr and Radarr libraries are not affected."
+				description="This clears local settings, mappings, and cached data, and attempts to remove provider and cookie permissions. Provider libraries and browser sign-ins are not affected."
 				confirmText="Reset"
 				cancelText="Cancel"
 				onCancel={() => setShowResetDialog(false)}

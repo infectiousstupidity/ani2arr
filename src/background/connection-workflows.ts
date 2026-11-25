@@ -22,7 +22,11 @@ import {
 import type { ExtensionOptions } from "@/settings/types";
 import { logError, normalizeError } from "@/shared/errors/error-utils";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
-import { refreshProviderLibrary, seerrClient } from "./api-services";
+import {
+	captureResetGuard,
+	refreshProviderLibrary,
+	seerrClient,
+} from "./api-services";
 import { refreshMappingPipeline } from "./mapping-refresh";
 
 async function attempt(effect: () => Promise<unknown>, scope: string) {
@@ -41,7 +45,10 @@ function hasAnyConfiguredConnection(options: ExtensionOptions): boolean {
 	);
 }
 
-async function refreshMappings(options: ExtensionOptions): Promise<void> {
+async function refreshMappings(
+	options: ExtensionOptions,
+	isCurrent: () => boolean,
+): Promise<void> {
 	let revisionBumped = false;
 	if (hasAnyConfiguredConnection(options)) {
 		try {
@@ -51,7 +58,7 @@ async function refreshMappings(options: ExtensionOptions): Promise<void> {
 		}
 	}
 
-	if (!revisionBumped) {
+	if (!revisionBumped && isCurrent()) {
 		await attempt(() => bumpMappingsRevision(), "bumpMappingsRevision");
 	}
 }
@@ -74,7 +81,10 @@ export async function commitProviderConnection(
 	provider: Provider,
 	credentials: ProviderCredentials | null,
 ): Promise<void> {
+	const isCurrent = captureResetGuard();
 	const previousOptions = await getExtensionOptionsSnapshot();
+	if (!isCurrent())
+		throw new Error("Connection save interrupted by extension reset.");
 	const previousConnection = getProviderCredentials(previousOptions, provider);
 	const savedOptions = await saveProviderConnectionSnapshot(
 		provider,
@@ -83,11 +93,6 @@ export async function commitProviderConnection(
 	const savedConnection = getProviderCredentials(savedOptions, provider);
 	if (sameProviderCredentials(previousConnection, savedConnection)) return;
 
-	await refreshMappings(savedOptions);
-	await attempt(
-		() => refreshProviderLibrary(provider, savedOptions),
-		`${provider}:refreshLibrary`,
-	);
 	await attempt(
 		() =>
 			cleanupUnusedProviderHostPermission(
@@ -96,19 +101,28 @@ export async function commitProviderConnection(
 			),
 		`${provider}:cleanupHostPermission`,
 	);
+	if (!isCurrent()) return;
+	await refreshMappings(savedOptions, isCurrent);
+	if (!isCurrent()) return;
+	await attempt(
+		() => refreshProviderLibrary(provider, savedOptions),
+		`${provider}:refreshLibrary`,
+	);
 }
 
 export async function commitSeerrConnection(
 	connection: SeerrConnection | null,
 ): Promise<void> {
+	const isCurrent = captureResetGuard();
 	const previousOptions = await getExtensionOptionsSnapshot();
+	if (!isCurrent())
+		throw new Error("Connection save interrupted by extension reset.");
 	const previousConnection = getSeerrConnection(previousOptions);
 	const savedOptions = await saveSeerrConnectionSnapshot(connection);
 	const savedConnection = getSeerrConnection(savedOptions);
 	if (sameSeerrConnection(previousConnection, savedConnection)) return;
 
-	seerrClient.clearMediaCache();
-	await refreshMappings(savedOptions);
+	if (isCurrent()) seerrClient.clearMediaCache();
 	await attempt(
 		() =>
 			cleanupUnusedProviderHostPermission(
@@ -117,10 +131,13 @@ export async function commitSeerrConnection(
 			),
 		"seerr:cleanupHostPermission",
 	);
-	if (savedConnection?.auth.mode !== "session") {
-		await attempt(
-			() => removeSeerrCsrfCookiePermission(),
-			"seerr:removeCookiePermission",
-		);
+	if (!isCurrent()) return;
+	await refreshMappings(savedOptions, isCurrent);
+	if (isCurrent() && savedConnection?.auth.mode !== "session") {
+		await attempt(async () => {
+			if (!(await removeSeerrCsrfCookiePermission())) {
+				throw new Error("Could not remove optional cookie permission.");
+			}
+		}, "seerr:removeCookiePermission");
 	}
 }

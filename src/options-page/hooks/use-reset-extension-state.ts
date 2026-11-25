@@ -23,7 +23,8 @@ export function useResetExtensionState() {
 		setResetSuccess(false);
 
 		try {
-			await getAni2arrApi().resetExtensionState();
+			const { permissionsCleared } =
+				await getAni2arrApi().resetExtensionState();
 
 			const extensionOptions = createDefaultExtensionOptions();
 			const publicOptions = createDefaultPublicOptions();
@@ -32,6 +33,12 @@ export function useResetExtensionState() {
 			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
 			await queryClient.invalidateQueries({ queryKey: queryKeys.all });
 
+			if (!permissionsCleared) {
+				setResetError(
+					"Local settings, mappings, and cached data were reset, but not all extension permissions could be removed. Review ani2arr’s permissions in your browser settings.",
+				);
+				return false;
+			}
 			setResetSuccess(true);
 			return true;
 		} catch (error) {

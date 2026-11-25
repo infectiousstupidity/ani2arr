@@ -7,7 +7,11 @@ import {
 	type MyAnimeListId,
 	type MyAnimeListMetadata,
 } from "@/myanimelist/types";
-import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
+import {
+	createTtlCache,
+	getTtlCacheGeneration,
+	type TtlCache,
+} from "@/shared/cache/ttl-cache";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 
@@ -46,6 +50,7 @@ export class MyAnimeListMediaService {
 			);
 		}
 
+		const generation = getTtlCacheGeneration();
 		const cached = await this.cache.read(String(malId));
 		if (cached && !cached.stale) return cached.value;
 
@@ -56,11 +61,13 @@ export class MyAnimeListMediaService {
 			.add(async () => {
 				try {
 					const metadata = await fetchMyAnimeListMetadata(malId);
-					await this.cache.write(
-						String(malId),
-						metadata,
-						MYANIMELIST_METADATA_CACHE_TTL,
-					);
+					if (generation === getTtlCacheGeneration()) {
+						await this.cache.write(
+							String(malId),
+							metadata,
+							MYANIMELIST_METADATA_CACHE_TTL,
+						);
+					}
 					return metadata;
 				} catch (error) {
 					if (cached) return cached.value;

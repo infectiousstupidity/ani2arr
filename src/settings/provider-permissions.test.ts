@@ -67,15 +67,16 @@ describe("removeSeerrCsrfCookiePermission", () => {
 			.spyOn(browser.permissions, "remove")
 			.mockResolvedValue(true as never);
 
-		await removeSeerrCsrfCookiePermission();
+		await expect(removeSeerrCsrfCookiePermission()).resolves.toBe(true);
 		expect(remove).toHaveBeenCalledWith({ permissions: ["cookies"] });
 	});
 
-	it("handles permission removal that is already browser-managed", async () => {
+	it("treats a rejected removal as success when cookie access is already absent", async () => {
 		vi.spyOn(browser.permissions, "remove").mockRejectedValue(
 			new Error("permission absent"),
 		);
 
-		await expect(removeSeerrCsrfCookiePermission()).resolves.toBeUndefined();
+		vi.spyOn(browser.permissions, "contains").mockResolvedValue(false as never);
+		await expect(removeSeerrCsrfCookiePermission()).resolves.toBe(true);
 	});
 });

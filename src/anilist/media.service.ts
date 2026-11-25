@@ -10,7 +10,11 @@ import {
 	type AniListId,
 	type AniListMedia,
 } from "@/anilist/types";
-import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
+import {
+	createTtlCache,
+	getTtlCacheGeneration,
+	type TtlCache,
+} from "@/shared/cache/ttl-cache";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 
@@ -53,6 +57,7 @@ export class AniListMediaService {
 			);
 		}
 
+		const generation = getTtlCacheGeneration();
 		const cached = await this.readCachedMedia(anilistId);
 		if (cached) return cached;
 
@@ -60,7 +65,7 @@ export class AniListMediaService {
 		if (inflight) return inflight;
 
 		const request = this.queue
-			.add(() => this.fetchAndCache(anilistId), {
+			.add(() => this.fetchAndCache(anilistId, generation), {
 				priority: REQUEST_PRIORITY[options?.priority ?? "normal"],
 			})
 			.then((media) => {
@@ -133,9 +138,14 @@ export class AniListMediaService {
 		}
 	}
 
-	private async fetchAndCache(id: AniListId): Promise<AniListMedia> {
+	private async fetchAndCache(
+		id: AniListId,
+		generation: number,
+	): Promise<AniListMedia> {
 		const media = await this.fetchWithRetry(id);
-		await this.writeCachedMedia(id, media);
+		if (generation === getTtlCacheGeneration()) {
+			await this.writeCachedMedia(id, media);
+		}
 		return media;
 	}
 

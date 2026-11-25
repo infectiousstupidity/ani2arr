@@ -22,14 +22,23 @@ export async function requestSeerrCsrfCookiePermission(): Promise<boolean> {
 	}
 }
 
-export async function removeSeerrCsrfCookiePermission(): Promise<void> {
+export async function removeOptionalPermission(
+	permission: Parameters<typeof browser.permissions.remove>[0],
+): Promise<boolean> {
 	try {
-		await browser.permissions.remove({
-			permissions: ["cookies"],
-		});
+		if (await browser.permissions.remove(permission)) return true;
 	} catch {
-		// Permission may already be absent or browser-managed.
+		// Some browsers reject removal of a permission that is already absent.
 	}
+	try {
+		return !(await browser.permissions.contains(permission));
+	} catch {
+		return false;
+	}
+}
+
+export function removeSeerrCsrfCookiePermission(): Promise<boolean> {
+	return removeOptionalPermission({ permissions: ["cookies"] });
 }
 
 function getPermissionPattern(url: string | undefined): string | null {

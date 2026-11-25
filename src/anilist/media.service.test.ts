@@ -8,10 +8,11 @@ import {
 	type AniListId,
 	type AniListMedia,
 } from "@/anilist/types";
-import type {
-	CacheHit,
-	CacheWriteOptions,
-	TtlCache,
+import {
+	clearAllTtlCaches,
+	type CacheHit,
+	type CacheWriteOptions,
+	type TtlCache,
 } from "@/shared/cache/ttl-cache";
 import { AniListMediaService } from "./media.service";
 
@@ -22,6 +23,8 @@ const { fetchAniListMediaMock } = vi.hoisted(() => ({
 vi.mock("@/anilist/client", () => ({
 	fetchAniListMedia: fetchAniListMediaMock,
 }));
+
+vi.mock("idb", () => ({ deleteDB: vi.fn() }));
 
 type MemoryCache<T> = TtlCache<T> & {
 	peek(key: string): CacheHit<T> | null;
@@ -202,6 +205,23 @@ describe("AniListMediaService", () => {
 		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(4);
 		expect(vi.getTimerCount()).toBe(0);
 		await rejection;
+	});
+
+	it("does not cache an in-flight metadata response after a cache clear", async () => {
+		const id = parseAniListId(207);
+		const pending = createDeferred<AniListMedia>();
+		fetchAniListMediaMock.mockReturnValueOnce(pending.promise);
+		const cache = createMemoryCache<AniListMedia>();
+		const service = new AniListMediaService({ media: cache });
+		const request = service.fetchMediaWithRelations(id);
+		await vi.waitFor(() =>
+			expect(fetchAniListMediaMock).toHaveBeenCalledOnce(),
+		);
+
+		await clearAllTtlCaches();
+		pending.resolve(createMedia(id));
+		await expect(request).resolves.toMatchObject({ id });
+		expect(cache.peek(String(id))).toBeNull();
 	});
 
 	it("returns fresh cache hits without fetching", async () => {

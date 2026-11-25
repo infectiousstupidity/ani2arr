@@ -46,6 +46,11 @@ interface CacheDbSchema extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<CacheDbSchema>> | null = null;
+let generation = 0;
+
+export function getTtlCacheGeneration(): number {
+	return generation;
+}
 
 const openCacheDb = (): Promise<IDBPDatabase<CacheDbSchema>> =>
 	openDB<CacheDbSchema>(TTL_CACHE_DB_NAME, TTL_CACHE_DB_VERSION, {
@@ -86,6 +91,7 @@ const getDb = (): Promise<IDBPDatabase<CacheDbSchema>> => {
 };
 
 export async function clearAllTtlCaches(): Promise<void> {
+	generation += 1;
 	if (dbPromise) {
 		try {
 			const db = await dbPromise;
@@ -134,8 +140,11 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
 			expiresAt: now + (options.hardMs ?? options.staleMs * 4),
 			...(options.meta ? { meta: options.meta } : {}),
 		};
+		const writeGeneration = generation;
 		const db = await getDb();
-		await db.put(TTL_CACHE_STORE_NAME, entry, keyFor(key));
+		if (writeGeneration === generation) {
+			await db.put(TTL_CACHE_STORE_NAME, entry, keyFor(key));
+		}
 	};
 
 	const remove = async (key: string): Promise<void> => {

@@ -28,7 +28,6 @@ import { getSeerrXsrfToken } from "@/providers/seerr/csrf-token";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
-	removeProviderHostPermission,
 } from "@/providers/settings/host-permissions";
 import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary } from "@/providers/sonarr/library";
@@ -36,7 +35,10 @@ import {
 	getExtensionOptionsSnapshot,
 	resetAllSettingsSnapshot,
 } from "@/settings/store";
-import { removeSeerrCsrfCookiePermission } from "@/settings/provider-permissions";
+import {
+	removeOptionalPermission,
+	removeSeerrCsrfCookiePermission,
+} from "@/settings/provider-permissions";
 import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
@@ -56,6 +58,16 @@ import {
 } from "./provider-config";
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 15 * 1000;
+
+let resetGeneration = 0;
+let resetInFlight: Promise<boolean> | null = null;
+
+// Capture before an await that can outlive the settings or cache it is using.
+export function captureResetGuard(): () => boolean {
+	const generation = resetGeneration;
+	const startedDuringReset = resetInFlight !== null;
+	return () => !startedDuringReset && generation === resetGeneration;
+}
 
 function createDebouncer(ms: number) {
 	let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -148,7 +160,9 @@ function queueAutomaticMappingsRevision(
 		automaticRevisionScope ??= new Set();
 		automaticRevisionScope.add(changedId);
 	}
+	const isCurrent = captureResetGuard();
 	debounceAutomaticMappingsRevision(async () => {
+		if (!isCurrent()) return;
 		const scope = automaticRevisionScope;
 		automaticRevisionScope = null;
 		await bumpMappingsRevision(
@@ -159,12 +173,14 @@ function queueAutomaticMappingsRevision(
 
 export const mappingService = new MappingService(
 	async (input): Promise<boolean> => {
-		if (!(await resolveAutomaticMapping(input))) return false;
+		const isCurrent = captureResetGuard();
+		if (!isCurrent() || !(await resolveAutomaticMapping(input))) return false;
 		const mapping = await mappingService.getMapping(
 			input.provider,
 			input.identity,
 			input.anilistId,
 		);
+		if (!isCurrent()) return false;
 		if (mapping.kind === "mapped") {
 			queueAutomaticMappingsRevision(input.identity, input.anilistId);
 		}
@@ -178,7 +194,10 @@ export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
 	getAutoResult: getSeerrAutoResult,
 	setAutoResult: async (...args) => {
 		const [, identity, , result, anilistId] = args;
+		const isCurrent = captureResetGuard();
+		if (!isCurrent()) return false;
 		const stored = await setSeerrAutoResult(...args);
+		if (!isCurrent()) return false;
 		if (stored && result.kind === "mapped") {
 			queueAutomaticMappingsRevision(identity, anilistId);
 		}
@@ -225,10 +244,14 @@ const sonarrDebouncer = createDebouncer(DEBOUNCED_LIBRARY_REFRESH_MS);
 const radarrDebouncer = createDebouncer(DEBOUNCED_LIBRARY_REFRESH_MS);
 
 export const scheduleLibraryRefresh = (provider: Provider): void => {
+	const isCurrent = captureResetGuard();
+	if (!isCurrent()) return;
 	const debouncer = provider === "sonarr" ? sonarrDebouncer : radarrDebouncer;
 	debouncer(async () => {
+		if (!isCurrent()) return;
 		const options = await getExtensionOptionsSnapshot();
-		if (!hasConfiguredProviderCredentials(options, provider)) return;
+		if (!isCurrent() || !hasConfiguredProviderCredentials(options, provider))
+			return;
 		await refreshProviderLibrary(provider, options);
 	});
 };
@@ -245,54 +268,44 @@ export const clearPersistentCaches = async (): Promise<void> => {
 	await resetAllRevisions();
 };
 
-const removeConfiguredProviderHostPermissions = async (
+async function clearResetPermissions(
 	options: ExtensionOptions,
-): Promise<void> => {
-	const urls = [
+): Promise<boolean> {
+	const patterns = new Set<string>();
+	let valid = true;
+	for (const url of [
 		options.providers.sonarr.url,
 		options.providers.radarr.url,
 		options.seerr.url,
-	].filter((url): url is string => !!url);
+	]) {
+		if (!url) continue;
+		const pattern = getProviderHostPermissionPattern(url);
+		if (pattern.ok) patterns.add(pattern.value);
+		else valid = false;
+	}
+	const cleared = await Promise.all([
+		...[...patterns].map((pattern) =>
+			removeOptionalPermission({ origins: [pattern] }),
+		),
+		removeSeerrCsrfCookiePermission(),
+	]);
+	return valid && cleared.every(Boolean);
+}
 
-	const uniqueUrls = new Set(urls);
+export function resetExtensionState(): Promise<boolean> {
+	if (resetInFlight) return resetInFlight;
 
-	await Promise.all(
-		[...uniqueUrls].map(async (url) => {
-			const pattern = getProviderHostPermissionPattern(url);
-			if (!pattern.ok)
-				return logError(
-					normalizeError(pattern.error),
-					`Ani2arrApi:removePermission`,
-				);
-
-			const removal = await removeProviderHostPermission(url);
-			if (!removal.ok)
-				return logError(
-					normalizeError(removal.error),
-					`Ani2arrApi:removePermission`,
-				);
-
-			if (!removal.value.removed) {
-				logError(
-					normalizeError(
-						new Error(
-							`Permission removal rejected for ${removal.value.pattern}.`,
-						),
-					),
-					`Ani2arrApi:removePermission`,
-				);
-			}
-		}),
-	);
-};
-
-export const resetExtensionState = async (): Promise<void> => {
-	const previousOptions = await getExtensionOptionsSnapshot();
-
-	await clearManualFacts();
-	await clearAutoResults();
-	await clearPersistentCaches();
-	await resetAllSettingsSnapshot();
-	await removeConfiguredProviderHostPermissions(previousOptions);
-	await removeSeerrCsrfCookiePermission();
-};
+	resetGeneration += 1;
+	automaticRevisionScope = null;
+	resetInFlight = (async () => {
+		// Disconnect before clearing caches so new refreshes cannot use the old settings.
+		const previousOptions = await resetAllSettingsSnapshot();
+		await clearManualFacts();
+		await clearAutoResults();
+		await clearPersistentCaches();
+		return clearResetPermissions(previousOptions);
+	})().finally(() => {
+		resetInFlight = null;
+	});
+	return resetInFlight;
+}

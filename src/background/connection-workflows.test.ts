@@ -32,6 +32,7 @@ vi.mock("@/settings/provider-permissions", () => ({
 }));
 
 vi.mock("./api-services", () => ({
+	captureResetGuard: vi.fn().mockReturnValue(() => true),
 	refreshProviderLibrary: refreshProviderLibraryMock,
 	seerrClient: { clearMediaCache: clearSeerrMediaCacheMock },
 }));
@@ -94,7 +95,7 @@ describe("connection workflows", () => {
 		bumpMappingsRevisionMock.mockImplementation(async () => {});
 		refreshProviderLibraryMock.mockImplementation(async () => {});
 		cleanupUnusedProviderHostPermissionMock.mockImplementation(async () => {});
-		removeSeerrCsrfCookiePermissionMock.mockImplementation(async () => {});
+		removeSeerrCsrfCookiePermissionMock.mockResolvedValue(true);
 	});
 
 	it("keeps a committed Arr save successful when warming fails", async () => {

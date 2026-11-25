@@ -13,7 +13,7 @@ export const maintenanceHandlers = {
 	},
 
 	async resetExtensionState() {
-		await resetExtensionStateWorkflow();
-		return { ok: true as const };
+		const permissionsCleared = await resetExtensionStateWorkflow();
+		return { ok: true as const, permissionsCleared };
 	},
 };

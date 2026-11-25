@@ -419,7 +419,10 @@ describe("options store helpers", () => {
 		await saveProviderConnectionSnapshot("sonarr", SONARR_CONNECTION);
 		await updatePublicOptions({ type: "debugLogging", value: true });
 
-		await resetAllSettingsSnapshot();
+		await expect(resetAllSettingsSnapshot()).resolves.toMatchObject({
+			providers: { sonarr: SONARR_CONNECTION },
+			debugLogging: true,
+		});
 
 		await expect(
 			browser.storage.local.get([

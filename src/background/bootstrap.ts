@@ -6,6 +6,7 @@ import * as v from "valibot";
 import { registerAni2arrApi } from "@/rpc";
 import { createApiHandlers } from "@/rpc/handlers";
 import { refreshMappingPipeline } from "@/background/mapping-refresh";
+import { captureResetGuard } from "./api-services";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
 import { migrateMappingStorage } from "@/mapping/migrate";
@@ -39,17 +40,16 @@ const A2AMessageSchema = v.object({
 	enableSeerrCsrf: v.optional(v.literal(true)),
 });
 
-async function shouldWarmMappingsCache(): Promise<boolean> {
-	try {
-		const options = await getExtensionOptionsSnapshot();
-		return (
-			hasConfiguredProviderCredentials(options, "sonarr") ||
+async function refreshMappingsIfConfigured(): Promise<void> {
+	const isCurrent = captureResetGuard();
+	const options = await getExtensionOptionsSnapshot();
+	if (
+		isCurrent() &&
+		(hasConfiguredProviderCredentials(options, "sonarr") ||
 			hasConfiguredProviderCredentials(options, "radarr") ||
-			hasConfiguredSeerrConnection(options)
-		);
-	} catch (error) {
-		logError(normalizeError(error), "Background:shouldWarmMappingsCache");
-		return false;
+			hasConfiguredSeerrConnection(options))
+	) {
+		await refreshMappingPipeline();
 	}
 }
 
@@ -82,7 +82,7 @@ export const bootstrapBackground = (): void => {
 			if (!deletedUpstream) return;
 			await ensurePeriodicRefresh();
 			await settingsInitialization;
-			if (await shouldWarmMappingsCache()) await refreshMappingPipeline();
+			await refreshMappingsIfConfigured();
 		})
 		.catch((error) => {
 			logError(normalizeError(error), "Background:migrateMappingStorage");
@@ -96,9 +96,7 @@ export const bootstrapBackground = (): void => {
 			await settingsInitialization;
 			await mappingInitialization;
 			await ensurePeriodicRefresh();
-			if (await shouldWarmMappingsCache()) {
-				await refreshMappingPipeline();
-			}
+			await refreshMappingsIfConfigured();
 		} catch (error) {
 			logError(normalizeError(error), "Background:onInstalled");
 		}
@@ -109,9 +107,7 @@ export const bootstrapBackground = (): void => {
 			await settingsInitialization;
 			await mappingInitialization;
 			await ensurePeriodicRefresh();
-			if (await shouldWarmMappingsCache()) {
-				await refreshMappingPipeline();
-			}
+			await refreshMappingsIfConfigured();
 		} catch (error) {
 			logError(normalizeError(error), "Background:onStartup");
 		}
@@ -124,9 +120,7 @@ export const bootstrapBackground = (): void => {
 			try {
 				await settingsInitialization;
 				await mappingInitialization;
-				if (await shouldWarmMappingsCache()) {
-					await refreshMappingPipeline();
-				}
+				await refreshMappingsIfConfigured();
 			} catch (error) {
 				logError(
 					normalizeError(error),

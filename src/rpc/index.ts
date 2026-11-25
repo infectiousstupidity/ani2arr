@@ -146,7 +146,7 @@ export interface Ani2arrApi {
 		input: ValidateTmdbInput,
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
-	resetExtensionState(): Promise<{ ok: true }>;
+	resetExtensionState(): Promise<{ ok: true; permissionsCleared: boolean }>;
 	getMappings(): Promise<MappingListGroup[]>;
 	getMappingInspection(
 		input: GetMappingInspectionInput,
