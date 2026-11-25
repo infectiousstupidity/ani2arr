@@ -1,4 +1,5 @@
 /** Radarr setup form for media modal add and edit flows. */
+// Mirrors sonarr/sonarr-setup-form.tsx; keep shared draft, submit and footer lifecycle changes in sync.
 // src/features/media-modal/radarr/radarr-setup-form.tsx
 
 import { useState, type SubmitEvent } from "react";

@@ -2,9 +2,6 @@
 // src/features/media-modal/sonarr/sonarr-add-options-fields.tsx
 
 import React from "react";
-import * as v from "valibot";
-
-import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import {
@@ -20,6 +17,7 @@ import {
 	ProviderRootFolderSelect,
 	type ProviderRootFolderPathPreview,
 } from "../setup/provider-root-folder-select";
+import { ProviderQualityProfileSelect } from "../setup/provider-quality-profile-select";
 
 export interface SonarrAddOptionsFieldsProps {
 	values: SonarrFormState;
@@ -101,12 +99,6 @@ export function SonarrAddOptionsFields(
 		pathPreview,
 	} = props;
 
-	const qualityProfileOptions = formResources.qualityProfiles.map(
-		(profile) => ({
-			value: String(profile.id),
-			label: profile.name,
-		}),
-	);
 	const monitor = values.addOptions?.monitor ?? "";
 
 	return (
@@ -136,26 +128,12 @@ export function SonarrAddOptionsFields(
 				container={portalContainer ?? null}
 			/>
 
-			<SelectField
-				label="Quality Profile"
+			<ProviderQualityProfileSelect
+				value={values.qualityProfileId}
+				qualityProfiles={formResources.qualityProfiles}
+				onChange={(value) => onChange("qualityProfileId", value)}
 				disabled={disabled}
-				value={
-					values.qualityProfileId === undefined
-						? ""
-						: String(values.qualityProfileId)
-				}
-				onChange={(value) => {
-					const num = Number(value);
-					onChange(
-						"qualityProfileId",
-						!value || Number.isNaN(num)
-							? undefined
-							: v.parse(ProviderQualityProfileIdSchema, num),
-					);
-				}}
-				options={qualityProfileOptions}
-				placeholder="Select a profile..."
-				container={portalContainer ?? null}
+				portalContainer={portalContainer}
 			/>
 
 			<SelectField

@@ -2,9 +2,6 @@
 // src/features/media-modal/radarr/radarr-edit-options-fields.tsx
 
 import React from "react";
-import * as v from "valibot";
-
-import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrMinimumAvailability } from "@/providers/radarr/schemas";
@@ -17,6 +14,7 @@ import {
 	ProviderRootFolderSelect,
 	type ProviderRootFolderPathPreview,
 } from "../setup/provider-root-folder-select";
+import { ProviderQualityProfileSelect } from "../setup/provider-quality-profile-select";
 import { RADARR_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from "@/providers/radarr/form-options";
 
 export interface RadarrEditOptionsFieldsProps {
@@ -45,13 +43,6 @@ export function RadarrEditOptionsFields(
 		pathPreview,
 	} = props;
 
-	const qualityProfileOptions = formResources.qualityProfiles.map(
-		(profile) => ({
-			value: String(profile.id),
-			label: profile.name,
-		}),
-	);
-
 	return (
 		<div className={cn("flex flex-col gap-4", className)}>
 			<ProviderRootFolderSelect
@@ -63,26 +54,12 @@ export function RadarrEditOptionsFields(
 				pathPreview={pathPreview}
 			/>
 
-			<SelectField
-				label="Quality Profile"
+			<ProviderQualityProfileSelect
+				value={values.qualityProfileId}
+				qualityProfiles={formResources.qualityProfiles}
+				onChange={(value) => onChange("qualityProfileId", value)}
 				disabled={disabled}
-				value={
-					values.qualityProfileId === undefined
-						? ""
-						: String(values.qualityProfileId)
-				}
-				onChange={(value) => {
-					const num = Number(value);
-					onChange(
-						"qualityProfileId",
-						!value || Number.isNaN(num)
-							? undefined
-							: v.parse(ProviderQualityProfileIdSchema, num),
-					);
-				}}
-				options={qualityProfileOptions}
-				placeholder="Select a profile..."
-				container={portalContainer ?? null}
+				portalContainer={portalContainer}
 			/>
 
 			<SelectField

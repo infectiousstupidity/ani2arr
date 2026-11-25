@@ -2,9 +2,6 @@
 // src/features/media-modal/radarr/radarr-add-options-fields.tsx
 
 import React from "react";
-import * as v from "valibot";
-
-import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
@@ -20,6 +17,7 @@ import {
 	ProviderRootFolderSelect,
 	type ProviderRootFolderPathPreview,
 } from "../setup/provider-root-folder-select";
+import { ProviderQualityProfileSelect } from "../setup/provider-quality-profile-select";
 import {
 	RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
 	RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
@@ -51,12 +49,6 @@ export function RadarrAddOptionsFields(
 		pathPreview,
 	} = props;
 
-	const qualityProfileOptions = formResources.qualityProfiles.map(
-		(profile) => ({
-			value: String(profile.id),
-			label: profile.name,
-		}),
-	);
 	const searchForMovie = values.addOptions?.searchForMovie ?? false;
 
 	return (
@@ -70,26 +62,12 @@ export function RadarrAddOptionsFields(
 				pathPreview={pathPreview}
 			/>
 
-			<SelectField
-				label="Quality Profile"
+			<ProviderQualityProfileSelect
+				value={values.qualityProfileId}
+				qualityProfiles={formResources.qualityProfiles}
+				onChange={(value) => onChange("qualityProfileId", value)}
 				disabled={disabled}
-				value={
-					values.qualityProfileId === undefined
-						? ""
-						: String(values.qualityProfileId)
-				}
-				onChange={(value) => {
-					const num = Number(value);
-					onChange(
-						"qualityProfileId",
-						!value || Number.isNaN(num)
-							? undefined
-							: v.parse(ProviderQualityProfileIdSchema, num),
-					);
-				}}
-				options={qualityProfileOptions}
-				placeholder="Select a profile..."
-				container={portalContainer ?? null}
+				portalContainer={portalContainer}
 			/>
 
 			<SelectField
