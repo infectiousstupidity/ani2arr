@@ -6,7 +6,7 @@
 import { beforeEach, describe, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import type { AniListId } from "@/anilist/types";
-import { apiHandlers } from "@/rpc/handlers";
+import { createApiHandlers } from "@/rpc/handlers";
 import { sonarrLibrary } from "@/background/api-services";
 import { saveProviderConnectionSnapshot } from "@/settings/store";
 import {
@@ -39,6 +39,10 @@ vi.mock("@/rpc/revision-signals", () => ({
 	RADARR_LIBRARY_REVISION_CHANGE_KEY: "radarrLibraryRevision",
 }));
 
+// These scenarios measure handler work separately from migration.
+const initialized = Promise.resolve();
+const apiHandlers = createApiHandlers(initialized, initialized);
+
 function pickMappedAniListIds(count: number): AniListId[] {
 	const ids: AniListId[] = [];
 	for (const [key, record] of Object.entries(loadUpstreamRecords())) {
@@ -70,7 +74,7 @@ async function coldModules() {
 	vi.resetModules();
 	const [
 		{ migrateMappingStorage: migrate },
-		{ apiHandlers: handlers },
+		{ createApiHandlers: createHandlers },
 		services,
 	] = await Promise.all([
 		import("@/mapping/migrate"),
@@ -78,7 +82,7 @@ async function coldModules() {
 		import("@/background/api-services"),
 	]);
 	vi.spyOn(services.sonarrLibrary, "getSeriesSnapshots").mockResolvedValue([]);
-	return { migrate, handlers };
+	return { migrate, handlers: createHandlers(initialized, initialized) };
 }
 
 describe("browse batch background cost", () => {

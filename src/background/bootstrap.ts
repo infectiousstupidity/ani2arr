@@ -4,7 +4,7 @@
 import { browser } from "wxt/browser";
 import * as v from "valibot";
 import { registerAni2arrApi } from "@/rpc";
-import { apiHandlers } from "@/rpc/handlers";
+import { createApiHandlers } from "@/rpc/handlers";
 import { refreshMappingPipeline } from "@/background/mapping-refresh";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
@@ -65,13 +65,18 @@ async function ensurePeriodicRefresh(): Promise<void> {
 export const bootstrapBackground = (): void => {
 	log.info("Background initializing…");
 
-	const settingsInitialization = initializeSettingsStorage();
+	// Register all listeners in this turn before starting storage work.
+	const settingsInitialization = Promise.resolve().then(
+		initializeSettingsStorage,
+	);
+	const mappingInitialization = Promise.resolve().then(migrateMappingStorage);
+	registerAni2arrApi(
+		createApiHandlers(settingsInitialization, mappingInitialization),
+	);
+
 	void settingsInitialization.catch((error) => {
 		logError(normalizeError(error), "Background:initializeSettingsStorage");
 	});
-
-	registerAni2arrApi(apiHandlers);
-	const mappingInitialization = migrateMappingStorage();
 	void mappingInitialization
 		.then(async (deletedUpstream) => {
 			if (!deletedUpstream) return;
@@ -118,6 +123,7 @@ export const bootstrapBackground = (): void => {
 		void (async () => {
 			try {
 				await settingsInitialization;
+				await mappingInitialization;
 				if (await shouldWarmMappingsCache()) {
 					await refreshMappingPipeline();
 				}
