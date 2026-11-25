@@ -48,16 +48,13 @@ function createDeps() {
 function setup(defaults: Partial<ResolveRequest> = {}) {
 	const deps = createDeps();
 	const identity = defaults.identity ?? defaultIdentity;
+	const identityAniListId = identity.source === "anilist" ? identity.id : null;
 	const request: ResolveRequest = {
 		writeToken: defaults.writeToken ?? captureAutomaticWriteToken(),
 		provider: defaults.provider ?? "sonarr",
 		identity,
 		anilistId:
-			defaults.anilistId === undefined
-				? (identity.source === "anilist"
-					? identity.id
-					: null)
-				: defaults.anilistId,
+			defaults.anilistId === undefined ? identityAniListId : defaults.anilistId,
 		rejectedProviderIds: defaults.rejectedProviderIds ?? [],
 		...(defaults.title === undefined ? {} : { title: defaults.title }),
 		...(defaults.metadata === undefined ? {} : { metadata: defaults.metadata }),

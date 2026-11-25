@@ -889,7 +889,8 @@ function findTitleMatchForTermInternal(
 	const yearRank = (year: number | undefined) => {
 		if (targetYear === undefined || year === undefined) return 0;
 		const distance = Math.abs(targetYear - year);
-		return distance === 0 ? 2 : (distance === 1 ? 1 : 0);
+		if (distance === 0) return 2;
+		return distance === 1 ? 1 : 0;
 	};
 	const scored = precomputedCandidates
 		.map((pc) =>

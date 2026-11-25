@@ -67,7 +67,7 @@ export function SeerrRequestMainPane(props: {
 				</div>
 			) : null}
 
-			{target?.mediaType === "tv" ? (
+			{target?.mediaType === "tv" && (
 				<>
 					{isLoading ? (
 						<p className="mt-3 rounded-lg border border-border-primary/50 bg-bg-tertiary/45 px-3 py-4 text-sm text-text-secondary">
@@ -109,11 +109,13 @@ export function SeerrRequestMainPane(props: {
 						</div>
 					) : null}
 				</>
-			) : (target?.mediaType === "movie" ? (
+			)}
+
+			{target?.mediaType === "movie" && (
 				<div className="mt-3 rounded-xl border border-border-primary/55 bg-bg-secondary/35 p-4 text-sm text-text-secondary">
 					Movie requests use Seerr defaults. Review the target, then request.
 				</div>
-			) : null)}
+			)}
 		</div>
 	);
 }

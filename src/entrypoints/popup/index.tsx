@@ -338,9 +338,9 @@ export function QuickSettings(): React.JSX.Element {
 			>
 				{saveError ? (
 					<span className="text-error">{saveError}</span>
-				) : (isSaving ? (
-					i18n.t("popup.saving")
-				) : null)}
+				) : (
+					isSaving && i18n.t("popup.saving")
+				)}
 			</div>
 		</div>
 	);
